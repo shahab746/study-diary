@@ -11,6 +11,7 @@ export function LoginPage() {
   const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginStage, setLoginStage] = useState<'idle' | 'verifying' | 'signing_in' | 'loading_dashboard'>('idle');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,27 +19,90 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
+      const cleanPhone = phone.trim();
+      const cleanPin = pin.trim();
+
+      if (!cleanPhone || !cleanPin) {
+        setError('Please enter both phone number and PIN');
+        setIsLoading(false);
+        return;
+      }
+
+      // Step 1: Verify credentials against live Google Sheet
+      setLoginStage('verifying');
+      console.log(`🔑 Step 1: Verifying credentials for phone="${cleanPhone}"`);
+
+      const verifyRes = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, pin: cleanPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+
+      if (!verifyData.success) {
+        console.warn('🔑 Verification failed:', verifyData.error);
+        setError(verifyData.error || 'Invalid credentials');
+        setIsLoading(false);
+        setLoginStage('idle');
+        return;
+      }
+
+      console.log('🔑 Step 1: Credentials verified for', verifyData.user.name);
+
+      // Step 2: Create NextAuth session
+      setLoginStage('signing_in');
+      console.log('🔑 Step 2: Creating NextAuth session...');
+
       const result = await signIn('credentials', {
-        phone,
-        pin,
+        phone: cleanPhone,
+        pin: cleanPin,
         redirect: false,
       });
 
+      console.log('🔑 Step 2: NextAuth result:', JSON.stringify(result));
+
       if (result?.error) {
-        // NextAuth wraps all credential errors as 'CredentialsSignin'
-        // Show a more helpful message
-        setError(result.error === 'CredentialsSignin'
-          ? 'Invalid phone number or PIN. Make sure your phone matches the sheet exactly.'
-          : result.error);
-        console.log('Login failed:', result.error, result);
-      } else if (result?.ok) {
-        // Successful login - page will reload via NextAuth
-        console.log('Login successful, redirecting...');
+        // NextAuth signIn failed even though our API verified the credentials
+        // This shouldn't happen, but handle it gracefully
+        console.error('🔑 NextAuth signIn error after verified credentials:', result.error);
+        
+        // Try once more - sometimes there's a CSRF timing issue
+        console.log('🔑 Retrying NextAuth signIn...');
+        const retryResult = await signIn('credentials', {
+          phone: cleanPhone,
+          pin: cleanPin,
+          redirect: false,
+        });
+        
+        if (retryResult?.error) {
+          setError('Session creation failed. Please refresh the page and try again.');
+          setIsLoading(false);
+          setLoginStage('idle');
+          return;
+        }
       }
-    } catch {
-      setError('Something went wrong. Please try again.');
-    } finally {
+
+      // Step 3: Load dashboard
+      setLoginStage('loading_dashboard');
+      console.log('🔑 Step 3: Redirecting to dashboard...');
+
+      // Hard reload to ensure session is properly initialized
+      window.location.href = '/';
+    } catch (err) {
+      console.error('🔑 Login error:', err);
+      setError('Connection error. Please check your internet and try again.');
       setIsLoading(false);
+      setLoginStage('idle');
+    }
+  };
+
+  const getLoadingText = () => {
+    switch (loginStage) {
+      case 'verifying': return 'Verifying credentials...';
+      case 'signing_in': return 'Creating session...';
+      case 'loading_dashboard': return 'Loading dashboard...';
+      default: return 'Signing in...';
     }
   };
 
@@ -98,11 +162,12 @@ export function LoginPage() {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => { setPhone(e.target.value); setError(''); }}
                   placeholder="03XXXXXXXXX"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary/50 border border-border text-sm font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all"
                   autoComplete="tel"
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -119,12 +184,13 @@ export function LoginPage() {
                 <input
                   type={showPin ? 'text' : 'password'}
                   value={pin}
-                  onChange={(e) => setPin(e.target.value)}
+                  onChange={(e) => { setPin(e.target.value); setError(''); }}
                   placeholder="••••"
                   maxLength={6}
                   className="w-full pl-10 pr-12 py-3 rounded-xl bg-secondary/50 border border-border text-sm font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all tracking-[0.3em]"
                   autoComplete="current-password"
                   required
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -155,14 +221,14 @@ export function LoginPage() {
             <motion.button
               type="submit"
               disabled={isLoading || !phone || !pin}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={!isLoading ? { scale: 1.01 } : undefined}
+              whileTap={!isLoading ? { scale: 0.98 } : undefined}
               className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-display font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Signing in...</span>
+                  <span>{getLoadingText()}</span>
                 </>
               ) : (
                 <>
@@ -172,36 +238,20 @@ export function LoginPage() {
               )}
             </motion.button>
           </form>
-
-          {/* Demo hint */}
-          <div className="mt-6 pt-5 border-t border-border">
-            <div className="text-center">
-              <p className="text-[10px] text-muted-foreground font-mono tracking-wider uppercase mb-2">
-                Demo Credentials
-              </p>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground">
-                  <span>Phone: <span className="text-foreground/80">03360883355</span></span>
-                  <span>PIN: <span className="text-foreground/80">1234</span></span>
-                </div>
-                <div className="flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground">
-                  <span>Phone: <span className="text-foreground/80">03141495078</span></span>
-                  <span>PIN: <span className="text-foreground/80">1234</span></span>
-                </div>
-              </div>
-            </div>
-          </div>
         </motion.div>
 
-        {/* Footer */}
-        <motion.p
+        {/* Live status indicator */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="text-center text-[10px] text-muted-foreground font-mono mt-6"
+          className="mt-5 flex items-center justify-center gap-2"
         >
-          LectureDiary v1.0 · Built for focused study
-        </motion.p>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[10px] text-muted-foreground font-mono">
+            Live synced with Google Sheets
+          </span>
+        </motion.div>
       </motion.div>
     </div>
   );
