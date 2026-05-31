@@ -20,36 +20,65 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.phone || !credentials?.pin) {
+          console.warn('🔐 Auth: Missing phone or PIN');
           throw new Error('Phone number and PIN are required');
         }
 
-        // LIVE SHEET LOOKUP: Always fetches the latest user data from Google Sheets
-        // If you add a user to the sheet, they can log in immediately
-        const sheetUser = await findUserByPhone(credentials.phone, true);
+        const cleanPhone = credentials.phone.trim();
+        const cleanPin = credentials.pin.trim();
 
-        if (!sheetUser) {
-          throw new Error('No account found with this phone number');
+        console.log(`🔐 Auth: Looking up phone="${cleanPhone}" with forceRefresh=true`);
+
+        try {
+          // LIVE SHEET LOOKUP: Always fetches the latest user data from Google Sheets
+          // forceRefresh=true bypasses ALL caches (in-memory + Next.js fetch cache)
+          // so newly added users can log in immediately
+          const sheetUser = await findUserByPhone(cleanPhone, true);
+
+          if (!sheetUser) {
+            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}"`);
+            throw new Error('No account found with this phone number. Make sure your phone number matches the one in the sheet.');
+          }
+
+          console.log(`🔐 Auth: Found user "${sheetUser.name}" (phone: ${sheetUser.phone}, status: ${sheetUser.status}, pin: "${sheetUser.pin}")`);
+
+          if (sheetUser.pin !== cleanPin) {
+            console.warn(`🔐 Auth: PIN mismatch for "${cleanPhone}" (expected: "${sheetUser.pin}", got: "${cleanPin}")`);
+            throw new Error('Incorrect PIN');
+          }
+
+          // Check if account is active (paid or free users can both log in,
+          // but free users will have restricted access in the dashboard)
+          if (sheetUser.status === 'blocked' || sheetUser.status === 'disabled') {
+            throw new Error('Your account has been disabled. Please contact support.');
+          }
+
+          console.log(`🔐 Auth: Login successful for "${sheetUser.name}" (${sheetUser.status})`);
+
+          return {
+            id: sheetUser.phone, // Use phone as unique ID
+            name: sheetUser.name,
+            phone: sheetUser.phone,
+            grade: sheetUser.grade,
+            board: sheetUser.board,
+            field: sheetUser.field,
+            status: sheetUser.status, // 'paid' | 'free' | 'blocked'
+          };
+        } catch (error) {
+          // Re-throw our own error messages
+          if (error instanceof Error && error.message.includes('No account')) {
+            throw error;
+          }
+          if (error instanceof Error && error.message.includes('Incorrect PIN')) {
+            throw error;
+          }
+          if (error instanceof Error && error.message.includes('disabled')) {
+            throw error;
+          }
+          // Unexpected errors
+          console.error('🔐 Auth: Unexpected error during authorization:', error);
+          throw new Error('Unable to connect to the database. Please try again in a moment.');
         }
-
-        if (sheetUser.pin !== credentials.pin) {
-          throw new Error('Incorrect PIN');
-        }
-
-        // Check if account is active (paid or free users can both log in,
-        // but free users will have restricted access in the dashboard)
-        if (sheetUser.status === 'blocked' || sheetUser.status === 'disabled') {
-          throw new Error('Your account has been disabled. Please contact support.');
-        }
-
-        return {
-          id: sheetUser.phone, // Use phone as unique ID
-          name: sheetUser.name,
-          phone: sheetUser.phone,
-          grade: sheetUser.grade,
-          board: sheetUser.board,
-          field: sheetUser.field,
-          status: sheetUser.status, // 'paid' | 'free' | 'blocked'
-        };
       },
     }),
   ],

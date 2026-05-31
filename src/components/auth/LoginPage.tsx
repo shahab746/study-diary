@@ -25,9 +25,15 @@ export function LoginPage() {
       });
 
       if (result?.error) {
+        // NextAuth wraps all credential errors as 'CredentialsSignin'
+        // Show a more helpful message
         setError(result.error === 'CredentialsSignin'
-          ? 'Invalid phone number or PIN'
+          ? 'Invalid phone number or PIN. Make sure your phone matches the sheet exactly.'
           : result.error);
+        console.log('Login failed:', result.error, result);
+      } else if (result?.ok) {
+        // Successful login - page will reload via NextAuth
+        console.log('Login successful, redirecting...');
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -173,9 +179,15 @@ export function LoginPage() {
               <p className="text-[10px] text-muted-foreground font-mono tracking-wider uppercase mb-2">
                 Demo Credentials
               </p>
-              <div className="flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground">
-                <span>Phone: <span className="text-foreground/80">03360883355</span></span>
-                <span>PIN: <span className="text-foreground/80">1234</span></span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground">
+                  <span>Phone: <span className="text-foreground/80">03360883355</span></span>
+                  <span>PIN: <span className="text-foreground/80">1234</span></span>
+                </div>
+                <div className="flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground">
+                  <span>Phone: <span className="text-foreground/80">03141495078</span></span>
+                  <span>PIN: <span className="text-foreground/80">1234</span></span>
+                </div>
               </div>
             </div>
           </div>

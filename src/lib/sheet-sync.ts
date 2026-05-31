@@ -79,32 +79,78 @@ function getSheets() {
 // CSV Fallback for Public Sheets
 // ============================================
 
-async function fetchSheetAsCSV(sheetName: string): Promise<string[][]> {
+async function fetchSheetAsCSV(sheetName: string, forceRefresh = false): Promise<string[][]> {
   // Google Sheets public CSV export URL
-  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${getGidForSheet(sheetName)}`;
+  // Add cache-busting timestamp when forceRefresh is true (e.g., during login)
+  const cacheBuster = forceRefresh ? `&_=${Date.now()}` : '';
+  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${getGidForSheet(sheetName)}${cacheBuster}`;
   
-  try {
-    const response = await fetch(url, { 
-      next: { revalidate: 300 }, // Cache for 5 minutes at fetch level
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch sheet ${sheetName}: ${response.status}`);
-    }
-    
-    const csvText = await response.text();
-    return parseCSV(csvText);
-  } catch (error) {
-    console.error(`CSV fetch failed for ${sheetName}:`, error);
-    // Try with sheet name directly
-    const url2 = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`;
-    const response2 = await fetch(url2);
-    if (!response2.ok) {
-      throw new Error(`Failed to fetch sheet ${sheetName}: ${response2.status}`);
-    }
-    const csvText2 = await response2.text();
-    return parseCSV(csvText2);
+  const fetchOptions: RequestInit = {};
+  
+  if (forceRefresh) {
+    // NO caching for authentication lookups — always get fresh data
+    fetchOptions.cache = 'no-store';
+  } else {
+    // Cache for 5 minutes for normal reads (dashboard data, etc.)
+    fetchOptions.next = { revalidate: 300 };
   }
+  
+  // Try GID first
+  try {
+    const response = await fetch(url, fetchOptions);
+    
+    if (response.ok) {
+      const csvText = await response.text();
+      const rows = parseCSV(csvText);
+      // Validate that we got the right sheet (check header row)
+      if (rows.length > 0 && isRightSheet(sheetName, rows[0])) {
+        return rows;
+      }
+      console.warn(`GID for ${sheetName} returned wrong sheet, trying name-based fetch`);
+    }
+  } catch (error) {
+    console.warn(`GID fetch failed for ${sheetName}:`, error);
+  }
+  
+  // Fallback: try with sheet name parameter
+  try {
+    const url2 = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=${encodeURIComponent(sheetName)}${cacheBuster}`;
+    const fetchOptions2: RequestInit = forceRefresh ? { cache: 'no-store' } : {};
+    const response2 = await fetch(url2, fetchOptions2);
+    if (response2.ok) {
+      const csvText2 = await response2.text();
+      const rows2 = parseCSV(csvText2);
+      if (rows2.length > 0 && isRightSheet(sheetName, rows2[0])) {
+        return rows2;
+      }
+      console.warn(`Sheet "${sheetName}" tab not found in Google Sheets — returning empty data`);
+      return []; // Sheet tab doesn't exist
+    }
+  } catch (error) {
+    console.warn(`Name fetch also failed for ${sheetName}:`, error);
+  }
+  
+  // Sheet doesn't exist or isn't accessible — return empty (not crash)
+  console.warn(`Sheet "${sheetName}" not available — using empty data`);
+  return [];
+}
+
+/**
+ * Validate that we fetched the right sheet by checking header keywords
+ */
+function isRightSheet(sheetName: string, headerRow: string[]): boolean {
+  const headerStr = headerRow.join(',').toLowerCase();
+  const validators: Record<string, (h: string) => boolean> = {
+    'Users': (h) => h.includes('phone') || h.includes('pin'),
+    'Curriculum': (h) => h.includes('subject') || h.includes('chapter') || h.includes('topic'),
+    'Subjects': (h) => h.includes('subject') && !h.includes('topic'),
+    'Special_Courses': (h) => h.includes('special') || h.includes('course'),
+    'Progress': (h) => h.includes('completed') || (h.includes('topic') && h.includes('phone')),
+    'Config': (h) => h.includes('key') || h.includes('value'),
+  };
+  const validator = validators[sheetName];
+  if (!validator) return true; // Unknown sheet, assume OK
+  return validator(headerStr);
 }
 
 function getGidForSheet(sheetName: string): string {
@@ -180,11 +226,15 @@ interface CacheEntry<T> {
 }
 
 const cache: Map<string, CacheEntry<unknown>> = new Map();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for general data
+const USER_CACHE_TTL_MS = 60 * 1000; // 1 minute for users (needs to be fresher for login)
 
 function getCached<T>(key: string): T | null {
   const entry = cache.get(key);
-  if (entry && Date.now() - entry.timestamp < CACHE_TTL_MS) {
+  if (!entry) return null;
+  // Use shorter TTL for user cache
+  const ttl = key === 'sheet_users' ? USER_CACHE_TTL_MS : CACHE_TTL_MS;
+  if (Date.now() - entry.timestamp < ttl) {
     return entry.data as T;
   }
   return null;
@@ -227,7 +277,7 @@ export async function fetchUsersFromSheet(forceRefresh = false): Promise<SheetUs
       rows = response.data.values || [];
     } else {
       // Use CSV export for public sheets
-      rows = await fetchSheetAsCSV(SHEETS.USERS);
+      rows = await fetchSheetAsCSV(SHEETS.USERS, forceRefresh);
     }
 
     if (rows.length < 2) {
@@ -304,7 +354,7 @@ export async function fetchProgressFromSheet(forceRefresh = false): Promise<Shee
       });
       rows = response.data.values || [];
     } else {
-      rows = await fetchSheetAsCSV(SHEETS.PROGRESS);
+      rows = await fetchSheetAsCSV(SHEETS.PROGRESS, forceRefresh);
     }
 
     if (rows.length < 2) {
