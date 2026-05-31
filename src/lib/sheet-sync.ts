@@ -522,3 +522,111 @@ export async function testSheetConnection(): Promise<{ connected: boolean; userC
     return { connected: false, userCount: 0, error: String(error) };
   }
 }
+
+// ============================================
+// Fetch Curriculum Sheet (for Group_Eligibility sync)
+// ============================================
+
+export interface SheetCurriculumRow {
+  grade: string;
+  board: string;
+  field: string;
+  subject: string;
+  chapterNo: number;
+  chapterName: string;
+  topicNo: number;
+  topicName: string;
+  videoLink: string;
+  pdfLink: string;
+  isFree: boolean;
+  totalDays: number;
+  subjectColor: string;
+  groupEligibility: string;
+}
+
+export async function fetchCurriculumFromSheet(forceRefresh = false): Promise<SheetCurriculumRow[]> {
+  const cacheKey = 'sheet_curriculum';
+  
+  if (!forceRefresh) {
+    const cached = getCached<SheetCurriculumRow[]>(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    let rows: string[][] = [];
+
+    if (hasServiceAccount) {
+      const sheets = getSheets();
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEETS.CURRICULUM}!A:N`,
+      });
+      rows = response.data.values || [];
+    } else {
+      // Use gviz API for Curriculum sheet since GID-based CSV export may not work
+      const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEETS.CURRICULUM)}`;
+      const response = await fetch(url, forceRefresh ? { cache: 'no-store' } : { next: { revalidate: 300 } });
+      if (response.ok) {
+        const csvText = await response.text();
+        rows = parseCSV(csvText);
+      }
+    }
+
+    if (rows.length < 2) {
+      console.warn('No curriculum data found in sheet');
+      return [];
+    }
+
+    // Header: Grade, Board, Field, Subject, Chapter_No, Chapter_Name, Topic_No, Topic_Name, Video_Link, PDF_View_Link, Is_Free, Total_Days, Subject_Color, Group_Eligibility
+    const curriculum: SheetCurriculumRow[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row[3]) continue; // Skip rows without subject name
+
+      curriculum.push({
+        grade: String(row[0] || '').trim(),
+        board: String(row[1] || '').trim(),
+        field: String(row[2] || '').trim(),
+        subject: String(row[3] || '').trim(),
+        chapterNo: parseInt(String(row[4] || '0'), 10) || 0,
+        chapterName: String(row[5] || '').trim(),
+        topicNo: parseInt(String(row[6] || '0'), 10) || 0,
+        topicName: String(row[7] || '').trim(),
+        videoLink: String(row[8] || '').trim(),
+        pdfLink: String(row[9] || '').trim(),
+        isFree: String(row[10] || 'TRUE').trim().toLowerCase() === 'true',
+        totalDays: parseInt(String(row[11] || '0'), 10) || 0,
+        subjectColor: String(row[12] || '').trim(),
+        groupEligibility: String(row[13] || 'Both').trim(),
+      });
+    }
+
+    setCache(cacheKey, curriculum);
+    console.log(`✅ Fetched ${curriculum.length} curriculum rows from live Google Sheet`);
+    return curriculum;
+  } catch (error) {
+    console.error('Failed to fetch curriculum from sheet:', error);
+    const cached = getCached<SheetCurriculumRow[]>(cacheKey);
+    if (cached) return cached;
+    return [];
+  }
+}
+
+/**
+ * Get the Group_Eligibility for each subject from the Curriculum sheet
+ * Returns a map of "SubjectName-Grade" -> "Group_Eligibility"
+ */
+export async function fetchSubjectEligibilityMap(forceRefresh = false): Promise<Record<string, string>> {
+  const curriculum = await fetchCurriculumFromSheet(forceRefresh);
+  const eligibilityMap: Record<string, string> = {};
+  
+  for (const row of curriculum) {
+    const key = `${row.subject}-${row.grade}`;
+    // Use the first non-empty, non-"Both" value if multiple exist
+    if (!eligibilityMap[key] && row.groupEligibility) {
+      eligibilityMap[key] = row.groupEligibility;
+    }
+  }
+  
+  return eligibilityMap;
+}

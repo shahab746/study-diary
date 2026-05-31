@@ -28,19 +28,20 @@ model Student {
 }
 
 model Subject {
-  id           String    @id @default(cuid())
-  name         String
-  grade        String
-  board        String
-  field        String
-  totalTopics  Int
-  chapterCount Int
-  color        String
-  icon         String
-  order        Int       @default(0)
-  chapters     Chapter[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  name             String
+  grade            String
+  board            String
+  field            String
+  totalTopics      Int
+  chapterCount     Int
+  color            String
+  icon             String
+  order            Int       @default(0)
+  groupEligibility String    @default("Both")
+  chapters         Chapter[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Chapter {

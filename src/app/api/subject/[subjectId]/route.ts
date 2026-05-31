@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { findUserByPhone } from '@/lib/sheet-sync';
 
 export async function GET(
   request: NextRequest,
@@ -31,6 +32,15 @@ export async function GET(
 
     if (!subject) {
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    }
+
+    // Check Group_Eligibility: if the subject is restricted, verify the user is eligible
+    if (subject.groupEligibility && subject.groupEligibility !== 'Both' && phone) {
+      const sheetUser = await findUserByPhone(phone, false);
+      const userGroup = sheetUser?.academicGroup || '';
+      if (userGroup && subject.groupEligibility !== userGroup) {
+        return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });
+      }
     }
 
     const result = {

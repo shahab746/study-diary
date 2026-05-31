@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
-import { findUserByPhone, fetchProgressFromSheet } from '@/lib/sheet-sync';
+import { findUserByPhone, fetchProgressFromSheet, fetchSubjectEligibilityMap } from '@/lib/sheet-sync';
 
 export async function GET(request: Request) {
   try {
@@ -10,9 +10,11 @@ export async function GET(request: Request) {
 
     // Fetch user profile LIVE from Google Sheet
     let student = null;
+    let academicGroup = ''; // From Google Sheet
     if (phone) {
       const sheetUser = await findUserByPhone(phone, true);
       if (sheetUser) {
+        academicGroup = sheetUser.academicGroup || ''; // e.g. "Biology", "Computer Science"
         student = {
           name: sheetUser.name,
           phone: sheetUser.phone,
@@ -27,6 +29,7 @@ export async function GET(request: Request) {
           topicsDone: sheetUser.topicsDone,
           daysLeft: sheetUser.daysLeft,
           pacingGoal: '5M', // default, can be overridden
+          academicGroup: sheetUser.academicGroup || '',
         };
       }
     }
@@ -72,6 +75,27 @@ export async function GET(request: Request) {
       },
     });
 
+    // Filter subjects by Group_Eligibility based on user's Academic_Group
+    // A subject is visible if:
+    //   - groupEligibility is "Both" (everyone can see it)
+    //   - groupEligibility matches the user's academicGroup exactly
+    // e.g. Biology student sees "Both" + "Biology" but NOT "Computer Science"
+    //
+    // Also sync groupEligibility from live Curriculum sheet to DB
+    const eligibilityMap = await fetchSubjectEligibilityMap(false);
+    
+    const eligibleSubjects = subjects.filter(subject => {
+      // Determine eligibility: prefer live sheet data, fall back to DB value
+      const sheetKey = `${subject.name}-${subject.grade}`;
+      const eligibility = eligibilityMap[sheetKey] || subject.groupEligibility || 'Both';
+      
+      if (eligibility === 'Both') return true;
+      if (academicGroup && eligibility === academicGroup) return true;
+      // If no academic group specified, show all (backward compatibility)
+      if (!academicGroup) return true;
+      return false;
+    });
+
     // Fetch progress - prefer live sheet data, fallback to local DB
     let progress: { topicId: string; completed: boolean; dateCompleted: Date | null }[] = [];
     
@@ -102,8 +126,8 @@ export async function GET(request: Request) {
       orderBy: { order: 'asc' },
     });
 
-    // Compute per-subject progress
-    const subjectProgress = subjects.map(subject => {
+    // Compute per-subject progress (using eligible subjects only)
+    const subjectProgress = eligibleSubjects.map(subject => {
       const allTopics = subject.chapters.flatMap(ch => ch.topics);
       const completedTopics = allTopics.filter(topic =>
         progress.some(p => p.topicId === topic.id && p.completed)
@@ -145,7 +169,7 @@ export async function GET(request: Request) {
     const months = pacingMonths[pacingGoal] || 5;
     const totalDaysInPlan = months * 30;
 
-    const allTopics = subjects.flatMap(s => s.chapters.flatMap(ch => ch.topics));
+    const allTopics = eligibleSubjects.flatMap(s => s.chapters.flatMap(ch => ch.topics));
     const totalTopicsCount = allTopics.length;
     const totalCompleted = progress.filter(p => p.completed).length;
     const totalRemaining = totalTopicsCount - totalCompleted;
@@ -175,7 +199,7 @@ export async function GET(request: Request) {
       expectedByNow: number;
     }> = [];
 
-    for (const subject of subjects) {
+    for (const subject of eligibleSubjects) {
       // Free users only get tasks from unlocked subjects
       if (isFreeUser && subject.name !== 'Physics') continue;
 
