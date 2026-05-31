@@ -101,12 +101,19 @@ function MobileBottomNav() {
           <button
             key={item.id}
             onClick={() => setSidebarView(item.id)}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-200 ${
+            className={`relative flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all duration-200 ${
               sidebarView === item.id
-                ? 'text-primary'
-                : 'text-muted-foreground'
+                ? 'text-primary bg-primary/10'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
+            {sidebarView === item.id && (
+              <motion.div
+                layoutId="mobile-nav-indicator"
+                className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary"
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            )}
             {item.icon}
             <span className="text-[9px] font-mono">{item.label}</span>
           </button>
@@ -118,23 +125,23 @@ function MobileBottomNav() {
 
 function LoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background mesh-gradient-bg flex">
       {/* Sidebar skeleton */}
       <div className="hidden md:flex flex-col w-56 lg:w-64 border-r border-border p-4 space-y-4">
-        <div className="w-full h-10 bg-secondary/50 rounded-lg animate-pulse" />
+        <div className="w-full h-10 bg-secondary/50 rounded-lg shimmer" />
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="w-full h-9 bg-secondary/30 rounded-lg animate-pulse" />
+          <div key={i} className="w-full h-9 bg-secondary/30 rounded-lg shimmer" style={{ animationDelay: `${i * 0.1}s` }} />
         ))}
       </div>
       {/* Main skeleton */}
       <div className="flex-1 p-4 sm:p-6 space-y-4">
-        <div className="h-40 bg-secondary/30 rounded-2xl animate-pulse" />
+        <div className="h-40 bg-secondary/30 rounded-2xl shimmer" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-20 bg-secondary/30 rounded-xl animate-pulse" />
+            <div key={i} className="h-20 bg-secondary/30 rounded-xl shimmer" style={{ animationDelay: `${i * 0.15}s` }} />
           ))}
         </div>
-        <div className="h-64 bg-secondary/30 rounded-xl animate-pulse" />
+        <div className="h-64 bg-secondary/30 rounded-xl shimmer" />
       </div>
     </div>
   );
@@ -144,7 +151,7 @@ function DashboardView() {
   const { sidebarView } = useStudyOS();
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex bg-background mesh-gradient-bg-animated">
       {/* Desktop Sidebar */}
       <Sidebar />
 
@@ -230,7 +237,7 @@ function DashboardView() {
             <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
               <span>LectureDiary v1.0</span>
               <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse status-glow" />
                 Synced · {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
             </div>

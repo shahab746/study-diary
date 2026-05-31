@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { signIn, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Phone, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { Zap, Phone, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export function LoginPage() {
   const [phone, setPhone] = useState('');
@@ -51,31 +51,22 @@ export function LoginPage() {
       console.log('🔑 Step 1: Credentials verified for', verifyData.user.name);
 
       // Step 2: Clear any existing session FIRST
-      // This is critical — if the user was previously logged in as someone else,
-      // we must destroy that session before creating a new one
       setLoginStage('signing_in');
       console.log('🔑 Step 2: Clearing old session...');
 
-      // Clear Zustand persisted data to avoid showing wrong user's data
       localStorage.removeItem('study-os-storage');
 
-      // Sign out the old session (if any), then sign in as the new user
-      // We use a callback pattern to ensure sign-out completes before sign-in
       await new Promise<void>((resolve) => {
-        // Check if there's an existing session by trying to fetch it
         fetch('/api/auth/session')
           .then(res => res.json())
           .then(session => {
             if (session?.user) {
-              // There IS an old session — sign out first, then sign in
               console.log('🔑 Old session found for', (session.user as Record<string, unknown>).name, '— signing out first');
               signOut({ redirect: false }).then(() => {
                 console.log('🔑 Old session cleared, now signing in as new user');
-                // Small delay to let the cookie clear
                 setTimeout(resolve, 300);
               });
             } else {
-              // No old session — proceed directly
               resolve();
             }
           })
@@ -105,7 +96,6 @@ export function LoginPage() {
       setLoginStage('loading_dashboard');
       console.log('🔑 Step 4: Redirecting to dashboard...');
 
-      // Hard reload to ensure fresh session + fresh Zustand state
       window.location.href = '/';
     } catch (err) {
       console.error('🔑 Login error:', err);
@@ -117,20 +107,62 @@ export function LoginPage() {
 
   const getLoadingText = () => {
     switch (loginStage) {
-      case 'verifying': return 'Verifying credentials...';
-      case 'signing_in': return 'Signing in...';
-      case 'loading_dashboard': return 'Loading dashboard...';
-      default: return 'Signing in...';
+      case 'verifying': return 'Verifying credentials';
+      case 'signing_in': return 'Signing in';
+      case 'loading_dashboard': return 'Loading dashboard';
+      default: return 'Signing in';
+    }
+  };
+
+  const getLoadingStep = () => {
+    switch (loginStage) {
+      case 'verifying': return 1;
+      case 'signing_in': return 2;
+      case 'loading_dashboard': return 3;
+      default: return 0;
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Background ambient effects */}
+      {/* Animated floating orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-primary/3 rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/2 rounded-full blur-[160px]" />
+        <motion.div
+          animate={{
+            x: [0, 30, -20, 0],
+            y: [0, -40, 20, 0],
+            scale: [1, 1.1, 0.9, 1],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/4 -left-20 w-72 h-72 bg-primary/8 rounded-full blur-[100px]"
+        />
+        <motion.div
+          animate={{
+            x: [0, -25, 30, 0],
+            y: [0, 30, -30, 0],
+            scale: [1, 0.9, 1.15, 1],
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute bottom-1/4 -right-20 w-80 h-80 bg-amber-500/6 rounded-full blur-[120px]"
+        />
+        <motion.div
+          animate={{
+            x: [0, 20, -30, 0],
+            y: [0, -20, 30, 0],
+            scale: [1, 1.05, 0.95, 1],
+          }}
+          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/4 rounded-full blur-[160px]"
+        />
+        <motion.div
+          animate={{
+            x: [0, -15, 25, 0],
+            y: [0, 35, -15, 0],
+            scale: [1, 1.08, 0.92, 1],
+          }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-3/4 left-1/3 w-64 h-64 bg-orange-400/5 rounded-full blur-[100px]"
+        />
       </div>
 
       <motion.div
@@ -150,112 +182,222 @@ export function LoginPage() {
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-            className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-4"
+            className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-4 relative"
           >
             <Zap className="w-8 h-8 text-primary" />
+            {/* Subtle glow around logo */}
+            <div className="absolute inset-0 rounded-2xl bg-primary/10 blur-xl" />
           </motion.div>
           <h1 className="font-display text-3xl font-bold tracking-tight">LectureDiary</h1>
-          <p className="text-sm text-muted-foreground font-mono mt-1.5">
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="text-sm text-primary/80 font-display font-semibold tracking-widest mt-2"
+          >
+            Track. Pace. Complete.
+          </motion.p>
+          <p className="text-xs text-muted-foreground font-mono mt-1.5">
             Your Study OS · Sign in to continue
           </p>
         </motion.div>
 
-        {/* Login Card */}
+        {/* Login Card with animated gradient border */}
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="glass-strong rounded-2xl p-6 sm:p-8"
+          className="relative rounded-[1.15rem] p-[1px] overflow-hidden"
         >
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Phone Field */}
-            <div className="space-y-2">
-              <label className="text-xs font-mono text-muted-foreground tracking-wider uppercase">
-                Phone Number
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  <Phone className="w-4 h-4" />
+          {/* Rotating gradient border */}
+          <div className="login-card-border-glow" />
+          <div className="absolute inset-[1px] rounded-[1.1rem] bg-card" />
+
+          <div className="relative rounded-[1.1rem] p-6 sm:p-8 glass-strong">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Phone Field */}
+              <div className="space-y-2">
+                <label className="text-xs font-mono text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
+                  Phone Number
+                  {phone && (
+                    <motion.span
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                    >
+                      <CheckCircle2 className="w-3 h-3 text-primary/60" />
+                    </motion.span>
+                  )}
+                </label>
+                <div className="relative group">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => { setPhone(e.target.value); setError(''); }}
+                    placeholder="03XXXXXXXXX"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary/50 border border-border text-sm font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 focus:shadow-[0_0_20px_oklch(0.795_0.184_86.047/10%)] transition-all"
+                    autoComplete="tel"
+                    required
+                    disabled={isLoading}
+                  />
                 </div>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => { setPhone(e.target.value); setError(''); }}
-                  placeholder="03XXXXXXXXX"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary/50 border border-border text-sm font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all"
-                  autoComplete="tel"
-                  required
-                  disabled={isLoading}
-                />
               </div>
-            </div>
 
-            {/* PIN Field */}
-            <div className="space-y-2">
-              <label className="text-xs font-mono text-muted-foreground tracking-wider uppercase">
-                PIN
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  <Lock className="w-4 h-4" />
+              {/* PIN Field */}
+              <div className="space-y-2">
+                <label className="text-xs font-mono text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
+                  PIN
+                  {pin && (
+                    <motion.span
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                    >
+                      <CheckCircle2 className="w-3 h-3 text-primary/60" />
+                    </motion.span>
+                  )}
+                </label>
+                <div className="relative group">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    value={pin}
+                    onChange={(e) => { setPin(e.target.value); setError(''); }}
+                    placeholder="••••"
+                    maxLength={6}
+                    className="w-full pl-10 pr-12 py-3 rounded-xl bg-secondary/50 border border-border text-sm font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 focus:shadow-[0_0_20px_oklch(0.795_0.184_86.047/10%)] transition-all tracking-[0.3em]"
+                    autoComplete="current-password"
+                    required
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-                <input
-                  type={showPin ? 'text' : 'password'}
-                  value={pin}
-                  onChange={(e) => { setPin(e.target.value); setError(''); }}
-                  placeholder="••••"
-                  maxLength={6}
-                  className="w-full pl-10 pr-12 py-3 rounded-xl bg-secondary/50 border border-border text-sm font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all tracking-[0.3em]"
-                  autoComplete="current-password"
-                  required
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPin(!showPin)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
-            </div>
 
-            {/* Error Message */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -5, height: 0 }}
-                  className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20"
+              {/* Error Message */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -5, height: 0 }}
+                    className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20"
+                  >
+                    <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                    <p className="text-xs text-destructive font-medium">{error}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Submit Button with shimmer */}
+              <div className="relative overflow-hidden rounded-xl">
+                <motion.button
+                  type="submit"
+                  disabled={isLoading || !phone || !pin}
+                  whileHover={!isLoading ? { scale: 1.01 } : undefined}
+                  whileTap={!isLoading ? { scale: 0.98 } : undefined}
+                  className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-display font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
                 >
-                  <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-                  <p className="text-xs text-destructive font-medium">{error}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  {isLoading ? (
+                    <div className="flex items-center gap-3">
+                      {/* Animated loading dots */}
+                      <div className="flex gap-1">
+                        {[0, 1, 2].map((i) => (
+                          <motion.div
+                            key={i}
+                            animate={{ y: [0, -6, 0] }}
+                            transition={{
+                              duration: 0.6,
+                              repeat: Infinity,
+                              delay: i * 0.15,
+                              ease: 'easeInOut',
+                            }}
+                            className="w-1.5 h-1.5 rounded-full bg-primary-foreground"
+                          />
+                        ))}
+                      </div>
+                      <span>{getLoadingText()}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <span>Sign in</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </motion.button>
 
-            {/* Submit Button */}
-            <motion.button
-              type="submit"
-              disabled={isLoading || !phone || !pin}
-              whileHover={!isLoading ? { scale: 1.01 } : undefined}
-              whileTap={!isLoading ? { scale: 0.98 } : undefined}
-              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-display font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{getLoadingText()}</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign in</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </motion.button>
-          </form>
+                {/* Shimmer sweep effect */}
+                {!isLoading && phone && pin && (
+                  <motion.div
+                    className="absolute inset-0 pointer-events-none"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '200%' }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3, ease: 'easeInOut' }}
+                  >
+                    <div className="w-1/3 h-full bg-gradient-to-r from-transparent via-white/15 to-transparent skew-x-[-20deg]" />
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Loading progress steps */}
+              <AnimatePresence>
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-1.5"
+                  >
+                    {/* Step progress bar */}
+                    <div className="flex gap-1.5">
+                      {['verifying', 'signing_in', 'loading_dashboard'].map((stage, i) => (
+                        <div
+                          key={stage}
+                          className="h-1 flex-1 rounded-full overflow-hidden bg-secondary"
+                        >
+                          <motion.div
+                            className="h-full bg-primary rounded-full"
+                            initial={{ width: '0%' }}
+                            animate={{
+                              width: getLoadingStep() > i ? '100%' : getLoadingStep() === i ? '60%' : '0%',
+                            }}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between">
+                      {['Verify', 'Sign in', 'Load'].map((label, i) => (
+                        <span
+                          key={label}
+                          className={`text-[9px] font-mono transition-colors ${
+                            getLoadingStep() > i
+                              ? 'text-primary'
+                              : getLoadingStep() === i
+                                ? 'text-muted-foreground'
+                                : 'text-muted-foreground/40'
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </form>
+          </div>
         </motion.div>
 
         {/* Live status indicator */}

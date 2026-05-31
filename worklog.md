@@ -162,3 +162,195 @@ Stage Summary:
 - Both API endpoints validate links before exposing hasVideo/hasPdf flags
 - SubjectMatrix removed from today view, kept in courses view
 - All linting passes, no server errors
+
+---
+Task ID: 9-b
+Agent: Frontend Styling Expert
+Task: Upgrade WelcomeCard and StatsGrid components
+
+Work Log:
+- Added `@keyframes gradient-shift` and `.animated-gradient-bg` class to `globals.css` for slow-shifting gradient animation (12s cycle, 300% background-size for smooth movement)
+
+WelcomeCard upgrades (all 6 features):
+1. **Animated gradient background** - Replaced static `bg-gradient-to-br` with `animated-gradient-bg` class (CSS keyframe animates gradient position through amber/blue hues)
+2. **Study progress ring** - Added `ProgressRing` component using SVG arc (same pattern as SubjectMatrix's `ArcProgress`) showing overall completion % (totalCompleted/totalTopics)
+3. **Better visual hierarchy** - Greeting now larger with time-of-day emoji (🌅/☀️/🌙), date and day badge moved to top row alongside progress ring
+4. **"Start next best task" button** - Prominent gradient background (amber→dark-amber), subtle glow effect via `boxShadow` with rgba primary color
+5. **Day counter badge** - Shows "Day X of Y" as a small `bg-primary/10` badge next to date, pulls from `student.currentDay` / `student.totalDays`
+6. **Overall progress bar** - Added at bottom with "OVERALL PROGRESS" label, animated width via framer-motion, shows `totalCompleted/totalTopics`
+
+StatsGrid upgrades (all 5 features):
+1. **Color-coded stat icons** - Each stat card has distinct colors:
+   - Focus Score: amber (#f59e0b)
+   - Study Time: teal (#14b8a6)
+   - Streak: red/orange (#ef4444/#f97316)
+   - Program Week: blue (#3b82f6)
+2. **Circular mini-progress** - `MiniArcProgress` SVG arc component (8x8px) on each card, with unique linearGradient per color
+3. **Animated counter** - `AnimatedNumber` component using framer-motion's `useMotionValue` + `useTransform` + `animate` (counts from 0→target, no setState in effect)
+4. **Hover lift effect** - Cards lift 3px on hover via `whileHover`, plus color-matched glow shadow via `onMouseEnter/Leave`
+5. **Better empty state** - When streak is 0, shows "Start your streak today! 🔥" instead of "days in a row"
+
+Lint fix: Initially used `useState` + `useEffect` pattern in `useAnimatedCounter` hook which triggered `react-hooks/set-state-in-effect` lint error. Refactored to `AnimatedNumber` component that renders `motion.span` with `useTransform` value directly, avoiding setState entirely.
+
+Stage Summary:
+- WelcomeCard: 6 visual upgrades complete (animated gradient, progress ring, time emoji, glow button, day badge, progress bar)
+- StatsGrid: 5 visual upgrades complete (color-coded icons, mini arc progress, animated counters, hover lift+glow, streak empty state)
+- All linting passes cleanly
+
+---
+Task ID: 9-a
+Agent: Frontend Styling Expert
+Task: Major CSS Overhaul - Premium Visual Enhancements
+
+Work Log:
+- Read current globals.css (288 lines) and worklog.md for context
+- Enhanced Glassmorphism on `.glass` and `.glass-strong`:
+  - Increased blur (28px → 48px) with saturate(1.2–1.3)
+  - Added inner glow via `inset` box-shadow
+  - Added noise texture overlay via SVG `::before` pseudo-element
+  - Added hover state transitions (brightness increase + deeper shadow)
+  - Added `.glass-gradient-border` class with mask-composite gradient border
+- Added Animated Mesh Gradient Background:
+  - `.mesh-gradient-bg` with fixed radial gradients (amber, blue, teal)
+  - `.mesh-gradient-bg-animated` with slow 30s drift animation
+- Added Smooth Page Transitions:
+  - `.page-enter` class with 0.4s ease-out fade+slide animation
+- Enhanced Custom Scrollbar:
+  - Added hover-expand width effect (4px → 6px on hover)
+  - Added transition for smooth width and color changes
+- Added Card Hover Lift Effect:
+  - `.card-lift` class with translateY(-2px) + expanded shadow on hover
+- Added Shimmer/Skeleton Loading:
+  - `.shimmer` class with animated gradient sweep (1.5s infinite)
+  - Dark mode variant with adjusted opacity
+- Added Gradient Text Utility:
+  - `.gradient-text` with Solar Amber 135deg gradient + background-clip
+- Better Dark Mode:
+  - Background gets subtle blue-ish tint (oklch chroma 0.01 → 0.015)
+  - Glass cards more opaque (80% → 88%) for depth
+  - Noise texture overlay on body via `::after` pseudo-element
+  - Glass cards get stronger shadows in dark mode (20-35% opacity)
+  - Mesh gradient more visible in dark mode (higher opacity values)
+  - Card lift gets stronger shadow in dark mode
+- Added Status Glow Animation:
+  - `.status-glow` with green glow box-shadow
+  - `.status-glow-pulse` with breathing glow animation
+- Added Better Focus Ring:
+  - `:focus-visible` with amber outline, 2px offset, 8px border-radius
+- Added smooth scrolling globally: `html { scroll-behavior: smooth; }`
+- Added safe area bottom padding: `.safe-area-bottom`
+- All existing CSS rules preserved, no Tailwind theme variables changed
+- `bun run lint` passes with zero errors
+
+Stage Summary:
+- globals.css expanded from ~288 lines to ~608 lines
+- 12 major visual enhancements applied
+- Deep Glass aesthetic significantly more polished with inner glow, noise texture, hover states
+- Both light and dark modes enhanced with appropriate depth differences
+- All new classes are reusable utilities ready for component integration
+
+---
+Task ID: 9-c
+Agent: Frontend Styling Expert
+Task: Upgrade LoginPage + MissionFeed Components
+
+Work Log:
+
+### LoginPage Upgrades (`src/components/auth/LoginPage.tsx`):
+- Replaced static blur blobs with 4 animated floating orbs using framer-motion
+  - Each orb has unique x/y drift patterns, scale pulsing, and different durations (18-25s)
+  - Colors: primary/8, amber-500/6, primary/4, orange-400/5
+- Added animated rotating conic-gradient border around login card
+  - `login-card-border-glow` CSS class with 8s rotation animation
+  - Uses inset -50% trick with overflow-hidden on parent for rounded corner clipping
+  - Background card sits on top via absolute positioning
+- Enhanced input fields:
+  - Group wrapper with `group` class for icon color transition on focus
+  - Focus glow: `shadow-[0_0_20px_oklch(0.795_0.184_86.047/10%)]` on focus
+  - Animated check indicator (CheckCircle2 icon) appears when field is filled
+  - Icon transitions from muted-foreground to primary on focus-within
+- Shimmer effect on sign-in button:
+  - Gradient sweep div that moves left-to-right with 2s duration
+  - Repeats every 5s (2s animation + 3s delay)
+  - Only shows when button is enabled (phone + pin filled) and not loading
+  - Uses skew-x transform for angled light sweep
+- Loading state redesign:
+  - Replaced Loader2 spinner with 3 animated bouncing dots
+  - Each dot has staggered delay (0, 0.15s, 0.3s)
+  - Added 3-step progress bar showing Verify → Sign in → Load stages
+  - Active step shows 60% fill, completed steps show 100%, upcoming shows 0%
+  - Step labels below bar with color-coded status
+- Added brand tagline "Track. Pace. Complete." under app name
+  - Font-display, semibold, primary/80 color, tracking-widest
+  - Fade-in animation with 0.4s delay
+- Removed unused Loader2 import, added CheckCircle2
+
+### MissionFeed Upgrades (`src/components/study-os/MissionFeed.tsx`):
+- Better card design:
+  - Colored dot on left border (3px border-l matching subject color)
+  - rounded-xl corners maintained
+  - Subtle hover glow effect per subject color via `hover:shadow-[0_0_20px_...]`
+  - Completed cards: opacity 0.4, muted colors, line-through with reduced opacity
+  - Better spacing: mb-2 instead of mb-1, mt-2 for course details
+- Progress ring in header:
+  - SVG circular progress indicator (40px) next to "Today's mission" title
+  - Uses circumference + strokeDashoffset for smooth animation
+  - Percentage number centered inside ring
+  - Animated via framer-motion (0.8s ease-out)
+- Smoother card animations:
+  - `layout` prop on MissionCard for smoother reflow
+  - Exit animation: fade + slide right (x: 80) + slight scale-down (0.95)
+  - Entry animation: y: 12 + scale: 0.98 → y: 0 + scale: 1
+  - Completed cards animate opacity to 0.4 (not just toggle)
+- Empty state illustration:
+  - Sparkles icon in rounded container
+  - Contextual message per filter type (all/pending/done)
+  - Motivational subtext under main message
+  - Fade-in animation
+- Subject distribution bar:
+  - Replaced subject pills with thin horizontal stacked bar
+  - Each subject segment proportional to task count
+  - White overlay shows completed portion within each segment
+  - 1px gap between segments for separation
+  - Legend below with colored dots + subject names + completion counts
+  - Width animates from 0 with 0.6s ease-out
+- Completed task animation:
+  - Cards fade to 0.4 opacity when completed (smooth transition)
+  - Priority dot and labels dim for completed tasks
+  - Course detail pills use secondary/30 + muted-foreground/40 when completed
+- Added Target icon to progress bar label
+- Added `hex` field to COLOR_TAG for potential future use
+
+### CSS Additions (`src/app/globals.css`):
+- `@keyframes border-rotate` - 0-360deg rotation
+- `.login-card-border-glow` - Conic gradient with amber, blue, teal, green segments
+  - Absolute positioned, inset -50%, animated rotation
+  - Creates subtle rotating border glow effect around login card
+
+### Verification:
+- `bun run lint` passes with zero errors
+- `npx next build` compiles successfully
+- All existing functionality preserved
+
+Stage Summary:
+- LoginPage transformed from static to immersive with animated orbs, rotating gradient border, shimmer button, and step-by-step loading
+- MissionFeed upgraded with progress ring, stacked subject bar, better card design, smooth completion animations, and contextual empty states
+- Both components follow Deep Glass aesthetic with Solar Amber primary
+---
+Task ID: 9
+Agent: Main Agent + Frontend Styling Experts
+Task: Major UI/UX overhaul of the entire LectureDiary app
+
+Work Log:
+- CSS overhaul (Task 9-a): Enhanced glassmorphism, animated mesh gradient, shimmer loading, gradient text, better dark mode, status glow, card-lift, focus rings, smooth scrolling, safe area
+- WelcomeCard + StatsGrid (Task 9-b): Animated gradient bg, progress ring, time-of-day emoji, color-coded stats, animated counters, hover lift+glow, streak empty state
+- LoginPage + MissionFeed (Task 9-c): Animated floating orbs, rotating gradient border, shimmer button, loading dots with progress steps, brand tagline, subject distribution bar, progress ring header
+- Sidebar: Animated active indicator (layoutId), gradient text logo, overall progress bar, sparkles icon on Today, hover slide effect
+- page.tsx: Mesh gradient background, shimmer skeleton loading, mobile nav active indicator animation, status-glow on sync dot
+- All components use consistent Deep Glass aesthetic with Solar Amber primary
+
+Stage Summary:
+- Complete visual overhaul across all components
+- Lint passes with zero errors
+- Dev server compiles and serves pages successfully
+- Animated transitions, micro-interactions, and polish throughout
