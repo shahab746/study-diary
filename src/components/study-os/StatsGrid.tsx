@@ -5,12 +5,12 @@ import { useStudyOS } from '@/lib/store';
 import { Target, Clock, Flame, Calendar } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
-// Color configuration per stat card
+// Color configuration per stat card — Premium SaaS palette
 const STAT_COLORS = {
-  focus: { main: '#f59e0b', light: '#fbbf24', bg: 'bg-amber-500/10', text: 'text-amber-500' },
-  studyTime: { main: '#14b8a6', light: '#2dd4bf', bg: 'bg-teal-500/10', text: 'text-teal-500' },
-  streak: { main: '#ef4444', light: '#f97316', bg: 'bg-red-500/10', text: 'text-red-500' },
-  programWeek: { main: '#3b82f6', light: '#60a5fa', bg: 'bg-blue-500/10', text: 'text-blue-500' },
+  focus: { main: '#FBBF24', light: '#FDE68A', bg: 'bg-amber-500/10', text: 'text-amber-400' },
+  studyTime: { main: '#2DD4BF', light: '#5EEAD4', bg: 'bg-teal-500/10', text: 'text-teal-400' },
+  streak: { main: '#EF4444', light: '#F97316', bg: 'bg-red-500/10', text: 'text-red-400' },
+  programWeek: { main: '#38BDF8', light: '#7DD3FC', bg: 'bg-sky-500/10', text: 'text-sky-400' },
 } as const;
 
 // Mini SVG arc progress indicator

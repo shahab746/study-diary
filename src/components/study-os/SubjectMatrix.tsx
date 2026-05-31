@@ -5,22 +5,23 @@ import { useStudyOS, SubjectProgress } from '@/lib/store';
 import { useState } from 'react';
 import { BookOpen, Play, ChevronRight } from 'lucide-react';
 
-// Color definitions with explicit hex values for SVG and glows
+// Color definitions — Premium SaaS palette
+// Sky Blue, Luminous Teal, Soft Violet, Mint Emerald, Radiant Amber
 const COLOR_HEX: Record<string, { main: string; light: string; rgb: string }> = {
-  'Blue':   { main: '#3b82f6', light: '#60a5fa', rgb: '59,130,246' },
-  'Teal':   { main: '#14b8a6', light: '#2dd4bf', rgb: '20,184,166' },
-  'Purple': { main: '#8b5cf6', light: '#a78bfa', rgb: '139,92,246' },
-  'Green':  { main: '#22c55e', light: '#4ade80', rgb: '34,197,94' },
-  'Amber':  { main: '#f59e0b', light: '#fbbf24', rgb: '245,158,11' },
+  'Blue':   { main: '#38BDF8', light: '#7DD3FC', rgb: '56,189,248' },   // Sky Blue
+  'Teal':   { main: '#2DD4BF', light: '#5EEAD4', rgb: '45,212,191' },   // Luminous Teal
+  'Purple': { main: '#A78BFA', light: '#C4B5FD', rgb: '167,139,250' },  // Soft Violet
+  'Green':  { main: '#34D399', light: '#6EE7B7', rgb: '52,211,153' },   // Mint Emerald
+  'Amber':  { main: '#FBBF24', light: '#FDE68A', rgb: '251,191,36' },   // Radiant Amber
 };
 
-// Tinted 10% opacity badge backgrounds
+// Premium 10% opacity badge backgrounds with 100% opacity crisp text
 const COLOR_BADGE: Record<string, { bg: string; text: string; border: string }> = {
-  'Blue':   { bg: 'rgba(59,130,246,0.10)',  text: '#60a5fa', border: 'rgba(59,130,246,0.15)' },
-  'Teal':   { bg: 'rgba(20,184,166,0.10)',   text: '#2dd4bf', border: 'rgba(20,184,166,0.15)' },
-  'Purple': { bg: 'rgba(139,92,246,0.10)',   text: '#a78bfa', border: 'rgba(139,92,246,0.15)' },
-  'Green':  { bg: 'rgba(34,197,94,0.10)',    text: '#4ade80', border: 'rgba(34,197,94,0.15)' },
-  'Amber':  { bg: 'rgba(245,158,11,0.10)',   text: '#fbbf24', border: 'rgba(245,158,11,0.15)' },
+  'Blue':   { bg: 'rgba(56,189,248,0.10)',  text: '#7DD3FC', border: 'rgba(56,189,248,0.15)' },
+  'Teal':   { bg: 'rgba(45,212,191,0.10)',   text: '#5EEAD4', border: 'rgba(45,212,191,0.15)' },
+  'Purple': { bg: 'rgba(167,139,250,0.10)',   text: '#C4B5FD', border: 'rgba(167,139,250,0.15)' },
+  'Green':  { bg: 'rgba(52,211,153,0.10)',    text: '#6EE7B7', border: 'rgba(52,211,153,0.15)' },
+  'Amber':  { bg: 'rgba(251,191,36,0.10)',    text: '#FDE68A', border: 'rgba(251,191,36,0.15)' },
 };
 
 function ArcProgress({ progress, color, subjectId }: { progress: number; color: string; subjectId: string }) {
@@ -88,10 +89,10 @@ function SubjectCard({ subject, index, onClick }: { subject: SubjectProgress; in
       onClick={onClick}
       className="relative rounded-2xl cursor-pointer group overflow-hidden"
       style={{
-        background: 'rgba(24, 24, 27, 0.6)',
+        background: 'rgba(18, 20, 31, 0.7)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255,255,255,0.03)',
+        border: '1px solid rgba(248, 250, 252, 0.04)',
         boxShadow: isHovered
           ? `0 8px 32px rgba(0,0,0,0.25), 0 0 20px rgba(${colorHex.rgb},0.08)`
           : `0 1px 3px rgba(0,0,0,0.12)`,

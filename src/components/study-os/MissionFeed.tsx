@@ -24,18 +24,18 @@ const PRIORITY_STYLES: Record<string, { dot: string; label: string; text: string
 };
 
 const COLOR_TAG: Record<string, { bg: string; text: string; border: string; glow: string; dot: string; hex: string }> = {
-  'Blue': { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30', glow: 'hover:shadow-[0_0_20px_oklch(0.623_0.214_259.815/12%)]', dot: 'bg-blue-500', hex: '#3b82f6' },
-  'Teal': { bg: 'bg-teal-500/15', text: 'text-teal-400', border: 'border-teal-500/30', glow: 'hover:shadow-[0_0_20px_oklch(0.704_0.121_178.724/12%)]', dot: 'bg-teal-500', hex: '#14b8a6' },
-  'Purple': { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30', glow: 'hover:shadow-[0_0_20px_oklch(0.576_0.195_304.4/12%)]', dot: 'bg-purple-500', hex: '#a855f7' },
-  'Green': { bg: 'bg-green-500/15', text: 'text-green-400', border: 'border-green-500/30', glow: 'hover:shadow-[0_0_20px_oklch(0.698_0.166_162.48/12%)]', dot: 'bg-green-500', hex: '#22c55e' },
-  'Amber': { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', glow: 'hover:shadow-[0_0_20px_oklch(0.795_0.184_86.047/12%)]', dot: 'bg-amber-500', hex: '#f59e0b' },
+  'Blue': { bg: 'bg-sky-500/10', text: 'text-sky-300', border: 'border-sky-500/30', glow: 'hover:shadow-[0_0_20px_rgba(56,189,248,12%)]', dot: 'bg-sky-500', hex: '#38BDF8' },
+  'Teal': { bg: 'bg-teal-500/10', text: 'text-teal-300', border: 'border-teal-500/30', glow: 'hover:shadow-[0_0_20px_rgba(45,212,191,12%)]', dot: 'bg-teal-500', hex: '#2DD4BF' },
+  'Purple': { bg: 'bg-violet-500/10', text: 'text-violet-300', border: 'border-violet-500/30', glow: 'hover:shadow-[0_0_20px_rgba(167,139,250,12%)]', dot: 'bg-violet-500', hex: '#A78BFA' },
+  'Green': { bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/30', glow: 'hover:shadow-[0_0_20px_rgba(52,211,153,12%)]', dot: 'bg-emerald-500', hex: '#34D399' },
+  'Amber': { bg: 'bg-amber-500/10', text: 'text-amber-300', border: 'border-amber-500/30', glow: 'hover:shadow-[0_0_20px_rgba(251,191,36,12%)]', dot: 'bg-amber-500', hex: '#FBBF24' },
 };
 
 const SUBJECT_BAR_COLORS: Record<string, string> = {
-  'Blue': 'bg-blue-500/70',
+  'Blue': 'bg-sky-500/70',
   'Teal': 'bg-teal-500/70',
-  'Purple': 'bg-purple-500/70',
-  'Green': 'bg-green-500/70',
+  'Purple': 'bg-violet-500/70',
+  'Green': 'bg-emerald-500/70',
   'Amber': 'bg-amber-500/70',
 };
 

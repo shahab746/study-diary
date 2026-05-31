@@ -129,7 +129,7 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             className="fixed inset-0 z-[101] flex items-center justify-center p-4"
           >
-            <div className="glass-strong rounded-3xl p-6 sm:p-8 w-full max-w-sm relative border border-border shadow-2xl">
+            <div className="glass-strong rounded-3xl p-6 sm:p-8 w-full max-w-sm relative border border-[rgba(248,250,252,0.06)] shadow-2xl" style={{ background: 'rgba(18, 20, 31, 0.95)' }}>
               {/* Close button */}
               <button
                 onClick={() => {
@@ -260,11 +260,11 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
                   className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all"
                   style={{
                     background: isRunning
-                      ? 'linear-gradient(135deg, #6b7280, #4b5563)'
-                      : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      ? 'linear-gradient(135deg, #64748B, #475569)'
+                      : 'linear-gradient(135deg, #FBBF24, #F59E0B)',
                     boxShadow: isRunning
-                      ? '0 4px 15px rgba(107, 114, 128, 0.3)'
-                      : '0 4px 20px rgba(245, 158, 11, 0.35), 0 0 40px rgba(245, 158, 11, 0.1)',
+                      ? '0 4px 15px rgba(100, 116, 139, 0.3)'
+                      : '0 4px 20px rgba(251, 191, 36, 0.35), 0 0 40px rgba(251, 191, 36, 0.1)',
                   }}
                 >
                   {isRunning ? (

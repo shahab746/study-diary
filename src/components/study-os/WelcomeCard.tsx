@@ -158,9 +158,9 @@ export function WelcomeCard() {
               onClick={handleNextBestTask}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-display font-semibold shadow-lg transition-all relative overflow-hidden"
               style={{
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                color: '#1a1a1a',
-                boxShadow: '0 4px 20px rgba(245, 158, 11, 0.35), 0 0 40px rgba(245, 158, 11, 0.1)',
+                background: 'linear-gradient(135deg, #FBBF24, #F59E0B)',
+                color: '#090A0F',
+                boxShadow: '0 4px 20px rgba(251, 191, 36, 0.35), 0 0 40px rgba(251, 191, 36, 0.1)',
               }}
             >
               <Star className="w-4 h-4" />
@@ -193,7 +193,7 @@ export function WelcomeCard() {
             <motion.div
               className="h-full rounded-full"
               style={{
-                background: 'linear-gradient(90deg, #f59e0b, #d97706)',
+                background: 'linear-gradient(90deg, #FBBF24, #F59E0B)',
               }}
               initial={{ width: 0 }}
               animate={{ width: `${overallProgress}%` }}

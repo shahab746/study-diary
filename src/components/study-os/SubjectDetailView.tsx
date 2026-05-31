@@ -13,26 +13,26 @@ function useMounted() {
 }
 
 const COLOR_HEX: Record<string, string> = {
-  'Blue': '#3b82f6',
-  'Teal': '#14b8a6',
-  'Purple': '#8b5cf6',
-  'Green': '#22c55e',
-  'Amber': '#f59e0b',
+  'Blue': '#38BDF8',
+  'Teal': '#2DD4BF',
+  'Purple': '#A78BFA',
+  'Green': '#34D399',
+  'Amber': '#FBBF24',
 };
 
 const COLOR_TEXT: Record<string, string> = {
-  'Blue': 'text-blue-500',
-  'Teal': 'text-teal-500',
-  'Purple': 'text-purple-500',
-  'Green': 'text-green-500',
-  'Amber': 'text-amber-500',
+  'Blue': 'text-sky-400',
+  'Teal': 'text-teal-400',
+  'Purple': 'text-violet-400',
+  'Green': 'text-emerald-400',
+  'Amber': 'text-amber-400',
 };
 
 const COLOR_BG: Record<string, string> = {
-  'Blue': 'bg-blue-500/10',
+  'Blue': 'bg-sky-500/10',
   'Teal': 'bg-teal-500/10',
-  'Purple': 'bg-purple-500/10',
-  'Green': 'bg-green-500/10',
+  'Purple': 'bg-violet-500/10',
+  'Green': 'bg-emerald-500/10',
   'Amber': 'bg-amber-500/10',
 };
 
@@ -45,11 +45,11 @@ const COLOR_GRADIENT: Record<string, string> = {
 };
 
 const COLOR_TAG: Record<string, { bg: string; text: string }> = {
-  'Blue': { bg: 'bg-blue-500/15', text: 'text-blue-400' },
-  'Teal': { bg: 'bg-teal-500/15', text: 'text-teal-400' },
-  'Purple': { bg: 'bg-purple-500/15', text: 'text-purple-400' },
-  'Green': { bg: 'bg-green-500/15', text: 'text-green-400' },
-  'Amber': { bg: 'bg-amber-500/15', text: 'text-amber-400' },
+  'Blue': { bg: 'bg-sky-500/10', text: 'text-sky-300' },
+  'Teal': { bg: 'bg-teal-500/10', text: 'text-teal-300' },
+  'Purple': { bg: 'bg-violet-500/10', text: 'text-violet-300' },
+  'Green': { bg: 'bg-emerald-500/10', text: 'text-emerald-300' },
+  'Amber': { bg: 'bg-amber-500/10', text: 'text-amber-300' },
 };
 
 function TopicRow({
