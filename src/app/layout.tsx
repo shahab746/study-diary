@@ -1,0 +1,52 @@
+import type { Metadata } from "next";
+import { Inter, Space_Grotesk, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Shahab's Study OS",
+  description: "A high-fidelity, motion-rich productivity environment designed for high-performance engineering study.",
+  icons: {
+    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${inter.variable} ${spaceGrotesk.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}
