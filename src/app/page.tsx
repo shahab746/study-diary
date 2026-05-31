@@ -182,8 +182,6 @@ function DashboardView() {
                   </div>
                 </div>
 
-                {/* Subject Matrix */}
-                <SubjectMatrix />
               </motion.div>
             )}
 

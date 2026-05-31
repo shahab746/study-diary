@@ -273,8 +273,8 @@ export async function GET(request: Request) {
             subjectColor: sq.subjectColor,
             chapterName: topic.chapterName,
             completed: false,
-            videoLink: isFreeUser ? '' : topic.videoLink, // Free users don't see videos
-            pdfLink: topic.pdfLink,
+            videoLink: toValidUrl(isFreeUser ? '' : topic.videoLink), // Free users don't see videos
+            pdfLink: toValidUrl(topic.pdfLink),
             priority,
             subjectIcon: sq.subjectIcon,
             duration: 65,
@@ -337,6 +337,12 @@ export async function GET(request: Request) {
     console.error('Error fetching data:', error);
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
   }
+}
+
+function toValidUrl(value: string): string {
+  if (!value) return '';
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  return '';
 }
 
 function completedCountForMonth(progress: { completed: boolean; dateCompleted: Date | null }[], month: number): number {
