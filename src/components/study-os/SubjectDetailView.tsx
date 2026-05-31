@@ -1,0 +1,399 @@
+'use client';
+
+import { motion, AnimatePresence } from 'framer-motion';
+import { useStudyOS, SubjectDetail, SubjectDetailChapter, SubjectDetailTopic } from '@/lib/store';
+import { Check, ChevronDown, ChevronRight, ArrowLeft, Play, FileText, ExternalLink, Clock, BookOpen } from 'lucide-react';
+import { useState } from 'react';
+
+const COLOR_HEX: Record<string, string> = {
+  'Blue': '#3b82f6',
+  'Teal': '#14b8a6',
+  'Purple': '#8b5cf6',
+  'Green': '#22c55e',
+  'Amber': '#f59e0b',
+};
+
+const COLOR_TEXT: Record<string, string> = {
+  'Blue': 'text-blue-500',
+  'Teal': 'text-teal-500',
+  'Purple': 'text-purple-500',
+  'Green': 'text-green-500',
+  'Amber': 'text-amber-500',
+};
+
+const COLOR_BG: Record<string, string> = {
+  'Blue': 'bg-blue-500/10',
+  'Teal': 'bg-teal-500/10',
+  'Purple': 'bg-purple-500/10',
+  'Green': 'bg-green-500/10',
+  'Amber': 'bg-amber-500/10',
+};
+
+const COLOR_GRADIENT: Record<string, string> = {
+  'Blue': 'from-blue-500 to-blue-600',
+  'Teal': 'from-teal-500 to-teal-600',
+  'Purple': 'from-purple-500 to-purple-600',
+  'Green': 'from-green-500 to-green-600',
+  'Amber': 'from-amber-500 to-amber-600',
+};
+
+function TopicRow({
+  topic,
+  subjectColor,
+  onToggle,
+}: {
+  topic: SubjectDetailTopic;
+  subjectColor: string;
+  onToggle: (id: string) => void;
+}) {
+  const [isAnimating, setIsAnimating] = useState(false);
+  const colorHex = COLOR_HEX[subjectColor] || COLOR_HEX['Amber'];
+  const colorText = COLOR_TEXT[subjectColor] || 'text-amber-500';
+
+  const handleToggle = () => {
+    setIsAnimating(true);
+    onToggle(topic.id);
+    setTimeout(() => setIsAnimating(false), 300);
+  };
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
+        ${topic.completed ? 'opacity-50' : 'hover:bg-secondary/50'}`}
+    >
+      {/* Checkbox */}
+      <motion.button
+        whileTap={{ scale: 0.85 }}
+        onClick={handleToggle}
+        className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200
+          ${topic.completed
+            ? `bg-gradient-to-r ${COLOR_GRADIENT[subjectColor] || COLOR_GRADIENT['Amber']} text-white`
+            : 'border-2 border-muted-foreground/25 hover:border-primary'
+          } ${isAnimating ? 'haptic-click' : ''}`}
+        style={topic.completed ? { backgroundColor: colorHex } : undefined}
+      >
+        {topic.completed && (
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+          >
+            <Check className="w-3.5 h-3.5" />
+          </motion.div>
+        )}
+      </motion.button>
+
+      {/* Topic Info */}
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-medium ${topic.completed ? 'line-through text-muted-foreground' : ''}`}>
+          <span className={`font-mono text-xs ${colorText} mr-2`}>
+            {topic.number}.
+          </span>
+          {topic.name}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
+            <Clock className="w-2.5 h-2.5" />
+            Day {topic.dayNumber}
+          </span>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Watch Video - only show if video exists */}
+        {topic.hasVideo && topic.videoLink && (
+          <a
+            href={topic.videoLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-semibold
+              bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200
+              group-hover:opacity-100 sm:opacity-70"
+          >
+            <Play className="w-3 h-3" />
+            <span className="hidden sm:inline">Watch</span>
+          </a>
+        )}
+
+        {/* View PDF - only show if PDF exists */}
+        {topic.hasPdf && topic.pdfLink && (
+          <a
+            href={topic.pdfLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-semibold
+              bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all duration-200
+              group-hover:opacity-100 sm:opacity-70"
+          >
+            <FileText className="w-3 h-3" />
+            <span className="hidden sm:inline">PDF</span>
+          </a>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function ChapterSection({
+  chapter,
+  subjectColor,
+  onToggleTopic,
+  defaultOpen,
+}: {
+  chapter: SubjectDetailChapter;
+  subjectColor: string;
+  onToggleTopic: (id: string) => void;
+  defaultOpen: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const colorHex = COLOR_HEX[subjectColor] || COLOR_HEX['Amber'];
+  const colorText = COLOR_TEXT[subjectColor] || 'text-amber-500';
+  const colorBg = COLOR_BG[subjectColor] || 'bg-amber-500/10';
+  const isComplete = chapter.completedTopics === chapter.totalTopics && chapter.totalTopics > 0;
+  const progressPct = chapter.totalTopics > 0 ? Math.round((chapter.completedTopics / chapter.totalTopics) * 100) : 0;
+
+  return (
+    <div className="glass rounded-2xl overflow-hidden">
+      {/* Chapter Header */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center gap-3 p-4 hover:bg-secondary/30 transition-colors duration-200"
+      >
+        {/* Chapter number badge */}
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-display font-bold flex-shrink-0
+            ${isComplete ? `bg-gradient-to-r ${COLOR_GRADIENT[subjectColor] || COLOR_GRADIENT['Amber']} text-white` : colorBg}`}
+          style={isComplete ? { backgroundColor: colorHex } : undefined}
+        >
+          {isComplete ? <Check className="w-4 h-4" /> : chapter.number}
+        </div>
+
+        {/* Chapter info */}
+        <div className="flex-1 text-left min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="font-display font-semibold text-sm truncate">{chapter.name}</h3>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {chapter.completedTopics}/{chapter.totalTopics} topics
+            </span>
+            {/* Mini progress bar */}
+            <div className="flex-1 max-w-[80px] h-1 bg-muted/30 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ backgroundColor: colorHex }}
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPct}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+            <span className={`text-[10px] font-mono font-bold ${colorText}`}>{progressPct}%</span>
+          </div>
+        </div>
+
+        {/* Expand/collapse icon */}
+        <motion.div
+          animate={{ rotate: isOpen ? 0 : -90 }}
+          transition={{ duration: 0.2 }}
+          className="text-muted-foreground"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </motion.div>
+      </button>
+
+      {/* Topics list */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-border">
+              {chapter.topics.map((topic) => (
+                <TopicRow
+                  key={topic.id}
+                  topic={topic}
+                  subjectColor={subjectColor}
+                  onToggle={onToggleTopic}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export function SubjectDetailView() {
+  const { subjectDetail, subjectDetailLoading, closeSubjectDetail, toggleSubjectDetailTopic } = useStudyOS();
+  const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
+
+  if (subjectDetailLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="space-y-4 text-center">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 animate-pulse mx-auto" />
+          <div className="w-40 h-4 bg-secondary rounded animate-pulse" />
+          <div className="w-24 h-3 bg-secondary rounded animate-pulse mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!subjectDetail) return null;
+
+  const detail = subjectDetail;
+  const colorHex = COLOR_HEX[detail.color] || COLOR_HEX['Amber'];
+  const colorText = COLOR_TEXT[detail.color] || 'text-amber-500';
+  const colorBg = COLOR_BG[detail.color] || 'bg-amber-500/10';
+  const overallPct = detail.totalTopics > 0 ? Math.round((detail.completedTopics / detail.totalTopics) * 100) : 0;
+  const totalVideoTopics = detail.chapters.reduce((sum, ch) => sum + ch.topics.filter(t => t.hasVideo).length, 0);
+  const totalPdfTopics = detail.chapters.reduce((sum, ch) => sum + ch.topics.filter(t => t.hasPdf).length, 0);
+
+  // Filter chapters and topics
+  const filteredChapters = detail.chapters.map(ch => ({
+    ...ch,
+    topics: ch.topics.filter(t => {
+      if (filter === 'todo') return !t.completed;
+      if (filter === 'done') return t.completed;
+      return true;
+    }),
+  })).filter(ch => ch.topics.length > 0);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 40 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 40 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      className="min-h-screen flex flex-col"
+    >
+      {/* Header */}
+      <div className="glass-strong sticky top-0 z-50 border-b border-border" style={{ borderTop: `3px solid ${colorHex}` }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-3">
+            {/* Back button */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={closeSubjectDetail}
+              className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </motion.button>
+
+            {/* Subject icon */}
+            <div className={`w-10 h-10 rounded-xl ${colorBg} flex items-center justify-center`}>
+              <span className="text-xl">{detail.icon}</span>
+            </div>
+
+            {/* Title & meta */}
+            <div className="flex-1 min-w-0">
+              <h1 className="font-display text-lg font-bold tracking-tight">{detail.name}</h1>
+              <p className="text-[10px] text-muted-foreground font-mono">
+                {detail.grade} · {detail.board} · {detail.field}
+              </p>
+            </div>
+
+            {/* Overall progress */}
+            <div className="text-right flex-shrink-0">
+              <p className="font-display font-bold text-lg">
+                <span className={colorText}>{overallPct}%</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground font-mono">
+                {detail.completedTopics}/{detail.totalTopics} done
+              </p>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-4 mt-3">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <BookOpen className="w-3.5 h-3.5" />
+              <span className="font-mono">{detail.chapterCount} chapters</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Play className="w-3.5 h-3.5" />
+              <span className="font-mono">{totalVideoTopics} videos</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <FileText className="w-3.5 h-3.5" />
+              <span className="font-mono">{totalPdfTopics} PDFs</span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ backgroundColor: colorHex }}
+                initial={{ width: 0 }}
+                animate={{ width: `${overallPct}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+              />
+            </div>
+          </div>
+
+          {/* Filter tabs */}
+          <div className="flex gap-1 mt-3 bg-secondary rounded-lg p-0.5 w-fit">
+            {(['all', 'todo', 'done'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-md text-xs font-mono transition-all duration-200 ${
+                  filter === f
+                    ? 'bg-background shadow-sm text-foreground font-semibold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {f === 'all' ? `All (${detail.totalTopics})` : f === 'todo' ? `To Do (${detail.totalTopics - detail.completedTopics})` : `Done (${detail.completedTopics})`}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Chapters List */}
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-5 space-y-3">
+        {filteredChapters.map((chapter, index) => (
+          <ChapterSection
+            key={chapter.id}
+            chapter={chapter}
+            subjectColor={detail.color}
+            onToggleTopic={toggleSubjectDetailTopic}
+            defaultOpen={index === 0 || filter !== 'all'}
+          />
+        ))}
+
+        {filteredChapters.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-mono">
+              {filter === 'done' ? 'No completed topics yet' : 'All topics completed! 🎉'}
+            </p>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-border glass">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
+            <span>{detail.name} · Study OS</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              {totalVideoTopics} video lessons available
+            </span>
+          </div>
+        </div>
+      </footer>
+    </motion.div>
+  );
+}

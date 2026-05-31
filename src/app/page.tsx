@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS } from '@/lib/store';
 import { Header } from '@/components/study-os/Header';
 import { PacingEngineCard } from '@/components/study-os/PacingEngineCard';
@@ -9,6 +9,7 @@ import { SubjectMatrix } from '@/components/study-os/SubjectMatrix';
 import { TodayTimeline } from '@/components/study-os/TodayTimeline';
 import { PerformanceChart } from '@/components/study-os/PerformanceChart';
 import { RevisionDock } from '@/components/study-os/RevisionDock';
+import { SubjectDetailView } from '@/components/study-os/SubjectDetailView';
 import { Target, Calendar, Flame } from 'lucide-react';
 
 function StatCard({
@@ -77,19 +78,18 @@ function LoadingSkeleton() {
   );
 }
 
-export default function Home() {
-  const { fetchData, isLoading, student, totalCompleted, totalTopics, topicsPerDay } = useStudyOS();
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  if (isLoading) return <LoadingSkeleton />;
-
+function DashboardView() {
+  const { student, totalCompleted, totalTopics, topicsPerDay } = useStudyOS();
   const overallPct = totalTopics > 0 ? Math.round((totalCompleted / totalTopics) * 100) : 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, x: -40 }}
+      transition={{ duration: 0.3 }}
+      className="min-h-screen flex flex-col bg-background"
+    >
       <Header />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-5 space-y-6">
@@ -127,13 +127,10 @@ export default function Home() {
 
         {/* Main Bento Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Left Column - Pacing + Performance */}
           <div className="space-y-5">
             <PacingEngineCard />
             <PerformanceChart />
           </div>
-
-          {/* Center + Right - Subject Matrix (2 columns) */}
           <div className="lg:col-span-2">
             <SubjectMatrix />
           </div>
@@ -162,6 +159,26 @@ export default function Home() {
           </div>
         </div>
       </footer>
-    </div>
+    </motion.div>
+  );
+}
+
+export default function Home() {
+  const { fetchData, isLoading, selectedSubjectId } = useStudyOS();
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (isLoading) return <LoadingSkeleton />;
+
+  return (
+    <AnimatePresence mode="wait">
+      {selectedSubjectId ? (
+        <SubjectDetailView key="subject-detail" />
+      ) : (
+        <DashboardView key="dashboard" />
+      )}
+    </AnimatePresence>
   );
 }

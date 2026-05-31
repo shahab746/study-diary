@@ -26,3 +26,22 @@ Stage Summary:
 - Optimistic UI updates for task completion and pacing changes
 - All components styled with Deep Glass aesthetic, Solar Amber primary color
 - Framer Motion animations throughout (entrance, hover, transitions)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Add Subject Detail View with real video/PDF links from Google Sheet
+
+Work Log:
+- Extracted full curriculum data with real video (84) and PDF (337) links from Google Sheet
+- Re-seeded database with actual video URLs (YouTube) and PDF URLs (Google Drive)
+- Created /api/subject/[subjectId] API endpoint for detailed subject data
+- Added SubjectDetail types and navigation state to Zustand store
+- Built SubjectDetailView component with expandable chapters, Watch/PDF buttons, completion checkboxes
+- Updated SubjectMatrix to navigate to detail on click
+- Updated main page with AnimatePresence for view transitions
+
+Stage Summary:
+- Clicking any subject card opens detailed chapter/topic view with real links
+- If no video exists, no Watch button shown
+- Optimistic completion toggles with backend sync

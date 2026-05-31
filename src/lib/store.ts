@@ -52,6 +52,41 @@ export interface PerformanceData {
   lectures: number;
 }
 
+export interface SubjectDetailTopic {
+  id: string;
+  number: number;
+  name: string;
+  videoLink: string;
+  pdfLink: string;
+  hasVideo: boolean;
+  hasPdf: boolean;
+  dayNumber: number;
+  completed: boolean;
+}
+
+export interface SubjectDetailChapter {
+  id: string;
+  number: number;
+  name: string;
+  topics: SubjectDetailTopic[];
+  completedTopics: number;
+  totalTopics: number;
+}
+
+export interface SubjectDetail {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  grade: string;
+  board: string;
+  field: string;
+  totalTopics: number;
+  chapterCount: number;
+  chapters: SubjectDetailChapter[];
+  completedTopics: number;
+}
+
 interface StudyOSState {
   // Data
   student: {
@@ -77,6 +112,11 @@ interface StudyOSState {
   totalCompleted: number;
   topicsPerDay: number;
 
+  // Subject Detail
+  selectedSubjectId: string | null;
+  subjectDetail: SubjectDetail | null;
+  subjectDetailLoading: boolean;
+
   // UI State
   isLoading: boolean;
   activePacingGoal: string;
@@ -88,6 +128,9 @@ interface StudyOSState {
   toggleTaskComplete: (topicId: string) => Promise<void>;
   setPacingGoal: (goal: string) => Promise<void>;
   setExpandedSubject: (subjectId: string | null) => void;
+  openSubjectDetail: (subjectId: string) => Promise<void>;
+  closeSubjectDetail: () => void;
+  toggleSubjectDetailTopic: (topicId: string) => Promise<void>;
 }
 
 export const useStudyOS = create<StudyOSState>()(
@@ -107,6 +150,9 @@ export const useStudyOS = create<StudyOSState>()(
       activePacingGoal: '5M',
       syncing: false,
       expandedSubject: null,
+      selectedSubjectId: null,
+      subjectDetail: null,
+      subjectDetailLoading: false,
 
       fetchData: async () => {
         set({ isLoading: true });
@@ -137,11 +183,9 @@ export const useStudyOS = create<StudyOSState>()(
         const state = get();
         const phone = state.student?.phone || '';
 
-        // Optimistic update - immediately update UI
         const task = state.todayTasks.find(t => t.topicId === topicId);
         const newCompleted = !task?.completed;
 
-        // Update today tasks optimistically
         set({
           todayTasks: state.todayTasks.map(t =>
             t.topicId === topicId ? { ...t, completed: newCompleted } : t
@@ -152,7 +196,6 @@ export const useStudyOS = create<StudyOSState>()(
           syncing: true,
         });
 
-        // Update subject progress optimistically
         const updatedSubjects = state.subjects.map(s => {
           const taskObj = state.todayTasks.find(t => t.topicId === topicId && t.subjectName === s.subjectName);
           if (taskObj) {
@@ -167,30 +210,20 @@ export const useStudyOS = create<StudyOSState>()(
         });
         set({ subjects: updatedSubjects });
 
-        // Fire-and-forget to backend
         try {
           const res = await fetch('/api/progress', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              topicId,
-              studentPhone: phone,
-              completed: newCompleted,
-            }),
+            body: JSON.stringify({ topicId, studentPhone: phone, completed: newCompleted }),
           });
 
           if (!res.ok) {
-            // Revert on failure - show subtle toast
             console.warn('Sync failed, reverting optimistic update');
-            set({
-              todayTasks: state.todayTasks, // revert
-              syncing: false,
-            });
+            set({ todayTasks: state.todayTasks, syncing: false });
           } else {
             set({ syncing: false });
           }
         } catch {
-          // Silent failure - unobtrusive notification
           set({ syncing: false });
         }
       },
@@ -199,30 +232,22 @@ export const useStudyOS = create<StudyOSState>()(
         const state = get();
         const phone = state.student?.phone || '';
 
-        // Optimistic update
         const pacingInfo = state.pacingGoals[goal];
         set({
           activePacingGoal: goal,
           topicsPerDay: pacingInfo?.topicsPerDay || 4,
         });
 
-        // Fire-and-forget
         try {
           const res = await fetch('/api/pacing', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              pacingGoal: goal,
-              studentPhone: phone,
-            }),
+            body: JSON.stringify({ pacingGoal: goal, studentPhone: phone }),
           });
 
           if (res.ok) {
             const data = await res.json();
-            set({
-              activePacingGoal: goal,
-              topicsPerDay: data.topicsPerDay,
-            });
+            set({ activePacingGoal: goal, topicsPerDay: data.topicsPerDay });
           }
         } catch {
           // Silent failure
@@ -232,13 +257,79 @@ export const useStudyOS = create<StudyOSState>()(
       setExpandedSubject: (subjectId: string | null) => {
         set({ expandedSubject: subjectId });
       },
+
+      openSubjectDetail: async (subjectId: string) => {
+        set({ selectedSubjectId: subjectId, subjectDetailLoading: true, subjectDetail: null });
+        try {
+          const res = await fetch(`/api/subject/${subjectId}`);
+          if (!res.ok) throw new Error('Failed to fetch subject detail');
+          const data = await res.json();
+          set({ subjectDetail: data, subjectDetailLoading: false });
+        } catch (error) {
+          console.error('Failed to fetch subject detail:', error);
+          set({ subjectDetailLoading: false });
+        }
+      },
+
+      closeSubjectDetail: () => {
+        set({ selectedSubjectId: null, subjectDetail: null });
+        // Refresh main data to reflect any changes
+        get().fetchData();
+      },
+
+      toggleSubjectDetailTopic: async (topicId: string) => {
+        const state = get();
+        const phone = state.student?.phone || '';
+        const detail = state.subjectDetail;
+
+        if (!detail) return;
+
+        // Find the current topic to determine new state
+        let currentCompleted = false;
+        for (const ch of detail.chapters) {
+          const topic = ch.topics.find(t => t.id === topicId);
+          if (topic) {
+            currentCompleted = topic.completed;
+            break;
+          }
+        }
+        const newCompleted = !currentCompleted;
+
+        // Optimistic update on subject detail
+        const updatedDetail = {
+          ...detail,
+          chapters: detail.chapters.map(ch => ({
+            ...ch,
+            topics: ch.topics.map(t =>
+              t.id === topicId ? { ...t, completed: newCompleted } : t
+            ),
+            completedTopics: newCompleted
+              ? ch.completedTopics + 1
+              : Math.max(0, ch.completedTopics - 1),
+          })),
+          completedTopics: newCompleted
+            ? detail.completedTopics + 1
+            : Math.max(0, detail.completedTopics - 1),
+        };
+
+        set({ subjectDetail: updatedDetail });
+
+        // Fire-and-forget to backend
+        try {
+          await fetch('/api/progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topicId, studentPhone: phone, completed: newCompleted }),
+          });
+        } catch {
+          // Silent failure
+        }
+      },
     }),
     {
       name: 'study-os-storage',
       partialize: (state) => ({
         activePacingGoal: state.activePacingGoal,
-        todayTasks: state.todayTasks,
-        totalCompleted: state.totalCompleted,
       }),
     }
   )

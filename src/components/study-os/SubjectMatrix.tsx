@@ -92,7 +92,7 @@ function ArcProgress({ progress, color, subjectId }: { progress: number; color: 
   );
 }
 
-function SubjectCard({ subject, index }: { subject: SubjectProgress; index: number }) {
+function SubjectCard({ subject, index, onClick }: { subject: SubjectProgress; index: number; onClick: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
   const colorStyles = COLOR_MAP[subject.color] || COLOR_MAP['Amber'];
   const colorHex = COLOR_HEX[subject.color] || COLOR_HEX['Amber'];
@@ -106,8 +106,10 @@ function SubjectCard({ subject, index }: { subject: SubjectProgress; index: numb
         y: -4,
         transition: { duration: 0.2 },
       }}
+      whileTap={{ scale: 0.98 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
+      onClick={onClick}
       className="glass rounded-2xl p-5 relative overflow-hidden cursor-pointer group"
       style={{
         borderLeft: `3px solid ${colorHex.main}`,
@@ -169,7 +171,7 @@ function SubjectCard({ subject, index }: { subject: SubjectProgress; index: numb
 }
 
 export function SubjectMatrix() {
-  const { subjects } = useStudyOS();
+  const { subjects, openSubjectDetail } = useStudyOS();
 
   return (
     <div>
@@ -183,11 +185,14 @@ export function SubjectMatrix() {
       {/* Bento Grid - Physics & Chemistry get 2 cols on lg, rest get 1 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {subjects.map((subject, index) => {
-          // First and fourth items span 2 columns on large screens for bento effect
           const isWide = index === 0 || index === 3;
           return (
             <div key={subject.subjectId} className={isWide ? 'lg:col-span-2' : ''}>
-              <SubjectCard subject={subject} index={index} />
+              <SubjectCard
+                subject={subject}
+                index={index}
+                onClick={() => openSubjectDetail(subject.subjectId)}
+              />
             </div>
           );
         })}
