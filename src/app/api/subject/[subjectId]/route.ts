@@ -7,6 +7,8 @@ export async function GET(
 ) {
   try {
     const { subjectId } = await params;
+    const url = new URL(request.url);
+    const phone = url.searchParams.get('phone') || '';
 
     const subject = await db.subject.findUnique({
       where: { id: subjectId },
@@ -18,7 +20,7 @@ export async function GET(
               orderBy: { number: 'asc' },
               include: {
                 progress: {
-                  where: { studentPhone: '03360883355' },
+                  where: phone ? { studentPhone: phone } : {},
                 },
               },
             },

@@ -96,3 +96,38 @@ Stage Summary:
 - Free users see limited content (only Physics, no videos)
 - Progress write-back to sheet (requires service account for writes)
 - Cache TTL of 5 minutes, force-refresh on login
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: Seed Grade 9 Curriculum Data into SQLite Database
+
+Work Log:
+- Read existing seed.ts to understand the seeding pattern (Grade 10 uses grade="Grade 10", nested create with chapters->topics)
+- Read curriculum_grade9.json (490 entries, different structure than Grade 10 JSON)
+- Analyzed JSON structure: grade/board/field/subject/chapter_no(chapter_name)/topic_no/topic_name/video_link/pdf_link/is_free/color
+- Created /home/z/my-project/prisma/seed-grade9.ts with:
+  - Imports { db } from '@/lib/db'
+  - Reads curriculum_grade9.json
+  - SUBJECT_CONFIG: Physics(order=1, Blue, atom), Chemistry(order=2, Teal, flask-conical), Biology(order=3, Green, leaf), Maths(order=4, Amber, sigma)
+  - Grade stored as "9" (string, consistent with JSON data)
+  - Board: "BISE Abbottabad", Field: "Science"
+  - Idempotent: checks for existing Grade 9 subjects and deletes them before re-seeding
+  - Groups entries by subject -> chapter, sorts chapters by number
+  - Increments dayNumber from 1 across all topics (1-490)
+  - Parses is_free string ("TRUE"/"FALSE") to boolean
+  - Maps video_link/pdf_link to videoLink/pdfLink fields
+- Ran seed successfully: 4 subjects, 42 chapters, 490 topics
+- Verified via API and direct DB query:
+  - Physics: 86 topics, 9 chapters, color=Blue, icon=atom, order=1
+  - Chemistry: 153 topics, 8 chapters, color=Teal, icon=flask-conical, order=2
+  - Biology: 145 topics, 9 chapters, color=Green, icon=leaf, order=3
+  - Maths: 106 topics, 16 chapters, color=Amber, icon=sigma, order=4
+  - Day numbers: 1-490 (continuous incrementing)
+  - All topics have isFree=false (JSON has "FALSE" for all entries)
+  - No Computer Science subject (correct per Grade 9 spec)
+
+Stage Summary:
+- Grade 9 curriculum data successfully seeded alongside existing Grade 10 data
+- Database now has both Grade 9 (4 subjects) and Grade 10 (5 subjects) curricula
+- Seed script is idempotent and can be re-run safely

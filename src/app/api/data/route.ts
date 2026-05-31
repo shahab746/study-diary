@@ -53,8 +53,12 @@ export async function GET(request: Request) {
       }
     }
 
-    // Fetch subjects with chapters and topic counts (from local DB - curriculum doesn't change often)
+    // Fetch subjects filtered by the student's grade
+    // The DB stores grades as strings like "9", "10", or "Grade 10" — normalize
+    const studentGrade = String(student?.grade || '10');
+    const gradeVariants = [studentGrade, `Grade ${studentGrade}`];
     const subjects = await db.subject.findMany({
+      where: { grade: { in: gradeVariants } },
       orderBy: { order: 'asc' },
       include: {
         chapters: {
@@ -92,8 +96,9 @@ export async function GET(request: Request) {
       });
     }
 
-    // Fetch special courses (from local DB)
+    // Fetch special courses filtered by student's grade
     const specialCourses = await db.specialCourse.findMany({
+      where: { grade: { in: gradeVariants } },
       orderBy: { order: 'asc' },
     });
 

@@ -309,7 +309,9 @@ export const useStudyOS = create<StudyOSState>()(
       openSubjectDetail: async (subjectId: string) => {
         set({ selectedSubjectId: subjectId, subjectDetailLoading: true, subjectDetail: null });
         try {
-          const res = await fetch(`/api/subject/${subjectId}`);
+          const state = get();
+          const phone = state.student?.phone || '';
+          const res = await fetch(`/api/subject/${subjectId}?phone=${encodeURIComponent(phone)}`);
           if (!res.ok) throw new Error('Failed to fetch subject detail');
           const data = await res.json();
           set({ subjectDetail: data, subjectDetailLoading: false });
