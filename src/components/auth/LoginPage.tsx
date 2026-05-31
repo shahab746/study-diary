@@ -50,28 +50,11 @@ export function LoginPage() {
 
       console.log('🔑 Step 1: Credentials verified for', verifyData.user.name);
 
-      // Step 2: Clear any existing session FIRST
+      // Step 2: Create NextAuth session
       setLoginStage('signing_in');
-      console.log('🔑 Step 2: Clearing old session...');
+      console.log('🔑 Step 2: Creating session for', cleanPhone);
 
       localStorage.removeItem('study-os-storage');
-
-      await new Promise<void>((resolve) => {
-        fetch('/api/auth/session')
-          .then(res => res.json())
-          .then(session => {
-            if (session?.user) {
-              console.log('🔑 Old session found for', (session.user as Record<string, unknown>).name, '— signing out first');
-              signOut({ redirect: false }).then(() => {
-                console.log('🔑 Old session cleared, now signing in as new user');
-                setTimeout(resolve, 300);
-              });
-            } else {
-              resolve();
-            }
-          })
-          .catch(() => resolve());
-      });
 
       // Step 3: Create NextAuth session for the new user
       console.log('🔑 Step 3: Creating NextAuth session for', cleanPhone);

@@ -10,7 +10,7 @@ datasource db {
 model Student {
   id             String   @id @default(cuid())
   name           String
-  phone          String
+  phone          String   @unique
   grade          Int
   board          String
   field          String
@@ -23,6 +23,7 @@ model Student {
   daysLeft       Int
   pacingGoal     String   @default("5M")
   pin            String   @default("1234")
+  academicGroup  String   @default("")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

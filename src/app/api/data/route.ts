@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
-import { findUserByPhone, fetchProgressFromSheet, fetchSubjectEligibilityMap } from '@/lib/sheet-sync';
 
 export async function GET(request: Request) {
   try {
@@ -8,33 +7,33 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // Fetch user profile LIVE from Google Sheet
+    // Fetch user profile from local database (fast, no Google Sheets API call)
     let student = null;
-    let academicGroup = ''; // From Google Sheet
+    let academicGroup = '';
     if (phone) {
-      const sheetUser = await findUserByPhone(phone, true);
-      if (sheetUser) {
-        academicGroup = sheetUser.academicGroup || ''; // e.g. "Biology", "Computer Science"
+      const localStudent = await db.student.findUnique({ where: { phone } });
+      if (localStudent) {
+        academicGroup = localStudent.academicGroup || '';
         student = {
-          name: sheetUser.name,
-          phone: sheetUser.phone,
-          grade: sheetUser.grade,
-          board: sheetUser.board,
-          field: sheetUser.field,
-          status: sheetUser.status,
-          startDate: sheetUser.startDate,
-          targetDate: sheetUser.targetDate,
-          currentDay: sheetUser.currentDay,
-          totalDays: sheetUser.totalDays,
-          topicsDone: sheetUser.topicsDone,
-          daysLeft: sheetUser.daysLeft,
-          pacingGoal: '5M', // default, can be overridden
-          academicGroup: sheetUser.academicGroup || '',
+          name: localStudent.name,
+          phone: localStudent.phone,
+          grade: localStudent.grade,
+          board: localStudent.board,
+          field: localStudent.field,
+          status: localStudent.status,
+          startDate: localStudent.startDate,
+          targetDate: localStudent.targetDate,
+          currentDay: localStudent.currentDay,
+          totalDays: localStudent.totalDays,
+          topicsDone: localStudent.topicsDone,
+          daysLeft: localStudent.daysLeft,
+          pacingGoal: localStudent.pacingGoal,
+          academicGroup: localStudent.academicGroup || '',
         };
       }
     }
 
-    // Fallback: if no phone param, try local DB
+    // Fallback: if no phone param, try first student in DB
     if (!student) {
       const localStudent = await db.student.findFirst();
       if (localStudent) {
@@ -52,6 +51,7 @@ export async function GET(request: Request) {
           topicsDone: localStudent.topicsDone,
           daysLeft: localStudent.daysLeft,
           pacingGoal: localStudent.pacingGoal,
+          academicGroup: localStudent.academicGroup || '',
         };
       }
     }
@@ -80,14 +80,8 @@ export async function GET(request: Request) {
     //   - groupEligibility is "Both" (everyone can see it)
     //   - groupEligibility matches the user's academicGroup exactly
     // e.g. Biology student sees "Both" + "Biology" but NOT "Computer Science"
-    //
-    // Also sync groupEligibility from live Curriculum sheet to DB
-    const eligibilityMap = await fetchSubjectEligibilityMap(false);
-    
     const eligibleSubjects = subjects.filter(subject => {
-      // Determine eligibility: prefer live sheet data, fall back to DB value
-      const sheetKey = `${subject.name}-${subject.grade}`;
-      const eligibility = eligibilityMap[sheetKey] || subject.groupEligibility || 'Both';
+      const eligibility = subject.groupEligibility || 'Both';
       
       if (eligibility === 'Both') return true;
       if (academicGroup && eligibility === academicGroup) return true;
@@ -96,29 +90,10 @@ export async function GET(request: Request) {
       return false;
     });
 
-    // Fetch progress - prefer live sheet data, fallback to local DB
-    let progress: { topicId: string; completed: boolean; dateCompleted: Date | null }[] = [];
-    
-    if (phone) {
-      // Try to get progress from the live Google Sheet
-      const sheetProgress = await fetchProgressFromSheet(false);
-      const userProgress = sheetProgress.filter(p => p.phone === phone && p.completed);
-      
-      if (userProgress.length > 0) {
-        progress = userProgress.map(p => ({
-          topicId: p.topicId,
-          completed: p.completed,
-          dateCompleted: p.dateCompleted ? new Date(p.dateCompleted) : null,
-        }));
-      }
-    }
-
-    // Fallback to local DB progress if no sheet progress
-    if (progress.length === 0) {
-      progress = await db.progress.findMany({
-        where: { studentPhone: student?.phone || '' },
-      });
-    }
+    // Fetch progress from local database
+    const progress = await db.progress.findMany({
+      where: { studentPhone: student?.phone || '' },
+    });
 
     // Fetch special courses filtered by student's grade
     const specialCourses = await db.specialCourse.findMany({

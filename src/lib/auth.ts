@@ -1,6 +1,6 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { findUserByPhone } from '@/lib/sheet-sync';
+import { db } from '@/lib/db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -27,42 +27,41 @@ export const authOptions: NextAuthOptions = {
         const cleanPhone = credentials.phone.trim();
         const cleanPin = credentials.pin.trim();
 
-        console.log(`🔐 Auth: Looking up phone="${cleanPhone}" with forceRefresh=true`);
+        console.log(`🔐 Auth: Looking up phone="${cleanPhone}" in local DB`);
 
         try {
-          // LIVE SHEET LOOKUP: Always fetches the latest user data from Google Sheets
-          // forceRefresh=true bypasses ALL caches (in-memory + Next.js fetch cache)
-          // so newly added users can log in immediately
-          const sheetUser = await findUserByPhone(cleanPhone, true);
+          // Use local database for fast lookup (no Google Sheets API call needed)
+          // The /api/login endpoint already syncs from Google Sheets
+          const student = await db.student.findUnique({ where: { phone: cleanPhone } });
 
-          if (!sheetUser) {
-            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}"`);
-            throw new Error('No account found with this phone number. Make sure your phone number matches the one in the sheet.');
+          if (!student) {
+            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in local DB`);
+            throw new Error('No account found with this phone number. Make sure your phone number is in the sheet.');
           }
 
-          console.log(`🔐 Auth: Found user "${sheetUser.name}" (phone: ${sheetUser.phone}, status: ${sheetUser.status}, pin: "${sheetUser.pin}")`);
+          console.log(`🔐 Auth: Found user "${student.name}" (phone: ${student.phone}, status: ${student.status})`);
 
-          if (sheetUser.pin !== cleanPin) {
-            console.warn(`🔐 Auth: PIN mismatch for "${cleanPhone}" (expected: "${sheetUser.pin}", got: "${cleanPin}")`);
+          if (student.pin !== cleanPin) {
+            console.warn(`🔐 Auth: PIN mismatch for "${cleanPhone}"`);
             throw new Error('Incorrect PIN');
           }
 
-          // Check if account is active (paid or free users can both log in,
-          // but free users will have restricted access in the dashboard)
-          if (sheetUser.status === 'blocked' || sheetUser.status === 'disabled') {
+          // Check if account is active
+          if (student.status === 'blocked' || student.status === 'disabled') {
             throw new Error('Your account has been disabled. Please contact support.');
           }
 
-          console.log(`🔐 Auth: Login successful for "${sheetUser.name}" (${sheetUser.status})`);
+          console.log(`🔐 Auth: Login successful for "${student.name}" (${student.status})`);
 
           return {
-            id: sheetUser.phone, // Use phone as unique ID
-            name: sheetUser.name,
-            phone: sheetUser.phone,
-            grade: sheetUser.grade,
-            board: sheetUser.board,
-            field: sheetUser.field,
-            status: sheetUser.status, // 'paid' | 'free' | 'blocked'
+            id: student.phone,
+            name: student.name,
+            phone: student.phone,
+            grade: student.grade,
+            board: student.board,
+            field: student.field,
+            status: student.status,
+            academicGroup: student.academicGroup,
           };
         } catch (error) {
           // Re-throw our own error messages
@@ -94,6 +93,7 @@ export const authOptions: NextAuthOptions = {
         token.board = (user as Record<string, unknown>).board;
         token.field = (user as Record<string, unknown>).field;
         token.status = (user as Record<string, unknown>).status;
+        token.academicGroup = (user as Record<string, unknown>).academicGroup;
       }
       return token;
     },
@@ -104,6 +104,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as Record<string, unknown>).board = token.board;
         (session.user as Record<string, unknown>).field = token.field;
         (session.user as Record<string, unknown>).status = token.status;
+        (session.user as Record<string, unknown>).academicGroup = token.academicGroup;
       }
       return session;
     },
