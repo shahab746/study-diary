@@ -178,7 +178,16 @@ export const useStudyOS = create<StudyOSState>()(
       isFreeUser: false,
 
       fetchData: async (phone?: string) => {
-        set({ isLoading: true });
+        // Clear old data first to prevent showing wrong user's data
+        set({ 
+          isLoading: true, 
+          student: null,
+          subjects: [],
+          todayTasks: [],
+          totalCompleted: 0,
+          focusScore: 0,
+          streak: 0,
+        });
         try {
           const params = phone ? `?phone=${encodeURIComponent(phone)}` : '';
           const res = await fetch(`/api/data${params}`);

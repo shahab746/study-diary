@@ -264,13 +264,21 @@ function AuthLoadingScreen() {
 
 export default function Home() {
   const { data: session, status } = useSession();
-  const { fetchData, isLoading, selectedSubjectId } = useStudyOS();
+  const { fetchData, isLoading, selectedSubjectId, student } = useStudyOS();
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      // Pass the user's phone from session so the API fetches their live data from Google Sheets
-      const phone = (session.user as Record<string, unknown>).phone as string;
-      fetchData(phone);
+      const sessionPhone = (session.user as Record<string, unknown>).phone as string;
+      
+      // Check if the session user matches the currently loaded data
+      // If not, reset and reload (handles user switching)
+      const currentPhone = student?.phone;
+      if (currentPhone && currentPhone !== sessionPhone) {
+        console.log(`🔄 User changed: ${currentPhone} → ${sessionPhone}, reloading data...`);
+      }
+      
+      // Always fetch fresh data for the authenticated session user
+      fetchData(sessionPhone);
     }
   }, [fetchData, status, session]);
 

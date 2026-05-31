@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Phone, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -50,9 +50,40 @@ export function LoginPage() {
 
       console.log('🔑 Step 1: Credentials verified for', verifyData.user.name);
 
-      // Step 2: Create NextAuth session
+      // Step 2: Clear any existing session FIRST
+      // This is critical — if the user was previously logged in as someone else,
+      // we must destroy that session before creating a new one
       setLoginStage('signing_in');
-      console.log('🔑 Step 2: Creating NextAuth session...');
+      console.log('🔑 Step 2: Clearing old session...');
+
+      // Clear Zustand persisted data to avoid showing wrong user's data
+      localStorage.removeItem('study-os-storage');
+
+      // Sign out the old session (if any), then sign in as the new user
+      // We use a callback pattern to ensure sign-out completes before sign-in
+      await new Promise<void>((resolve) => {
+        // Check if there's an existing session by trying to fetch it
+        fetch('/api/auth/session')
+          .then(res => res.json())
+          .then(session => {
+            if (session?.user) {
+              // There IS an old session — sign out first, then sign in
+              console.log('🔑 Old session found for', (session.user as Record<string, unknown>).name, '— signing out first');
+              signOut({ redirect: false }).then(() => {
+                console.log('🔑 Old session cleared, now signing in as new user');
+                // Small delay to let the cookie clear
+                setTimeout(resolve, 300);
+              });
+            } else {
+              // No old session — proceed directly
+              resolve();
+            }
+          })
+          .catch(() => resolve());
+      });
+
+      // Step 3: Create NextAuth session for the new user
+      console.log('🔑 Step 3: Creating NextAuth session for', cleanPhone);
 
       const result = await signIn('credentials', {
         phone: cleanPhone,
@@ -60,34 +91,21 @@ export function LoginPage() {
         redirect: false,
       });
 
-      console.log('🔑 Step 2: NextAuth result:', JSON.stringify(result));
+      console.log('🔑 Step 3: NextAuth result:', JSON.stringify(result));
 
       if (result?.error) {
-        // NextAuth signIn failed even though our API verified the credentials
-        // This shouldn't happen, but handle it gracefully
-        console.error('🔑 NextAuth signIn error after verified credentials:', result.error);
-        
-        // Try once more - sometimes there's a CSRF timing issue
-        console.log('🔑 Retrying NextAuth signIn...');
-        const retryResult = await signIn('credentials', {
-          phone: cleanPhone,
-          pin: cleanPin,
-          redirect: false,
-        });
-        
-        if (retryResult?.error) {
-          setError('Session creation failed. Please refresh the page and try again.');
-          setIsLoading(false);
-          setLoginStage('idle');
-          return;
-        }
+        console.error('🔑 NextAuth signIn error:', result.error);
+        setError('Session creation failed. Please refresh the page and try again.');
+        setIsLoading(false);
+        setLoginStage('idle');
+        return;
       }
 
-      // Step 3: Load dashboard
+      // Step 4: Redirect to dashboard
       setLoginStage('loading_dashboard');
-      console.log('🔑 Step 3: Redirecting to dashboard...');
+      console.log('🔑 Step 4: Redirecting to dashboard...');
 
-      // Hard reload to ensure session is properly initialized
+      // Hard reload to ensure fresh session + fresh Zustand state
       window.location.href = '/';
     } catch (err) {
       console.error('🔑 Login error:', err);
@@ -100,7 +118,7 @@ export function LoginPage() {
   const getLoadingText = () => {
     switch (loginStage) {
       case 'verifying': return 'Verifying credentials...';
-      case 'signing_in': return 'Creating session...';
+      case 'signing_in': return 'Signing in...';
       case 'loading_dashboard': return 'Loading dashboard...';
       default: return 'Signing in...';
     }
