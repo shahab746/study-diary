@@ -267,10 +267,12 @@ export default function Home() {
   const { fetchData, isLoading, selectedSubjectId } = useStudyOS();
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      fetchData();
+    if (status === 'authenticated' && session?.user) {
+      // Pass the user's phone from session so the API fetches their live data from Google Sheets
+      const phone = (session.user as Record<string, unknown>).phone as string;
+      fetchData(phone);
     }
-  }, [fetchData, status]);
+  }, [fetchData, status, session]);
 
   // Show loading while checking session
   if (status === 'loading') return <AuthLoadingScreen />;

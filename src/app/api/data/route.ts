@@ -1,12 +1,59 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { findUserByPhone, fetchProgressFromSheet } from '@/lib/sheet-sync';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Fetch student profile
-    const student = await db.student.findFirst();
-    
-    // Fetch subjects with chapters and topic counts
+    // Get phone from query param (sent by frontend after auth)
+    const url = new URL(request.url);
+    const phone = url.searchParams.get('phone');
+
+    // Fetch user profile LIVE from Google Sheet
+    let student = null;
+    if (phone) {
+      const sheetUser = await findUserByPhone(phone, true);
+      if (sheetUser) {
+        student = {
+          name: sheetUser.name,
+          phone: sheetUser.phone,
+          grade: sheetUser.grade,
+          board: sheetUser.board,
+          field: sheetUser.field,
+          status: sheetUser.status,
+          startDate: sheetUser.startDate,
+          targetDate: sheetUser.targetDate,
+          currentDay: sheetUser.currentDay,
+          totalDays: sheetUser.totalDays,
+          topicsDone: sheetUser.topicsDone,
+          daysLeft: sheetUser.daysLeft,
+          pacingGoal: '5M', // default, can be overridden
+        };
+      }
+    }
+
+    // Fallback: if no phone param, try local DB
+    if (!student) {
+      const localStudent = await db.student.findFirst();
+      if (localStudent) {
+        student = {
+          name: localStudent.name,
+          phone: localStudent.phone,
+          grade: localStudent.grade,
+          board: localStudent.board,
+          field: localStudent.field,
+          status: localStudent.status,
+          startDate: localStudent.startDate,
+          targetDate: localStudent.targetDate,
+          currentDay: localStudent.currentDay,
+          totalDays: localStudent.totalDays,
+          topicsDone: localStudent.topicsDone,
+          daysLeft: localStudent.daysLeft,
+          pacingGoal: localStudent.pacingGoal,
+        };
+      }
+    }
+
+    // Fetch subjects with chapters and topic counts (from local DB - curriculum doesn't change often)
     const subjects = await db.subject.findMany({
       orderBy: { order: 'asc' },
       include: {
@@ -21,22 +68,34 @@ export async function GET() {
       },
     });
 
-    // Fetch all progress records
-    const progress = await db.progress.findMany({
-      where: { studentPhone: student?.phone || '' },
-    });
+    // Fetch progress - prefer live sheet data, fallback to local DB
+    let progress: { topicId: string; completed: boolean; dateCompleted: Date | null }[] = [];
+    
+    if (phone) {
+      // Try to get progress from the live Google Sheet
+      const sheetProgress = await fetchProgressFromSheet(false);
+      const userProgress = sheetProgress.filter(p => p.phone === phone && p.completed);
+      
+      if (userProgress.length > 0) {
+        progress = userProgress.map(p => ({
+          topicId: p.topicId,
+          completed: p.completed,
+          dateCompleted: p.dateCompleted ? new Date(p.dateCompleted) : null,
+        }));
+      }
+    }
 
-    // Fetch special courses
+    // Fallback to local DB progress if no sheet progress
+    if (progress.length === 0) {
+      progress = await db.progress.findMany({
+        where: { studentPhone: student?.phone || '' },
+      });
+    }
+
+    // Fetch special courses (from local DB)
     const specialCourses = await db.specialCourse.findMany({
       orderBy: { order: 'asc' },
     });
-
-    // Fetch config
-    const configs = await db.config.findMany();
-    const configMap: Record<string, string> = {};
-    for (const c of configs) {
-      configMap[c.key] = c.value;
-    }
 
     // Compute per-subject progress
     const subjectProgress = subjects.map(subject => {
@@ -44,15 +103,25 @@ export async function GET() {
       const completedTopics = allTopics.filter(topic =>
         progress.some(p => p.topicId === topic.id && p.completed)
       );
+
+      // For free users, only count "isFree" topics as available
+      const isFreeUser = student?.status === 'free';
+      const availableTopics = isFreeUser ? allTopics.filter(t => t.isFree) : allTopics;
+
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         color: subject.color,
         icon: subject.icon,
-        totalTopics: allTopics.length,
-        completedTopics: completedTopics.length,
-        progressPct: allTopics.length > 0 ? Math.round((completedTopics.length / allTopics.length) * 100) : 0,
+        totalTopics: availableTopics.length,
+        completedTopics: completedTopics.filter(t => 
+          isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
+        ).length,
+        progressPct: availableTopics.length > 0 ? Math.round((completedTopics.filter(t => 
+          isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
+        ).length / availableTopics.length) * 100) : 0,
         chapterCount: subject.chapters.length,
+        isLocked: isFreeUser && subject.name !== 'Physics', // Free users only see Physics
         chapters: subject.chapters.map(ch => ({
           id: ch.id,
           number: ch.number,
@@ -66,25 +135,22 @@ export async function GET() {
     });
 
     // === PARALLEL TASK ASSIGNMENT ALGORITHM ===
-    // This algorithm distributes today's tasks across ALL subjects in parallel,
-    // so the student makes progress on every subject each day regardless of pacing goal.
-    
     const pacingGoal = student?.pacingGoal || '5M';
     const pacingMonths: Record<string, number> = { '3M': 3, '5M': 5, '6M': 6 };
     const months = pacingMonths[pacingGoal] || 5;
     const totalDaysInPlan = months * 30;
-    
+
     const allTopics = subjects.flatMap(s => s.chapters.flatMap(ch => ch.topics));
     const totalTopicsCount = allTopics.length;
     const totalCompleted = progress.filter(p => p.completed).length;
     const totalRemaining = totalTopicsCount - totalCompleted;
-    
-    // Calculate topics per day based on pacing goal (not stale student record)
+
     const currentDay = student?.currentDay || 1;
     const daysLeft = Math.max(1, totalDaysInPlan - currentDay);
     const topicsPerDay = totalRemaining > 0 ? Math.ceil(totalRemaining / daysLeft) : 0;
 
-    // Build a queue of next uncompleted topics for each subject
+    // Build queues per subject
+    const isFreeUser = student?.status === 'free';
     const subjectQueues: Array<{
       subjectName: string;
       subjectColor: string;
@@ -97,6 +163,7 @@ export async function GET() {
         videoLink: string;
         pdfLink: string;
         chapterId: string;
+        isFree: boolean;
       }>;
       totalTopics: number;
       completedCount: number;
@@ -104,20 +171,21 @@ export async function GET() {
     }> = [];
 
     for (const subject of subjects) {
+      // Free users only get tasks from unlocked subjects
+      if (isFreeUser && subject.name !== 'Physics') continue;
+
       const allSubjectTopics = subject.chapters.flatMap(ch => ch.topics);
       const completedCount = allSubjectTopics.filter(t =>
         progress.some(p => p.topicId === t.id && p.completed)
       ).length;
-      
-      // Get remaining topics, sorted by chapter then topic order
+
       const remaining = allSubjectTopics
         .filter(t => !progress.some(p => p.topicId === t.id && p.completed))
+        .filter(t => isFreeUser ? t.isFree : true) // Free users only see free topics
         .sort((a, b) => {
           const chA = subject.chapters.find(ch => ch.id === a.chapterId);
           const chB = subject.chapters.find(ch => ch.id === b.chapterId);
-          if (chA && chB) {
-            if (chA.number !== chB.number) return chA.number - chB.number;
-          }
+          if (chA && chB && chA.number !== chB.number) return chA.number - chB.number;
           return a.number - b.number;
         })
         .map(t => {
@@ -130,11 +198,11 @@ export async function GET() {
             videoLink: t.videoLink,
             pdfLink: t.pdfLink,
             chapterId: t.chapterId,
+            isFree: t.isFree,
           };
         });
 
-      // Calculate expected progress for priority
-      const expectedByNow = Math.round((allSubjectTopics.length / totalDaysInPlan) * (student?.currentDay || 1));
+      const expectedByNow = Math.round((allSubjectTopics.length / totalDaysInPlan) * currentDay);
 
       subjectQueues.push({
         subjectName: subject.name,
@@ -147,19 +215,16 @@ export async function GET() {
       });
     }
 
-    // Calculate how many topics to assign from each subject today
-    // Proportional distribution: each subject gets tasks proportional to its remaining topics
+    // Calculate proportional allocation
     const totalRemainingTopics = subjectQueues.reduce((sum, q) => sum + q.remaining.length, 0);
-    
+
     const subjectTaskAllocation = subjectQueues.map(q => {
       const share = totalRemainingTopics > 0 ? q.remaining.length / totalRemainingTopics : 0;
-      // At least 1 topic from each subject that has remaining topics (parallel requirement)
       const allocated = q.remaining.length > 0 ? Math.max(1, Math.round(topicsPerDay * share)) : 0;
       return { ...q, allocated };
     });
 
-    // Now interleave tasks from all subjects in round-robin fashion
-    // This ensures the student sees tasks from DIFFERENT subjects mixed together
+    // Round-robin interleaving
     const todayTasks: Array<{
       topicId: string;
       topicName: string;
@@ -175,7 +240,6 @@ export async function GET() {
       duration: number;
     }> = [];
 
-    // Pick tasks round-robin from each subject
     const pickIndices: Record<string, number> = {};
     for (const sq of subjectTaskAllocation) {
       pickIndices[sq.subjectName] = 0;
@@ -190,7 +254,7 @@ export async function GET() {
           const topic = sq.remaining[idx];
           const isBehind = sq.completedCount < sq.expectedByNow - 2;
           const isOnTrack = sq.completedCount < sq.expectedByNow;
-          
+
           let priority: 'high' | 'medium' | 'low';
           if (isBehind) priority = 'high';
           else if (isOnTrack) priority = 'medium';
@@ -204,7 +268,7 @@ export async function GET() {
             subjectColor: sq.subjectColor,
             chapterName: topic.chapterName,
             completed: false,
-            videoLink: topic.videoLink,
+            videoLink: isFreeUser ? '' : topic.videoLink, // Free users don't see videos
             pdfLink: topic.pdfLink,
             priority,
             subjectIcon: sq.subjectIcon,
@@ -216,31 +280,27 @@ export async function GET() {
       }
     }
 
-    // Sort tasks: high priority first, then medium, then low
-    // But keep the round-robin interleaving within each priority level
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     todayTasks.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-
-    // Limit to max 10 tasks per day
     const finalTodayTasks = todayTasks.slice(0, 10);
 
-    // Performance data - monthly breakdown
+    // Performance data
     const performanceData = [
       { month: 'May', lectures: completedCountForMonth(progress, 5) },
       { month: 'Jun', lectures: completedCountForMonth(progress, 6) },
       { month: 'Jul', lectures: completedCountForMonth(progress, 7) },
     ];
 
-    // Calculate focus score (percentage of today's tasks done)
-    const todayDone = finalTodayTasks.filter(t => 
+    // Focus score
+    const todayDone = finalTodayTasks.filter(t =>
       progress.some(p => p.topicId === t.topicId && p.completed)
     ).length;
     const focusScore = finalTodayTasks.length > 0 ? Math.round((todayDone / finalTodayTasks.length) * 100) : 0;
 
-    // Calculate streak (consecutive days with at least 1 completion)
+    // Streak
     const streak = calculateStreak(progress);
 
-    // Calculate program week
+    // Program week
     const programWeek = Math.ceil(currentDay / 7);
     const totalWeeks = Math.ceil(totalDaysInPlan / 7);
     const weeksLeft = totalWeeks - programWeek;
@@ -253,26 +313,12 @@ export async function GET() {
     };
 
     return NextResponse.json({
-      student: student ? {
-        name: student.name,
-        phone: student.phone,
-        grade: student.grade,
-        board: student.board,
-        field: student.field,
-        startDate: student.startDate,
-        targetDate: student.targetDate,
-        currentDay: student.currentDay,
-        totalDays: student.totalDays,
-        topicsDone: totalCompleted,
-        daysLeft: student.daysLeft,
-        pacingGoal: student.pacingGoal,
-      } : null,
+      student,
       subjects: subjectProgress,
       specialCourses,
       todayTasks: finalTodayTasks,
       performanceData,
       pacingGoals,
-      config: configMap,
       totalTopics: totalTopicsCount,
       totalCompleted,
       topicsPerDay,
@@ -280,6 +326,7 @@ export async function GET() {
       streak,
       programWeek,
       weeksLeft,
+      isFreeUser,
     });
   } catch (error) {
     console.error('Error fetching data:', error);
@@ -306,7 +353,6 @@ function calculateStreak(progress: { completed: boolean; dateCompleted: Date | n
 
   let streak = 1;
   const today = new Date().toDateString();
-  
   const yesterday = new Date(Date.now() - 86400000).toDateString();
   if (completedDates[0] !== today && completedDates[0] !== yesterday) return 0;
 
@@ -314,11 +360,8 @@ function calculateStreak(progress: { completed: boolean; dateCompleted: Date | n
     const prevDate = new Date(completedDates[i - 1]);
     const currDate = new Date(completedDates[i]);
     const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
-    if (diffDays === 1) {
-      streak++;
-    } else {
-      break;
-    }
+    if (diffDays === 1) streak++;
+    else break;
   }
   return streak;
 }

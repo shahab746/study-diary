@@ -26,7 +26,7 @@ const NAV_ITEMS: { id: SidebarView; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function Sidebar() {
-  const { student, totalCompleted, totalTopics, sidebarView, setSidebarView } = useStudyOS();
+  const { student, totalCompleted, totalTopics, sidebarView, setSidebarView, isFreeUser } = useStudyOS();
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
 
@@ -51,6 +51,12 @@ export function Sidebar() {
               <span className="text-xs font-medium text-foreground">{student?.name || 'Student'}</span>
               <span className="text-[10px] text-muted-foreground font-mono">{totalCompleted} Lec</span>
             </div>
+            {/* Status badge */}
+            {isFreeUser && (
+              <span className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold tracking-wider bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                FREE PLAN
+              </span>
+            )}
           </div>
         </div>
       </div>

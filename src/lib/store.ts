@@ -120,6 +120,7 @@ interface StudyOSState {
   streak: number;
   programWeek: number;
   weeksLeft: number;
+  isFreeUser: boolean;
 
   // Subject Detail
   selectedSubjectId: string | null;
@@ -136,7 +137,7 @@ interface StudyOSState {
   focusTimerMinutes: number;
 
   // Actions
-  fetchData: () => Promise<void>;
+  fetchData: (phone?: string) => Promise<void>;
   toggleTaskComplete: (topicId: string) => Promise<void>;
   setPacingGoal: (goal: string) => Promise<void>;
   setExpandedSubject: (subjectId: string | null) => void;
@@ -174,11 +175,13 @@ export const useStudyOS = create<StudyOSState>()(
       sidebarView: 'today',
       focusTimerActive: false,
       focusTimerMinutes: 25,
+      isFreeUser: false,
 
-      fetchData: async () => {
+      fetchData: async (phone?: string) => {
         set({ isLoading: true });
         try {
-          const res = await fetch('/api/data');
+          const params = phone ? `?phone=${encodeURIComponent(phone)}` : '';
+          const res = await fetch(`/api/data${params}`);
           if (!res.ok) throw new Error('Failed to fetch');
           const data = await res.json();
           set({
@@ -196,6 +199,7 @@ export const useStudyOS = create<StudyOSState>()(
             programWeek: data.programWeek || 3,
             weeksLeft: data.weeksLeft || 60,
             activePacingGoal: data.student?.pacingGoal || '5M',
+            isFreeUser: data.isFreeUser || false,
             isLoading: false,
           });
         } catch (error) {

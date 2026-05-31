@@ -1,6 +1,6 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { db } from '@/lib/db';
+import { findUserByPhone } from '@/lib/sheet-sync';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -23,27 +23,32 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Phone number and PIN are required');
         }
 
-        const student = await db.student.findFirst({
-          where: {
-            phone: credentials.phone,
-          },
-        });
+        // LIVE SHEET LOOKUP: Always fetches the latest user data from Google Sheets
+        // If you add a user to the sheet, they can log in immediately
+        const sheetUser = await findUserByPhone(credentials.phone, true);
 
-        if (!student) {
+        if (!sheetUser) {
           throw new Error('No account found with this phone number');
         }
 
-        if (student.pin !== credentials.pin) {
+        if (sheetUser.pin !== credentials.pin) {
           throw new Error('Incorrect PIN');
         }
 
+        // Check if account is active (paid or free users can both log in,
+        // but free users will have restricted access in the dashboard)
+        if (sheetUser.status === 'blocked' || sheetUser.status === 'disabled') {
+          throw new Error('Your account has been disabled. Please contact support.');
+        }
+
         return {
-          id: student.id,
-          name: student.name,
-          phone: student.phone,
-          grade: student.grade,
-          board: student.board,
-          field: student.field,
+          id: sheetUser.phone, // Use phone as unique ID
+          name: sheetUser.name,
+          phone: sheetUser.phone,
+          grade: sheetUser.grade,
+          board: sheetUser.board,
+          field: sheetUser.field,
+          status: sheetUser.status, // 'paid' | 'free' | 'blocked'
         };
       },
     }),
@@ -55,10 +60,11 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.phone = user.phone;
-        token.grade = user.grade;
-        token.board = user.board;
-        token.field = user.field;
+        token.phone = (user as Record<string, unknown>).phone;
+        token.grade = (user as Record<string, unknown>).grade;
+        token.board = (user as Record<string, unknown>).board;
+        token.field = (user as Record<string, unknown>).field;
+        token.status = (user as Record<string, unknown>).status;
       }
       return token;
     },
@@ -68,6 +74,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as Record<string, unknown>).grade = token.grade;
         (session.user as Record<string, unknown>).board = token.board;
         (session.user as Record<string, unknown>).field = token.field;
+        (session.user as Record<string, unknown>).status = token.status;
       }
       return session;
     },

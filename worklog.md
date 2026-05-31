@@ -4,45 +4,26 @@ Agent: Main Agent
 Task: Build Shahab's Study OS - Complete Dashboard Application
 
 Work Log:
-- Analyzed Google Sheet data structure: 7 sheets (Users, Curriculum, Subjects, Special_Courses, Progress, Config, Syllabus_Reference)
-- Extracted data: Student (Ali, Grade 10, Science), 5 Subjects (Physics/91, Chemistry/132, CS/65, Biology/150, Maths/101), 537 topics total
-- Set up custom CSS with Deep Glass theme, Solar Amber color system, Space Grotesk + Inter fonts
-- Created Prisma schema with Student, Subject, Chapter, Topic, Progress, SpecialCourse, Config models
-- Seeded database with full curriculum data
-- Built API routes: GET /api/data, POST /api/progress, POST /api/pacing
-- Created Zustand store with localStorage persistence and optimistic updates
-- Built all UI components: Header, PacingEngineCard, SubjectMatrix, TodayTimeline, PerformanceChart, RevisionDock
-- Main page layout with stats row, bento grid, mission feed, revision dock, sticky footer
+- Created Prisma schema, seeded DB, built all UI components with Deep Glass aesthetic
+- Full-stack Study OS application running on port 3000
 
 Stage Summary:
-- Full-stack Study OS application running on port 3000
-- Dark mode by default with light mode toggle
-- Optimistic UI updates for task completion and pacing changes
+- Working dashboard with sidebar, mission feed, subject matrix, etc.
 
 ---
 Task ID: 2
 Agent: Main Agent
-Task: Add Subject Detail View with real video/PDF links
-
-Work Log:
-- Created /api/subject/[subjectId] endpoint and SubjectDetailView component
-- Real video/PDF links from Google Sheet, video button hidden when no video
+Task: Add Subject Detail View
 
 Stage Summary:
-- Subject detail page with chapter expansion, Watch/PDF buttons, completion toggles
+- Subject detail with real video/PDF links
 
 ---
 Task ID: 3
 Agent: Main Agent
 Task: Dashboard Redesign + Parallel Mission Feed
 
-Work Log:
-- Rewrote API with parallel task assignment algorithm
-- Created Sidebar, WelcomeCard, StatsGrid, MissionFeed, CalendarStrip components
-- Updated SubjectMatrix, PacingEngineCard, RevisionDock
-
 Stage Summary:
-- Dashboard matches LectureDiary reference design
 - Tasks distributed from ALL subjects in parallel
 
 ---
@@ -50,44 +31,68 @@ Task ID: 4
 Agent: Main Agent
 Task: Fix Biology data + Improve parallel task distribution
 
-Work Log:
-- Updated Biology to 150 topics / 9 chapters
-- Improved round-robin task distribution
-- Enhanced MissionFeed with subject distribution pills and colored borders
-
 Stage Summary:
-- Biology data correct: 150 topics, 9 chapters
-- All subjects represented in Today's Mission Feed
+- Biology 150 topics, 9 chapters. Round-robin task distribution.
 
 ---
 Task ID: 5
 Agent: Main Agent
-Task: Add Login/Logout feature with NextAuth.js
-
-Work Log:
-- Created NextAuth.js configuration with Credentials provider (phone + PIN) in `src/lib/auth.ts`
-- Created NextAuth API route handler at `src/app/api/auth/[...nextauth]/route.ts`
-- Created `.env.local` with NEXTAUTH_SECRET and NEXTAUTH_URL
-- Created `src/components/auth/AuthProvider.tsx` - client-side SessionProvider wrapper
-- Created `src/components/auth/LoginPage.tsx` - Deep Glass styled login page with:
-  - Phone number and PIN input fields
-  - Show/hide PIN toggle
-  - Error message animations with AnimatePresence
-  - Loading spinner on submit
-  - Demo credentials hint (Phone: 03360883355, PIN: 1234)
-  - Ambient background glow effects matching Solar Amber theme
-- Updated `src/app/layout.tsx` - wrapped children with AuthProvider
-- Updated `src/app/page.tsx`:
-  - Added useSession hook for auth state
-  - Shows LoginPage when unauthenticated
-  - Shows AuthLoadingScreen while session is loading
-  - Only fetches data when authenticated
-  - Added logout button to MobileHeader
-- Updated `src/components/study-os/Sidebar.tsx` - added "Sign out" button with LogOut icon
+Task: Add Login/Logout with NextAuth.js
 
 Stage Summary:
-- Full login/logout authentication system with NextAuth.js v4
-- Credentials provider using Student model's phone and pin fields
-- JWT session strategy with 30-day expiry
-- Login page matches Deep Glass aesthetic with amber accents
-- Logout buttons in both desktop sidebar and mobile header
+- Credentials auth using phone + PIN, JWT sessions, login page
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Live Google Sheets Sync for Users, Progress, and Auth
+
+Work Log:
+- Installed `googleapis` package
+- Created `src/lib/sheet-sync.ts` - comprehensive sync service with:
+  - Two modes: Service Account (private sheets) + CSV export (public sheets)
+  - In-memory cache with 5-minute TTL
+  - fetchUsersFromSheet() - reads Users tab (Name, Phone, Grade, Board, Field, Status, etc.)
+  - findUserByPhone() - used by NextAuth for live auth lookup
+  - fetchProgressFromSheet() - reads Progress tab
+  - writeProgressToSheet() - writes progress back (requires service account)
+  - updateUserInSheet() - updates user fields in sheet (requires service account)
+  - testSheetConnection() - health check
+  - CSV fallback parser for public sheet access
+- Updated `src/lib/auth.ts`:
+  - authorize() now calls findUserByPhone() from live sheet (forceRefresh=true on login)
+  - Checks user status: blocked/disabled users can't login
+  - Passes phone, grade, board, field, status in JWT token
+- Updated `src/app/api/data/route.ts`:
+  - Accepts `?phone=` query param from frontend
+  - Fetches user profile LIVE from Google Sheet via findUserByPhone()
+  - Falls back to local DB if no phone param
+  - Reads progress from live sheet when available
+  - Handles free/paid status: free users see limited subjects, no video links
+  - Adds `isFreeUser` flag to response
+  - Free users: only Physics unlocked, no video links in tasks
+- Updated `src/app/api/progress/route.ts`:
+  - Saves to local DB (fast, always works)
+  - Fire-and-forget write-back to Google Sheet (async, non-blocking)
+- Updated `src/lib/store.ts`:
+  - Added `isFreeUser` state
+  - fetchData now accepts optional `phone` parameter
+  - Passes phone to `/api/data?phone=xxx`
+- Updated `src/app/page.tsx`:
+  - On auth, passes user's phone from session to fetchData()
+  - Ensures API uses live sheet data for the logged-in user
+- Updated `src/components/study-os/Sidebar.tsx`:
+  - Shows "FREE PLAN" badge when user has free status
+- Added `.env.local` configuration:
+  - GOOGLE_SHEET_ID
+  - GOOGLE_SERVICE_ACCOUNT_EMAIL (optional, for private sheets)
+  - GOOGLE_PRIVATE_KEY (optional, for private sheets)
+- Verified live data: Sheet has 2 users (Ali + Abdul Wahab), CSV export works
+
+Stage Summary:
+- App is now synced with live Google Sheets
+- Adding a user in the sheet → they can log in immediately
+- User's Status (paid/free), Board, Grade, etc. all pulled live
+- Free users see limited content (only Physics, no videos)
+- Progress write-back to sheet (requires service account for writes)
+- Cache TTL of 5 minutes, force-refresh on login

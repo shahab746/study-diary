@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { writeProgressToSheet } from '@/lib/sheet-sync';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Upsert progress record
+    // 1. Save to local DB (fast, always works)
     const progress = await db.progress.upsert({
       where: {
         topicId_studentPhone: {
@@ -48,6 +49,23 @@ export async function POST(request: NextRequest) {
           data: { topicsDone: totalCompleted },
         });
       }
+    }
+
+    // 2. Write back to Google Sheet (async, non-blocking)
+    // Get the topic's subject and chapter info for the sheet reference
+    const topic = await db.topic.findUnique({
+      where: { id: topicId },
+      include: { chapter: { include: { subject: true } } },
+    });
+
+    if (topic) {
+      // Create a sheet-compatible topic ID (Subject_Chapter_Topic format)
+      const sheetTopicId = `${topic.chapter.subject.name}_${topic.chapter.number}_${topic.number}`;
+      
+      // Fire-and-forget write to Google Sheet
+      writeProgressToSheet(studentPhone, sheetTopicId, completed).catch(err => {
+        console.warn('Sheet write-back failed (non-critical):', err.message);
+      });
     }
 
     return NextResponse.json({ success: true, progress });
