@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Shahab's Study OS",
-  description: "A high-fidelity, motion-rich productivity environment designed for high-performance engineering study.",
+  title: "LectureDiary — Study OS",
+  description: "A high-fidelity, motion-rich productivity dashboard for engineering study. Track progress, manage pacing, and complete your curriculum in parallel.",
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },

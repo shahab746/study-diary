@@ -2,8 +2,15 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS, SubjectDetail, SubjectDetailChapter, SubjectDetailTopic } from '@/lib/store';
-import { Check, ChevronDown, ChevronRight, ArrowLeft, Play, FileText, ExternalLink, Clock, BookOpen } from 'lucide-react';
+import { Check, ChevronDown, ArrowLeft, Play, FileText, Clock, BookOpen, Zap } from 'lucide-react';
 import { useState } from 'react';
+import { useTheme } from 'next-themes';
+import { useSyncExternalStore } from 'react';
+
+const emptySubscribe = () => () => {};
+function useMounted() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
 
 const COLOR_HEX: Record<string, string> = {
   'Blue': '#3b82f6',
@@ -37,6 +44,14 @@ const COLOR_GRADIENT: Record<string, string> = {
   'Amber': 'from-amber-500 to-amber-600',
 };
 
+const COLOR_TAG: Record<string, { bg: string; text: string }> = {
+  'Blue': { bg: 'bg-blue-500/15', text: 'text-blue-400' },
+  'Teal': { bg: 'bg-teal-500/15', text: 'text-teal-400' },
+  'Purple': { bg: 'bg-purple-500/15', text: 'text-purple-400' },
+  'Green': { bg: 'bg-green-500/15', text: 'text-green-400' },
+  'Amber': { bg: 'bg-amber-500/15', text: 'text-amber-400' },
+};
+
 function TopicRow({
   topic,
   subjectColor,
@@ -49,6 +64,7 @@ function TopicRow({
   const [isAnimating, setIsAnimating] = useState(false);
   const colorHex = COLOR_HEX[subjectColor] || COLOR_HEX['Amber'];
   const colorText = COLOR_TEXT[subjectColor] || 'text-amber-500';
+  const colorTag = COLOR_TAG[subjectColor] || COLOR_TAG['Amber'];
 
   const handleToggle = () => {
     setIsAnimating(true);
@@ -69,12 +85,11 @@ function TopicRow({
       <motion.button
         whileTap={{ scale: 0.85 }}
         onClick={handleToggle}
-        className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200
+        className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200
           ${topic.completed
-            ? `bg-gradient-to-r ${COLOR_GRADIENT[subjectColor] || COLOR_GRADIENT['Amber']} text-white`
+            ? `${colorTag.bg}`
             : 'border-2 border-muted-foreground/25 hover:border-primary'
           } ${isAnimating ? 'haptic-click' : ''}`}
-        style={topic.completed ? { backgroundColor: colorHex } : undefined}
       >
         {topic.completed && (
           <motion.div
@@ -82,7 +97,7 @@ function TopicRow({
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 500, damping: 20 }}
           >
-            <Check className="w-3.5 h-3.5" />
+            <Check className={`w-3.5 h-3.5 ${colorText}`} />
           </motion.div>
         )}
       </motion.button>
@@ -105,7 +120,6 @@ function TopicRow({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        {/* Watch Video - only show if video exists */}
         {topic.hasVideo && topic.videoLink && (
           <a
             href={topic.videoLink}
@@ -120,7 +134,6 @@ function TopicRow({
           </a>
         )}
 
-        {/* View PDF - only show if PDF exists */}
         {topic.hasPdf && topic.pdfLink && (
           <a
             href={topic.pdfLink}
@@ -158,32 +171,26 @@ function ChapterSection({
   const progressPct = chapter.totalTopics > 0 ? Math.round((chapter.completedTopics / chapter.totalTopics) * 100) : 0;
 
   return (
-    <div className="glass rounded-2xl overflow-hidden">
-      {/* Chapter Header */}
+    <div className="glass rounded-xl overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center gap-3 p-4 hover:bg-secondary/30 transition-colors duration-200"
       >
-        {/* Chapter number badge */}
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-display font-bold flex-shrink-0
-            ${isComplete ? `bg-gradient-to-r ${COLOR_GRADIENT[subjectColor] || COLOR_GRADIENT['Amber']} text-white` : colorBg}`}
-          style={isComplete ? { backgroundColor: colorHex } : undefined}
+          className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-display font-bold flex-shrink-0
+            ${isComplete ? colorBg : colorBg}`}
+          style={isComplete ? { backgroundColor: colorHex, color: 'white' } : undefined}
         >
-          {isComplete ? <Check className="w-4 h-4" /> : chapter.number}
+          {isComplete ? <Check className="w-3.5 h-3.5" /> : chapter.number}
         </div>
 
-        {/* Chapter info */}
         <div className="flex-1 text-left min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-display font-semibold text-sm truncate">{chapter.name}</h3>
-          </div>
+          <h3 className="font-display font-semibold text-sm truncate">{chapter.name}</h3>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-[10px] font-mono text-muted-foreground">
               {chapter.completedTopics}/{chapter.totalTopics} topics
             </span>
-            {/* Mini progress bar */}
-            <div className="flex-1 max-w-[80px] h-1 bg-muted/30 rounded-full overflow-hidden">
+            <div className="flex-1 max-w-[60px] h-1 bg-muted/30 rounded-full overflow-hidden">
               <motion.div
                 className="h-full rounded-full"
                 style={{ backgroundColor: colorHex }}
@@ -196,7 +203,6 @@ function ChapterSection({
           </div>
         </div>
 
-        {/* Expand/collapse icon */}
         <motion.div
           animate={{ rotate: isOpen ? 0 : -90 }}
           transition={{ duration: 0.2 }}
@@ -206,7 +212,6 @@ function ChapterSection({
         </motion.div>
       </button>
 
-      {/* Topics list */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -234,12 +239,14 @@ function ChapterSection({
 }
 
 export function SubjectDetailView() {
-  const { subjectDetail, subjectDetailLoading, closeSubjectDetail, toggleSubjectDetailTopic } = useStudyOS();
+  const { subjectDetail, subjectDetailLoading, closeSubjectDetail, toggleSubjectDetailTopic, student } = useStudyOS();
+  const { theme, setTheme } = useTheme();
+  const mounted = useMounted();
   const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
 
   if (subjectDetailLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">
           <div className="w-12 h-12 rounded-xl bg-primary/10 animate-pulse mx-auto" />
           <div className="w-40 h-4 bg-secondary rounded animate-pulse" />
@@ -259,7 +266,6 @@ export function SubjectDetailView() {
   const totalVideoTopics = detail.chapters.reduce((sum, ch) => sum + ch.topics.filter(t => t.hasVideo).length, 0);
   const totalPdfTopics = detail.chapters.reduce((sum, ch) => sum + ch.topics.filter(t => t.hasPdf).length, 0);
 
-  // Filter chapters and topics
   const filteredChapters = detail.chapters.map(ch => ({
     ...ch,
     topics: ch.topics.filter(t => {
@@ -269,19 +275,21 @@ export function SubjectDetailView() {
     }),
   })).filter(ch => ch.topics.length > 0);
 
+  // Compute estimated total hours
+  const totalHours = Math.round((detail.totalTopics * 65) / 60);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 40 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="min-h-screen flex flex-col"
+      className="min-h-screen flex flex-col bg-background"
     >
       {/* Header */}
       <div className="glass-strong sticky top-0 z-50 border-b border-border" style={{ borderTop: `3px solid ${colorHex}` }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
-            {/* Back button */}
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={closeSubjectDetail}
@@ -290,20 +298,19 @@ export function SubjectDetailView() {
               <ArrowLeft className="w-4 h-4" />
             </motion.button>
 
-            {/* Subject icon */}
             <div className={`w-10 h-10 rounded-xl ${colorBg} flex items-center justify-center`}>
               <span className="text-xl">{detail.icon}</span>
             </div>
 
-            {/* Title & meta */}
             <div className="flex-1 min-w-0">
-              <h1 className="font-display text-lg font-bold tracking-tight">{detail.name}</h1>
+              <h1 className="font-display text-lg font-bold tracking-tight">
+                {detail.name} <span className="text-muted-foreground font-normal text-sm">— ~{totalHours}h remaining</span>
+              </h1>
               <p className="text-[10px] text-muted-foreground font-mono">
                 {detail.grade} · {detail.board} · {detail.field}
               </p>
             </div>
 
-            {/* Overall progress */}
             <div className="text-right flex-shrink-0">
               <p className="font-display font-bold text-lg">
                 <span className={colorText}>{overallPct}%</span>
@@ -329,7 +336,6 @@ export function SubjectDetailView() {
               <span className="font-mono">{totalPdfTopics} PDFs</span>
             </div>
 
-            {/* Progress bar */}
             <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
               <motion.div
                 className="h-full rounded-full"
@@ -376,7 +382,7 @@ export function SubjectDetailView() {
           <div className="text-center py-12 text-muted-foreground">
             <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm font-mono">
-              {filter === 'done' ? 'No completed topics yet' : 'All topics completed! 🎉'}
+              {filter === 'done' ? 'No completed topics yet' : 'All topics completed!'}
             </p>
           </div>
         )}
@@ -386,7 +392,7 @@ export function SubjectDetailView() {
       <footer className="mt-auto border-t border-border glass">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
-            <span>{detail.name} · Study OS</span>
+            <span>{detail.name} · LectureDiary</span>
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               {totalVideoTopics} video lessons available

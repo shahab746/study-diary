@@ -30,6 +30,9 @@ export interface TodayTask {
   completed: boolean;
   videoLink: string;
   pdfLink: string;
+  priority: 'high' | 'medium' | 'low';
+  subjectIcon: string;
+  duration: number;
 }
 
 export interface SpecialCourseItem {
@@ -87,6 +90,8 @@ export interface SubjectDetail {
   completedTopics: number;
 }
 
+type SidebarView = 'today' | 'tasks' | 'courses' | 'schedule';
+
 interface StudyOSState {
   // Data
   student: {
@@ -111,6 +116,10 @@ interface StudyOSState {
   totalTopics: number;
   totalCompleted: number;
   topicsPerDay: number;
+  focusScore: number;
+  streak: number;
+  programWeek: number;
+  weeksLeft: number;
 
   // Subject Detail
   selectedSubjectId: string | null;
@@ -122,6 +131,9 @@ interface StudyOSState {
   activePacingGoal: string;
   syncing: boolean;
   expandedSubject: string | null;
+  sidebarView: SidebarView;
+  focusTimerActive: boolean;
+  focusTimerMinutes: number;
 
   // Actions
   fetchData: () => Promise<void>;
@@ -131,6 +143,8 @@ interface StudyOSState {
   openSubjectDetail: (subjectId: string) => Promise<void>;
   closeSubjectDetail: () => void;
   toggleSubjectDetailTopic: (topicId: string) => Promise<void>;
+  setSidebarView: (view: SidebarView) => void;
+  toggleFocusTimer: () => void;
 }
 
 export const useStudyOS = create<StudyOSState>()(
@@ -146,6 +160,10 @@ export const useStudyOS = create<StudyOSState>()(
       totalTopics: 539,
       totalCompleted: 0,
       topicsPerDay: 4,
+      focusScore: 0,
+      streak: 0,
+      programWeek: 3,
+      weeksLeft: 60,
       isLoading: true,
       activePacingGoal: '5M',
       syncing: false,
@@ -153,6 +171,9 @@ export const useStudyOS = create<StudyOSState>()(
       selectedSubjectId: null,
       subjectDetail: null,
       subjectDetailLoading: false,
+      sidebarView: 'today',
+      focusTimerActive: false,
+      focusTimerMinutes: 25,
 
       fetchData: async () => {
         set({ isLoading: true });
@@ -170,6 +191,10 @@ export const useStudyOS = create<StudyOSState>()(
             totalTopics: data.totalTopics,
             totalCompleted: data.totalCompleted,
             topicsPerDay: data.topicsPerDay,
+            focusScore: data.focusScore || 0,
+            streak: data.streak || 0,
+            programWeek: data.programWeek || 3,
+            weeksLeft: data.weeksLeft || 60,
             activePacingGoal: data.student?.pacingGoal || '5M',
             isLoading: false,
           });
@@ -195,6 +220,14 @@ export const useStudyOS = create<StudyOSState>()(
             : Math.max(0, state.totalCompleted - 1),
           syncing: true,
         });
+
+        // Update focus score
+        const updatedTasks = state.todayTasks.map(t =>
+          t.topicId === topicId ? { ...t, completed: newCompleted } : t
+        );
+        const doneCount = updatedTasks.filter(t => t.completed).length;
+        const focusScore = updatedTasks.length > 0 ? Math.round((doneCount / updatedTasks.length) * 100) : 0;
+        set({ focusScore });
 
         const updatedSubjects = state.subjects.map(s => {
           const taskObj = state.todayTasks.find(t => t.topicId === topicId && t.subjectName === s.subjectName);
@@ -248,6 +281,8 @@ export const useStudyOS = create<StudyOSState>()(
           if (res.ok) {
             const data = await res.json();
             set({ activePacingGoal: goal, topicsPerDay: data.topicsPerDay });
+            // Refresh tasks for new pacing
+            get().fetchData();
           }
         } catch {
           // Silent failure
@@ -273,7 +308,6 @@ export const useStudyOS = create<StudyOSState>()(
 
       closeSubjectDetail: () => {
         set({ selectedSubjectId: null, subjectDetail: null });
-        // Refresh main data to reflect any changes
         get().fetchData();
       },
 
@@ -284,7 +318,6 @@ export const useStudyOS = create<StudyOSState>()(
 
         if (!detail) return;
 
-        // Find the current topic to determine new state
         let currentCompleted = false;
         for (const ch of detail.chapters) {
           const topic = ch.topics.find(t => t.id === topicId);
@@ -295,7 +328,6 @@ export const useStudyOS = create<StudyOSState>()(
         }
         const newCompleted = !currentCompleted;
 
-        // Optimistic update on subject detail
         const updatedDetail = {
           ...detail,
           chapters: detail.chapters.map(ch => ({
@@ -314,7 +346,6 @@ export const useStudyOS = create<StudyOSState>()(
 
         set({ subjectDetail: updatedDetail });
 
-        // Fire-and-forget to backend
         try {
           await fetch('/api/progress', {
             method: 'POST',
@@ -324,6 +355,14 @@ export const useStudyOS = create<StudyOSState>()(
         } catch {
           // Silent failure
         }
+      },
+
+      setSidebarView: (view: SidebarView) => {
+        set({ sidebarView: view });
+      },
+
+      toggleFocusTimer: () => {
+        set(state => ({ focusTimerActive: !state.focusTimerActive }));
       },
     }),
     {

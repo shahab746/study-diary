@@ -46,26 +46,34 @@ const COLOR_MAP: Record<string, { bg: string; border: string; gradient: string; 
   },
 };
 
+const COLOR_TAG: Record<string, { bg: string; text: string }> = {
+  'Blue': { bg: 'bg-blue-500/15', text: 'text-blue-400' },
+  'Teal': { bg: 'bg-teal-500/15', text: 'text-teal-400' },
+  'Purple': { bg: 'bg-purple-500/15', text: 'text-purple-400' },
+  'Green': { bg: 'bg-green-500/15', text: 'text-green-400' },
+  'Amber': { bg: 'bg-amber-500/15', text: 'text-amber-400' },
+};
+
 function ArcProgress({ progress, color, subjectId }: { progress: number; color: string; subjectId: string }) {
   const colorHex = COLOR_HEX[color] || COLOR_HEX['Amber'];
-  const radius = 28;
+  const radius = 24;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
   const isNearCompletion = progress >= 80;
   const gradientId = `arc-grad-${subjectId}`;
 
   return (
-    <div className="relative w-16 h-16 flex items-center justify-center">
-      <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+    <div className="relative w-12 h-12 flex items-center justify-center">
+      <svg className="w-12 h-12 -rotate-90" viewBox="0 0 56 56">
         <circle
-          cx="32" cy="32" r={radius}
+          cx="28" cy="28" r={radius}
           fill="none"
           stroke="currentColor"
           strokeWidth="3"
           className="text-muted/30"
         />
         <motion.circle
-          cx="32" cy="32" r={radius}
+          cx="28" cy="28" r={radius}
           fill="none"
           stroke={`url(#${gradientId})`}
           strokeWidth={isNearCompletion ? 4 : 3}
@@ -84,7 +92,7 @@ function ArcProgress({ progress, color, subjectId }: { progress: number; color: 
         </defs>
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className={`text-xs font-display font-bold ${COLOR_MAP[color]?.text || 'text-amber-500'}`}>
+        <span className={`text-[10px] font-display font-bold ${COLOR_MAP[color]?.text || 'text-amber-500'}`}>
           {progress}%
         </span>
       </div>
@@ -96,75 +104,65 @@ function SubjectCard({ subject, index, onClick }: { subject: SubjectProgress; in
   const [isHovered, setIsHovered] = useState(false);
   const colorStyles = COLOR_MAP[subject.color] || COLOR_MAP['Amber'];
   const colorHex = COLOR_HEX[subject.color] || COLOR_HEX['Amber'];
+  const colorTag = COLOR_TAG[subject.color] || COLOR_TAG['Amber'];
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.4, delay: index * 0.08 }}
-      whileHover={{
-        y: -4,
-        transition: { duration: 0.2 },
-      }}
+      transition={{ duration: 0.4, delay: index * 0.06 }}
+      whileHover={{ y: -3, transition: { duration: 0.2 } }}
       whileTap={{ scale: 0.98 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       onClick={onClick}
-      className="glass rounded-2xl p-5 relative overflow-hidden cursor-pointer group"
+      className="glass rounded-xl p-4 relative overflow-hidden cursor-pointer group"
       style={{
         borderLeft: `3px solid ${colorHex.main}`,
-        boxShadow: isHovered ? `0 12px 40px rgba(0,0,0,0.12), 0 0 20px ${colorHex.main}20` : undefined,
+        boxShadow: isHovered ? `0 8px 30px rgba(0,0,0,0.12), 0 0 15px ${colorHex.main}20` : undefined,
       }}
     >
       {/* Hover gradient overlay */}
       <div
-        className="absolute inset-0 pointer-events-none rounded-2xl transition-opacity duration-300"
+        className="absolute inset-0 pointer-events-none rounded-xl transition-opacity duration-300"
         style={{
           background: `linear-gradient(135deg, ${colorHex.main}08 0%, transparent 60%)`,
           opacity: isHovered ? 1 : 0,
         }}
       />
 
-      {/* Top-left squircle icon */}
-      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${colorStyles.bg} mb-3 relative z-10`}>
-        <span className="text-xl">{subject.icon}</span>
-      </div>
-
-      {/* Subject info */}
-      <h3 className="font-display text-base font-bold tracking-tight relative z-10">{subject.subjectName}</h3>
-      <p className="text-xs text-muted-foreground font-mono mt-0.5 relative z-10">
-        {subject.chapters.length} chapters · {subject.color}
-      </p>
-
-      {/* Progress arc + stats row */}
-      <div className="flex items-center justify-between mt-4 relative z-10">
-        <ArcProgress progress={subject.progressPct} color={subject.color} subjectId={subject.subjectId} />
-        <div className="text-right">
-          <p className="text-2xl font-display font-bold">
-            {subject.completedTopics}<span className="text-muted-foreground text-sm">/{subject.totalTopics}</span>
-          </p>
-          <p className="text-xs text-muted-foreground font-mono">TOPICS DONE</p>
+      <div className="flex items-center gap-3 relative z-10">
+        {/* Icon */}
+        <div className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${colorStyles.bg}`}>
+          <span className="text-base">{subject.icon}</span>
         </div>
+        
+        {/* Subject name + tag */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-display text-sm font-bold tracking-tight">{subject.subjectName}</h3>
+          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${colorTag.bg} ${colorTag.text}`}>
+            {subject.chapterCount} chapters
+          </span>
+        </div>
+
+        {/* Arc progress */}
+        <ArcProgress progress={subject.progressPct} color={subject.color} subjectId={subject.subjectId} />
       </div>
 
-      {/* Chapter progress dots */}
-      <div className="flex gap-1 mt-3 relative z-10">
-        {subject.chapters.slice(0, 10).map((ch) => (
-          <div
-            key={ch.id}
-            className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-              ch.completedTopics === ch.totalTopics && ch.totalTopics > 0
-                ? `bg-gradient-to-r ${colorStyles.gradient}`
-                : ch.completedTopics > 0
-                ? `${colorStyles.bg}`
-                : 'bg-muted/30'
-            }`}
-            title={`Ch ${ch.number}: ${ch.name} (${ch.completedTopics}/${ch.totalTopics})`}
+      {/* Progress stats */}
+      <div className="flex items-center justify-between mt-3 relative z-10">
+        <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden mr-3">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ backgroundColor: colorHex.main }}
+            initial={{ width: 0 }}
+            animate={{ width: `${subject.progressPct}%` }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
           />
-        ))}
-        {subject.chapters.length > 10 && (
-          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 self-center" />
-        )}
+        </div>
+        <span className="text-[10px] font-mono text-muted-foreground flex-shrink-0">
+          {subject.completedTopics}/{subject.totalTopics}
+        </span>
       </div>
     </motion.div>
   );
@@ -175,27 +173,22 @@ export function SubjectMatrix() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="font-display text-lg font-bold tracking-tight">Subject Matrix</h2>
-        <span className="text-xs text-muted-foreground font-mono px-2 py-0.5 bg-secondary rounded-md">
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="font-display text-lg font-bold tracking-tight">Courses</h2>
+        <span className="text-[10px] text-muted-foreground font-mono px-2 py-0.5 bg-secondary rounded-md">
           {subjects.length} SUBJECTS
         </span>
       </div>
 
-      {/* Bento Grid - Physics & Chemistry get 2 cols on lg, rest get 1 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {subjects.map((subject, index) => {
-          const isWide = index === 0 || index === 3;
-          return (
-            <div key={subject.subjectId} className={isWide ? 'lg:col-span-2' : ''}>
-              <SubjectCard
-                subject={subject}
-                index={index}
-                onClick={() => openSubjectDetail(subject.subjectId)}
-              />
-            </div>
-          );
-        })}
+      <div className="space-y-2">
+        {subjects.map((subject, index) => (
+          <SubjectCard
+            key={subject.subjectId}
+            subject={subject}
+            index={index}
+            onClick={() => openSubjectDetail(subject.subjectId)}
+          />
+        ))}
       </div>
     </div>
   );

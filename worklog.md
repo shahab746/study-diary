@@ -45,3 +45,45 @@ Stage Summary:
 - Clicking any subject card opens detailed chapter/topic view with real links
 - If no video exists, no Watch button shown
 - Optimistic completion toggles with backend sync
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Complete Dashboard Redesign to Match Reference Images + Fix Mission Feed Logic for Parallel Subject Distribution
+
+Work Log:
+- Analyzed 3 design reference images using VLM (LectureDiary/StudyFlow design patterns)
+- Design requirements: Left sidebar nav, Welcome hero card, Stats grid, Priority-coded Mission Feed, Calendar strip
+- Rewrote API data route with parallel task assignment algorithm:
+  - Calculates topics/day proportionally from each subject based on pacing goal
+  - Round-robin distribution ensures ALL subjects progress in parallel
+  - Priority levels: HIGH (behind schedule), MEDIUM (on track but due), LOW (ahead of schedule)
+  - Added focusScore, streak, programWeek, weeksLeft calculations
+- Updated Zustand store with new types: TodayTask.priority, TodayTask.subjectIcon, TodayTask.duration
+  - Added sidebarView, focusTimerActive, focusTimerMinutes state
+  - Added setSidebarView, toggleFocusTimer actions
+  - Focus score recalculated on task toggle
+- Updated CSS theme: darker backgrounds matching reference, priority pulse animation
+- Created new components:
+  - Sidebar.tsx: Desktop left sidebar with logo, user info, nav items, utilities, dark mode toggle
+  - WelcomeCard.tsx: Hero card with date, greeting, next task, action buttons
+  - StatsGrid.tsx: 4 stat cards (Focus Score, Study Time, Streak, Program Week)
+  - MissionFeed.tsx: Redesigned with priority dots, color-coded course tags, 65m duration, circular checkboxes
+  - CalendarStrip.tsx: Last 7 days calendar with today highlighted
+- Updated existing components:
+  - SubjectMatrix.tsx: Compact cards with progress bars, course tags, click to detail
+  - PacingEngineCard.tsx: Smaller compact version for sidebar/schedule view
+  - RevisionDock.tsx: Compact grid layout
+  - SubjectDetailView.tsx: Updated with new design patterns
+- Rewrote page.tsx with sidebar layout, mobile header, mobile bottom nav
+- Removed old unused components: Header.tsx, TodayTimeline.tsx, PerformanceChart.tsx
+- Fixed naming conflict: Home component vs Home icon from lucide-react
+
+Stage Summary:
+- Dashboard now matches the LectureDiary/StudyFlow reference design
+- Mission Feed uses parallel task distribution - tasks assigned from ALL subjects proportionally
+- Changing pacing goal (3M/5M/6M) recalculates and redistributes tasks across all subjects
+- Sidebar navigation: Today (welcome+stats+missions+calendar), Tasks, Courses, Schedule
+- Mobile responsive with bottom nav bar
+- Priority indicators: HIGH (red pulse dot), MEDIUM (amber), LOW (gray)
+- Each mission card shows: priority, subject tag, chapter, duration (65m), video/PDF links
