@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByPhone } from '@/lib/sheet-sync';
 
 export async function GET(
   request: NextRequest,
@@ -35,9 +34,10 @@ export async function GET(
     }
 
     // Check Group_Eligibility: if the subject is restricted, verify the user is eligible
+    // Use local DB for fast lookup (no Google Sheets API call)
     if (subject.groupEligibility && subject.groupEligibility !== 'Both' && phone) {
-      const sheetUser = await findUserByPhone(phone, false);
-      const userGroup = sheetUser?.academicGroup || '';
+      const localStudent = await db.student.findUnique({ where: { phone } });
+      const userGroup = localStudent?.academicGroup || '';
       if (userGroup && subject.groupEligibility !== userGroup) {
         return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });
       }

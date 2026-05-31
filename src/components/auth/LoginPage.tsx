@@ -75,11 +75,13 @@ export function LoginPage() {
         return;
       }
 
-      // Step 4: Redirect to dashboard
+      // Step 4: Wait for session to be established, then reload
       setLoginStage('loading_dashboard');
-      console.log('🔑 Step 4: Redirecting to dashboard...');
+      console.log('🔑 Step 4: Session created, waiting for dashboard...');
 
-      window.location.href = '/';
+      // Small delay to ensure session cookie is set, then soft reload
+      await new Promise(resolve => setTimeout(resolve, 500));
+      window.location.reload();
     } catch (err) {
       console.error('🔑 Login error:', err);
       setError('Connection error. Please check your internet and try again.');

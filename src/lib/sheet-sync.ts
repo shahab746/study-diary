@@ -1,18 +1,15 @@
 /**
- * Google Sheets Live Sync Service
+ * Google Sheets Live Sync Service — CSV-Only Mode
  * 
- * Reads data directly from the live Google Sheet so that:
+ * Reads data directly from the live Google Sheet via public CSV export.
  * - Adding a user in the sheet enables instant login
  * - Status (free/paid), Board, Grade, etc. are always up-to-date
  * - Curriculum changes are reflected automatically
  * 
- * Two modes:
- * 1. Service Account (PRIVATE sheets) - Full read/write with Google Sheets API
- * 2. Public Export (PUBLIC sheets) - Read-only via CSV export URL
- *    Falls back automatically when no service account is configured
+ * NOTE: The heavy `googleapis` package has been removed to save ~600MB of server memory.
+ * Write operations (progress sync, user updates) are saved to the local DB only.
+ * To re-enable Google Sheets API writes, add a service account and import googleapis.
  */
-
-import { google } from 'googleapis';
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID || '1cBUd2-hFPqPvY444GJ82GRjfSsZn20kPcSrQib3bhkE';
 
@@ -52,31 +49,7 @@ export interface SheetProgress {
 }
 
 // ============================================
-// Authentication: Service Account or Public
-// ============================================
-
-const hasServiceAccount = !!(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY);
-
-function getAuth() {
-  if (hasServiceAccount) {
-    const auth = new google.auth.JWT(
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      undefined,
-      process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-      ['https://www.googleapis.com/auth/spreadsheets']
-    );
-    return auth;
-  }
-  return null;
-}
-
-function getSheets() {
-  const auth = getAuth();
-  return google.sheets({ version: 'v4', auth: auth || undefined });
-}
-
-// ============================================
-// CSV Fallback for Public Sheets
+// CSV Fetch for Public Sheets
 // ============================================
 
 async function fetchSheetAsCSV(sheetName: string, forceRefresh = false): Promise<string[][]> {
@@ -154,8 +127,6 @@ function isRightSheet(sheetName: string, headerRow: string[]): boolean {
 }
 
 function getGidForSheet(sheetName: string): string {
-  // GID mapping from the Google Sheet (can be found in the URL when viewing the sheet)
-  // These may need to be updated if the sheet structure changes
   const gidMap: Record<string, string> = {
     'Users': '0',
     'Curriculum': '1362489824',
@@ -265,20 +236,7 @@ export async function fetchUsersFromSheet(forceRefresh = false): Promise<SheetUs
   }
 
   try {
-    let rows: string[][] = [];
-
-    if (hasServiceAccount) {
-      // Use Google Sheets API with service account
-      const sheets = getSheets();
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEETS.USERS}!A:P`,
-      });
-      rows = response.data.values || [];
-    } else {
-      // Use CSV export for public sheets
-      rows = await fetchSheetAsCSV(SHEETS.USERS, forceRefresh);
-    }
+    const rows = await fetchSheetAsCSV(SHEETS.USERS, forceRefresh);
 
     if (rows.length < 2) {
       console.warn('No user data found in sheet');
@@ -312,7 +270,7 @@ export async function fetchUsersFromSheet(forceRefresh = false): Promise<SheetUs
     }
 
     setCache(cacheKey, users);
-    console.log(`✅ Fetched ${users.length} users from live Google Sheet (${hasServiceAccount ? 'API' : 'CSV'})`);
+    console.log(`✅ Fetched ${users.length} users from live Google Sheet (CSV)`);
     return users;
   } catch (error) {
     console.error('Failed to fetch users from sheet:', error);
@@ -344,18 +302,7 @@ export async function fetchProgressFromSheet(forceRefresh = false): Promise<Shee
   }
 
   try {
-    let rows: string[][] = [];
-
-    if (hasServiceAccount) {
-      const sheets = getSheets();
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEETS.PROGRESS}!A:D`,
-      });
-      rows = response.data.values || [];
-    } else {
-      rows = await fetchSheetAsCSV(SHEETS.PROGRESS, forceRefresh);
-    }
+    const rows = await fetchSheetAsCSV(SHEETS.PROGRESS, forceRefresh);
 
     if (rows.length < 2) {
       return [];
@@ -385,129 +332,32 @@ export async function fetchProgressFromSheet(forceRefresh = false): Promise<Shee
 }
 
 // ============================================
-// Write Progress back to Google Sheet
+// Write Progress (local DB only — no googleapis)
 // ============================================
 
 export async function writeProgressToSheet(
-  phone: string,
-  topicId: string,
-  completed: boolean
+  _phone: string,
+  _topicId: string,
+  _completed: boolean
 ): Promise<boolean> {
-  if (!hasServiceAccount) {
-    // Cannot write to public sheets without service account
-    console.warn('Cannot write to Google Sheet: No service account configured. Progress saved locally only.');
-    return false;
-  }
-
-  try {
-    const sheets = getSheets();
-    
-    const existing = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEETS.PROGRESS}!A:D`,
-    });
-
-    const rows = existing.data.values || [];
-    let rowIndex = -1;
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][0] === phone && rows[i][1] === topicId) {
-        rowIndex = i + 1;
-        break;
-      }
-    }
-
-    const dateStr = completed ? new Date().toISOString().split('T')[0] : '';
-
-    if (rowIndex > 0) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEETS.PROGRESS}!A${rowIndex}:D${rowIndex}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [[phone, topicId, completed ? 'TRUE' : 'FALSE', dateStr]],
-        },
-      });
-    } else {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEETS.PROGRESS}!A:D`,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: {
-          values: [[phone, topicId, completed ? 'TRUE' : 'FALSE', dateStr]],
-        },
-      });
-    }
-
-    invalidateCache('sheet_progress');
-    return true;
-  } catch (error) {
-    console.error('Failed to write progress to sheet:', error);
-    return false;
-  }
+  // googleapis removed to save ~600MB of server memory
+  // Progress is saved to local DB only
+  console.warn('Cannot write to Google Sheet: No service account configured. Progress saved locally only.');
+  return false;
 }
 
 // ============================================
-// Update User in Google Sheet
+// Update User (local DB only — no googleapis)
 // ============================================
 
 export async function updateUserInSheet(
-  phone: string,
-  updates: Partial<SheetUser>
+  _phone: string,
+  _updates: Partial<SheetUser>
 ): Promise<boolean> {
-  if (!hasServiceAccount) {
-    console.warn('Cannot write to Google Sheet: No service account configured.');
-    return false;
-  }
-
-  try {
-    const sheets = getSheets();
-    
-    const existing = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEETS.USERS}!A:P`,
-    });
-
-    const rows = existing.data.values || [];
-    let rowIndex = -1;
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][1] === phone) {
-        rowIndex = i + 1;
-        break;
-      }
-    }
-
-    if (rowIndex === -1) {
-      console.warn(`User with phone ${phone} not found in sheet`);
-      return false;
-    }
-
-    const columnMap: Record<keyof SheetUser, string> = {
-      name: 'A', phone: 'B', grade: 'C', board: 'D', field: 'E', status: 'F',
-      startDate: 'G', targetDate: 'H', currentDay: 'I', totalDays: 'J',
-      topicsDone: 'L', daysLeft: 'M', academicGroup: 'N', topicsPerDay: 'O', pin: 'P',
-    };
-
-    for (const [key, value] of Object.entries(updates)) {
-      if (columnMap[key as keyof SheetUser]) {
-        const col = columnMap[key as keyof SheetUser];
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEETS.USERS}!${col}${rowIndex}`,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: {
-            values: [[String(value)]],
-          },
-        });
-      }
-    }
-
-    invalidateCache('sheet_users');
-    return true;
-  } catch (error) {
-    console.error('Failed to update user in sheet:', error);
-    return false;
-  }
+  // googleapis removed to save ~600MB of server memory
+  // User data is updated in local DB only
+  console.warn('Cannot write to Google Sheet: No service account configured.');
+  return false;
 }
 
 // ============================================
@@ -553,23 +403,14 @@ export async function fetchCurriculumFromSheet(forceRefresh = false): Promise<Sh
   }
 
   try {
-    let rows: string[][] = [];
+    // Use gviz API for Curriculum sheet since GID-based CSV export may not work
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEETS.CURRICULUM)}`;
+    const response = await fetch(url, forceRefresh ? { cache: 'no-store' } : { next: { revalidate: 300 } });
 
-    if (hasServiceAccount) {
-      const sheets = getSheets();
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEETS.CURRICULUM}!A:N`,
-      });
-      rows = response.data.values || [];
-    } else {
-      // Use gviz API for Curriculum sheet since GID-based CSV export may not work
-      const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEETS.CURRICULUM)}`;
-      const response = await fetch(url, forceRefresh ? { cache: 'no-store' } : { next: { revalidate: 300 } });
-      if (response.ok) {
-        const csvText = await response.text();
-        rows = parseCSV(csvText);
-      }
+    let rows: string[][] = [];
+    if (response.ok) {
+      const csvText = await response.text();
+      rows = parseCSV(csvText);
     }
 
     if (rows.length < 2) {

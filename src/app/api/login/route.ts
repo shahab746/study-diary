@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { findUserByPhone } from '@/lib/sheet-sync';
 
 /**
  * Custom login API endpoint
  * 
  * Authentication strategy:
  * 1. Check local database first (fast, no network dependency)
- * 2. If not found, try live Google Sheet (slower but catches new users)
+ * 2. If not found, dynamically import sheet-sync and try live Google Sheet
  * 3. If found in sheet, sync to local DB for future fast lookups
+ * 
+ * NOTE: findUserByPhone is dynamically imported to avoid loading the
+ * sheet-sync module (and triggering Google Sheets network calls) when
+ * the user already exists in the local DB.
  * 
  * POST /api/login
  * Body: { phone: string, pin: string }
@@ -32,8 +35,8 @@ export async function POST(request: Request) {
 
     console.log(`🔐 Login API: Looking up phone="${cleanPhone}"`);
 
-    // Step 1: Check local database first (fast)
-    let student = await db.student.findUnique({ where: { phone: cleanPhone } });
+    // Step 1: Check local database first (fast — no network calls)
+    const student = await db.student.findUnique({ where: { phone: cleanPhone } });
 
     if (student) {
       // Found in local DB - verify PIN
@@ -68,8 +71,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Step 2: Not in local DB, try live Google Sheet
+    // Step 2: Not in local DB — dynamically load sheet-sync and try Google Sheet
+    // This only runs for NEW users not yet synced to local DB
     console.log(`🔐 Login API: Not in local DB, trying Google Sheet...`);
+    const { findUserByPhone } = await import('@/lib/sheet-sync');
     const sheetUser = await findUserByPhone(cleanPhone, true);
 
     if (!sheetUser) {
@@ -154,35 +159,5 @@ export async function POST(request: Request) {
       { success: false, error: 'Unable to connect. Please try again in a moment.' },
       { status: 500 }
     );
-  }
-}
-
-/**
- * Background sync: Update local DB from Google Sheet
- * Runs non-blocking after a successful local DB login
- */
-async function syncUserFromSheet(phone: string) {
-  try {
-    const sheetUser = await findUserByPhone(phone, false); // Use cache
-    if (sheetUser) {
-      await db.student.update({
-        where: { phone },
-        data: {
-          name: sheetUser.name,
-          grade: sheetUser.grade,
-          board: sheetUser.board,
-          field: sheetUser.field,
-          status: sheetUser.status,
-          currentDay: sheetUser.currentDay,
-          totalDays: sheetUser.totalDays,
-          topicsDone: sheetUser.topicsDone,
-          daysLeft: sheetUser.daysLeft,
-          academicGroup: sheetUser.academicGroup,
-        },
-      });
-      console.log(`🔐 Background sync: Updated user "${sheetUser.name}" from sheet`);
-    }
-  } catch {
-    // Silent - background sync failure is not critical
   }
 }
