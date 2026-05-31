@@ -2,8 +2,9 @@
 
 import { motion } from 'framer-motion';
 import { useStudyOS } from '@/lib/store';
-import { Home, ListTodo, BookOpen, Calendar, Timer, Download, Moon, Sun, Zap } from 'lucide-react';
+import { Home, ListTodo, BookOpen, Calendar, Timer, Download, Moon, Sun, Zap, LogOut } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { signOut } from 'next-auth/react';
 import { useSyncExternalStore } from 'react';
 
 const emptySubscribe = () => () => {};
@@ -92,6 +93,13 @@ export function Sidebar() {
             <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
         )}
+        <button
+          onClick={() => signOut({ callbackUrl: '/' })}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Sign out</span>
+        </button>
       </div>
     </aside>
   );

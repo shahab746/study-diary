@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSession } from 'next-auth/react';
 import { useStudyOS } from '@/lib/store';
 import { Sidebar } from '@/components/study-os/Sidebar';
 import { WelcomeCard } from '@/components/study-os/WelcomeCard';
@@ -12,8 +13,10 @@ import { SubjectMatrix } from '@/components/study-os/SubjectMatrix';
 import { PacingEngineCard } from '@/components/study-os/PacingEngineCard';
 import { RevisionDock } from '@/components/study-os/RevisionDock';
 import { SubjectDetailView } from '@/components/study-os/SubjectDetailView';
-import { Home as HomeIcon, ListTodo, BookOpen, Calendar, Zap, Moon, Sun } from 'lucide-react';
+import { LoginPage } from '@/components/auth/LoginPage';
+import { Home as HomeIcon, ListTodo, BookOpen, Calendar, Zap, Moon, Sun, LogOut, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { signOut } from 'next-auth/react';
 import { useSyncExternalStore } from 'react';
 
 const emptySubscribe = () => () => {};
@@ -65,6 +68,15 @@ function MobileHeader() {
                 {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
               </button>
             )}
+
+            {/* Logout button */}
+            <button
+              onClick={() => signOut({ callbackUrl: '/' })}
+              className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center hover:bg-destructive/10 hover:text-destructive transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
@@ -234,13 +246,39 @@ function DashboardView() {
   );
 }
 
+function AuthLoadingScreen() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center">
+          <Zap className="w-7 h-7 text-primary" />
+        </div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-sm font-mono">Loading session...</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
+  const { data: session, status } = useSession();
   const { fetchData, isLoading, selectedSubjectId } = useStudyOS();
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (status === 'authenticated') {
+      fetchData();
+    }
+  }, [fetchData, status]);
 
+  // Show loading while checking session
+  if (status === 'loading') return <AuthLoadingScreen />;
+
+  // Show login page if not authenticated
+  if (status === 'unauthenticated' || !session) return <LoginPage />;
+
+  // Show dashboard loading skeleton
   if (isLoading) return <LoadingSkeleton />;
 
   return (
