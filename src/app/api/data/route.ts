@@ -37,6 +37,7 @@ export async function GET(request: Request) {
     if (!student) {
       const localStudent = await db.student.findFirst();
       if (localStudent) {
+        academicGroup = localStudent.academicGroup || '';
         student = {
           name: localStudent.name,
           phone: localStudent.phone,
