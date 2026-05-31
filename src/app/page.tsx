@@ -13,6 +13,7 @@ import { SubjectMatrix } from '@/components/study-os/SubjectMatrix';
 import { PacingEngineCard } from '@/components/study-os/PacingEngineCard';
 import { RevisionDock } from '@/components/study-os/RevisionDock';
 import { SubjectDetailView } from '@/components/study-os/SubjectDetailView';
+import { FocusTimer } from '@/components/study-os/FocusTimer';
 import { LoginPage } from '@/components/auth/LoginPage';
 import { Home as HomeIcon, ListTodo, BookOpen, Calendar, Zap, Moon, Sun, LogOut, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -176,15 +177,12 @@ function DashboardView() {
                 {/* Stats Grid */}
                 <StatsGrid />
 
-                {/* Bento Grid: Mission Feed + Pacing Engine */}
+                {/* Pacing Engine + Calendar */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                  {/* Mission Feed - takes 2 cols */}
-                  <div className="lg:col-span-2 glass-strong rounded-2xl p-5">
-                    <MissionFeed />
-                  </div>
-                  {/* Pacing Engine - takes 1 col */}
-                  <div className="space-y-5">
+                  <div className="lg:col-span-2">
                     <PacingEngineCard />
+                  </div>
+                  <div>
                     <CalendarStrip />
                   </div>
                 </div>
@@ -269,7 +267,7 @@ function AuthLoadingScreen() {
 
 export default function Home() {
   const { data: session, status } = useSession();
-  const { fetchData, isLoading, selectedSubjectId, student } = useStudyOS();
+  const { fetchData, isLoading, selectedSubjectId, student, focusTimerOpen, setFocusTimerOpen } = useStudyOS();
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
@@ -297,12 +295,15 @@ export default function Home() {
   if (isLoading) return <LoadingSkeleton />;
 
   return (
-    <AnimatePresence mode="wait">
-      {selectedSubjectId ? (
-        <SubjectDetailView key="subject-detail" />
-      ) : (
-        <DashboardView key="dashboard" />
-      )}
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait">
+        {selectedSubjectId ? (
+          <SubjectDetailView key="subject-detail" />
+        ) : (
+          <DashboardView key="dashboard" />
+        )}
+      </AnimatePresence>
+      <FocusTimer isOpen={focusTimerOpen} onClose={() => setFocusTimerOpen(false)} />
+    </>
   );
 }

@@ -135,6 +135,8 @@ interface StudyOSState {
   sidebarView: SidebarView;
   focusTimerActive: boolean;
   focusTimerMinutes: number;
+  focusTimerOpen: boolean;
+  highlightTopicId: string | null;
 
   // Actions
   fetchData: (phone?: string) => Promise<void>;
@@ -146,6 +148,8 @@ interface StudyOSState {
   toggleSubjectDetailTopic: (topicId: string) => Promise<void>;
   setSidebarView: (view: SidebarView) => void;
   toggleFocusTimer: () => void;
+  setFocusTimerOpen: (open: boolean) => void;
+  setHighlightTopicId: (id: string | null) => void;
 }
 
 export const useStudyOS = create<StudyOSState>()(
@@ -175,6 +179,8 @@ export const useStudyOS = create<StudyOSState>()(
       sidebarView: 'today',
       focusTimerActive: false,
       focusTimerMinutes: 25,
+      focusTimerOpen: false,
+      highlightTopicId: null,
       isFreeUser: false,
 
       fetchData: async (phone?: string) => {
@@ -378,6 +384,14 @@ export const useStudyOS = create<StudyOSState>()(
 
       toggleFocusTimer: () => {
         set(state => ({ focusTimerActive: !state.focusTimerActive }));
+      },
+
+      setFocusTimerOpen: (open: boolean) => {
+        set({ focusTimerOpen: open });
+      },
+
+      setHighlightTopicId: (id: string | null) => {
+        set({ highlightTopicId: id });
       },
     }),
     {

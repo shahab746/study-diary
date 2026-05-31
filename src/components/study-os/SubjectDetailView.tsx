@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS, SubjectDetail, SubjectDetailChapter, SubjectDetailTopic } from '@/lib/store';
 import { Check, ChevronDown, ArrowLeft, Play, FileText, Clock, BookOpen, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
 
@@ -56,10 +56,14 @@ function TopicRow({
   topic,
   subjectColor,
   onToggle,
+  isHighlighted,
+  highlightRef,
 }: {
   topic: SubjectDetailTopic;
   subjectColor: string;
   onToggle: (id: string) => void;
+  isHighlighted?: boolean;
+  highlightRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const [isAnimating, setIsAnimating] = useState(false);
   const colorHex = COLOR_HEX[subjectColor] || COLOR_HEX['Amber'];
@@ -74,12 +78,14 @@ function TopicRow({
 
   return (
     <motion.div
+      ref={isHighlighted ? highlightRef : undefined}
       layout
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2 }}
       className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
-        ${topic.completed ? 'opacity-50' : 'hover:bg-secondary/50'}`}
+        ${topic.completed ? 'opacity-50' : 'hover:bg-secondary/50'}
+        ${isHighlighted ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}
     >
       {/* Checkbox */}
       <motion.button
@@ -157,13 +163,19 @@ function ChapterSection({
   subjectColor,
   onToggleTopic,
   defaultOpen,
+  highlightTopicId,
+  highlightRef,
 }: {
   chapter: SubjectDetailChapter;
   subjectColor: string;
   onToggleTopic: (id: string) => void;
   defaultOpen: boolean;
+  highlightTopicId: string | null;
+  highlightRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  // Auto-open chapter if it contains the highlighted topic
+  const hasHighlighted = highlightTopicId && chapter.topics.some(t => t.id === highlightTopicId);
+  const [isOpen, setIsOpen] = useState(defaultOpen || !!hasHighlighted);
   const colorHex = COLOR_HEX[subjectColor] || COLOR_HEX['Amber'];
   const colorText = COLOR_TEXT[subjectColor] || 'text-amber-500';
   const colorBg = COLOR_BG[subjectColor] || 'bg-amber-500/10';
@@ -228,6 +240,8 @@ function ChapterSection({
                   topic={topic}
                   subjectColor={subjectColor}
                   onToggle={onToggleTopic}
+                  isHighlighted={highlightTopicId === topic.id}
+                  highlightRef={highlightRef}
                 />
               ))}
             </div>
@@ -239,10 +253,24 @@ function ChapterSection({
 }
 
 export function SubjectDetailView() {
-  const { subjectDetail, subjectDetailLoading, closeSubjectDetail, toggleSubjectDetailTopic, student } = useStudyOS();
+  const { subjectDetail, subjectDetailLoading, closeSubjectDetail, toggleSubjectDetailTopic, student, highlightTopicId, setHighlightTopicId } = useStudyOS();
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
   const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
+  const highlightedRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to highlighted topic when detail loads
+  useEffect(() => {
+    if (highlightTopicId && subjectDetail && !subjectDetailLoading) {
+      // Small delay to allow animation to complete
+      const timer = setTimeout(() => {
+        highlightedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Clear highlight after scrolling
+        setTimeout(() => setHighlightTopicId(null), 3000);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightTopicId, subjectDetail, subjectDetailLoading, setHighlightTopicId]);
 
   if (subjectDetailLoading) {
     return (
@@ -375,6 +403,8 @@ export function SubjectDetailView() {
             subjectColor={detail.color}
             onToggleTopic={toggleSubjectDetailTopic}
             defaultOpen={index === 0 || filter !== 'all'}
+            highlightTopicId={highlightTopicId}
+            highlightRef={highlightedRef}
           />
         ))}
 

@@ -62,7 +62,7 @@ function ProgressRing({ progress, size = 48, strokeWidth = 3 }: { progress: numb
 }
 
 export function WelcomeCard() {
-  const { student, todayTasks, totalCompleted, totalTopics } = useStudyOS();
+  const { student, todayTasks, totalCompleted, totalTopics, subjects, openSubjectDetail, setHighlightTopicId, setFocusTimerOpen } = useStudyOS();
   const { text: greetingText, emoji: greetingEmoji } = getGreeting();
   const dateStr = getFormattedDate();
   const firstName = student?.name || 'Student';
@@ -76,6 +76,24 @@ export function WelcomeCard() {
   // Day counter
   const currentDay = student?.currentDay ?? 0;
   const totalDays = student?.totalDays ?? 0;
+
+  // Handle "Start next best task" click
+  const handleNextBestTask = () => {
+    if (!nextTask) return;
+
+    // Find the subject that matches this task's subject name
+    const matchingSubject = subjects.find(s => s.subjectName === nextTask.subjectName);
+    if (matchingSubject) {
+      // Set highlight topic so the subject detail knows which topic to scroll to
+      setHighlightTopicId(nextTask.topicId);
+      openSubjectDetail(matchingSubject.subjectId);
+    }
+  };
+
+  // Handle "Focus" click - open pomodoro timer
+  const handleFocusClick = () => {
+    setFocusTimerOpen(true);
+  };
 
   return (
     <motion.div
@@ -119,12 +137,25 @@ export function WelcomeCard() {
           </p>
         )}
 
+        {!nextTask && todayTasks.length > 0 && (
+          <p className="text-sm text-muted-foreground mt-2 max-w-lg">
+            All today&apos;s tasks are complete! Great work 🎉
+          </p>
+        )}
+
+        {!nextTask && todayTasks.length === 0 && (
+          <p className="text-sm text-muted-foreground mt-2 max-w-lg">
+            No tasks scheduled for today. Start a focus session or explore your courses.
+          </p>
+        )}
+
         {/* Action Buttons */}
         <div className="flex items-center gap-2 mt-5">
           {nextTask && (
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.95 }}
+              onClick={handleNextBestTask}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-display font-semibold shadow-lg transition-all relative overflow-hidden"
               style={{
                 background: 'linear-gradient(135deg, #f59e0b, #d97706)',
@@ -138,10 +169,11 @@ export function WelcomeCard() {
           )}
           <motion.button
             whileTap={{ scale: 0.95 }}
+            onClick={handleFocusClick}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-display font-semibold hover:bg-secondary/80 transition-colors"
           >
             <Clock className="w-4 h-4" />
-            Focus 25m
+            Focus
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.95 }}
