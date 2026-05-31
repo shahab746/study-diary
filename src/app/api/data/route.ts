@@ -66,6 +66,9 @@ export async function GET() {
     });
 
     // === PARALLEL TASK ASSIGNMENT ALGORITHM ===
+    // This algorithm distributes today's tasks across ALL subjects in parallel,
+    // so the student makes progress on every subject each day regardless of pacing goal.
+    
     const pacingGoal = student?.pacingGoal || '5M';
     const pacingMonths: Record<string, number> = { '3M': 3, '5M': 5, '6M': 6 };
     const months = pacingMonths[pacingGoal] || 5;
@@ -76,11 +79,87 @@ export async function GET() {
     const totalCompleted = progress.filter(p => p.completed).length;
     const totalRemaining = totalTopicsCount - totalCompleted;
     
-    // Calculate topics per day based on pacing
-    const daysLeft = student?.daysLeft || totalDaysInPlan;
+    // Calculate topics per day based on pacing goal (not stale student record)
+    const currentDay = student?.currentDay || 1;
+    const daysLeft = Math.max(1, totalDaysInPlan - currentDay);
     const topicsPerDay = totalRemaining > 0 ? Math.ceil(totalRemaining / daysLeft) : 0;
 
-    // For each subject, determine next uncompleted topics proportionally
+    // Build a queue of next uncompleted topics for each subject
+    const subjectQueues: Array<{
+      subjectName: string;
+      subjectColor: string;
+      subjectIcon: string;
+      remaining: Array<{
+        topicId: string;
+        topicName: string;
+        dayNumber: number;
+        chapterName: string;
+        videoLink: string;
+        pdfLink: string;
+        chapterId: string;
+      }>;
+      totalTopics: number;
+      completedCount: number;
+      expectedByNow: number;
+    }> = [];
+
+    for (const subject of subjects) {
+      const allSubjectTopics = subject.chapters.flatMap(ch => ch.topics);
+      const completedCount = allSubjectTopics.filter(t =>
+        progress.some(p => p.topicId === t.id && p.completed)
+      ).length;
+      
+      // Get remaining topics, sorted by chapter then topic order
+      const remaining = allSubjectTopics
+        .filter(t => !progress.some(p => p.topicId === t.id && p.completed))
+        .sort((a, b) => {
+          const chA = subject.chapters.find(ch => ch.id === a.chapterId);
+          const chB = subject.chapters.find(ch => ch.id === b.chapterId);
+          if (chA && chB) {
+            if (chA.number !== chB.number) return chA.number - chB.number;
+          }
+          return a.number - b.number;
+        })
+        .map(t => {
+          const chapter = subject.chapters.find(ch => ch.id === t.chapterId);
+          return {
+            topicId: t.id,
+            topicName: t.name,
+            dayNumber: t.dayNumber,
+            chapterName: chapter?.name || '',
+            videoLink: t.videoLink,
+            pdfLink: t.pdfLink,
+            chapterId: t.chapterId,
+          };
+        });
+
+      // Calculate expected progress for priority
+      const expectedByNow = Math.round((allSubjectTopics.length / totalDaysInPlan) * (student?.currentDay || 1));
+
+      subjectQueues.push({
+        subjectName: subject.name,
+        subjectColor: subject.color,
+        subjectIcon: subject.icon,
+        remaining,
+        totalTopics: allSubjectTopics.length,
+        completedCount,
+        expectedByNow,
+      });
+    }
+
+    // Calculate how many topics to assign from each subject today
+    // Proportional distribution: each subject gets tasks proportional to its remaining topics
+    const totalRemainingTopics = subjectQueues.reduce((sum, q) => sum + q.remaining.length, 0);
+    
+    const subjectTaskAllocation = subjectQueues.map(q => {
+      const share = totalRemainingTopics > 0 ? q.remaining.length / totalRemainingTopics : 0;
+      // At least 1 topic from each subject that has remaining topics (parallel requirement)
+      const allocated = q.remaining.length > 0 ? Math.max(1, Math.round(topicsPerDay * share)) : 0;
+      return { ...q, allocated };
+    });
+
+    // Now interleave tasks from all subjects in round-robin fashion
+    // This ensures the student sees tasks from DIFFERENT subjects mixed together
     const todayTasks: Array<{
       topicId: string;
       topicName: string;
@@ -96,73 +175,54 @@ export async function GET() {
       duration: number;
     }> = [];
 
-    for (const subject of subjects) {
-      const allSubjectTopics = subject.chapters.flatMap(ch => ch.topics);
-      const completedCount = allSubjectTopics.filter(t =>
-        progress.some(p => p.topicId === t.id && p.completed)
-      ).length;
-      const remaining = allSubjectTopics
-        .filter(t => !progress.some(p => p.topicId === t.id && p.completed))
-        .sort((a, b) => {
-          // Sort by chapter order, then topic order
-          const chA = subject.chapters.find(ch => ch.id === a.chapterId);
-          const chB = subject.chapters.find(ch => ch.id === b.chapterId);
-          if (chA && chB) {
-            if (chA.number !== chB.number) return chA.number - chB.number;
-          }
-          return a.number - b.number;
-        });
+    // Pick tasks round-robin from each subject
+    const pickIndices: Record<string, number> = {};
+    for (const sq of subjectTaskAllocation) {
+      pickIndices[sq.subjectName] = 0;
+    }
 
-      if (remaining.length === 0) continue;
+    let hasMore = true;
+    while (hasMore) {
+      hasMore = false;
+      for (const sq of subjectTaskAllocation) {
+        const idx = pickIndices[sq.subjectName];
+        if (idx < Math.min(sq.allocated, sq.remaining.length)) {
+          const topic = sq.remaining[idx];
+          const isBehind = sq.completedCount < sq.expectedByNow - 2;
+          const isOnTrack = sq.completedCount < sq.expectedByNow;
+          
+          let priority: 'high' | 'medium' | 'low';
+          if (isBehind) priority = 'high';
+          else if (isOnTrack) priority = 'medium';
+          else priority = 'low';
 
-      // How many topics from this subject should appear today?
-      const subjectShare = totalRemaining > 0 ? remaining.length / totalRemaining : 0;
-      const subjectTopicsToday = Math.max(1, Math.round(topicsPerDay * subjectShare));
-
-      // Calculate expected progress for priority
-      const expectedCompletedByNow = Math.round((allSubjectTopics.length / totalDaysInPlan) * (student?.currentDay || 1));
-      const isBehind = completedCount < expectedCompletedByNow - 2;
-      const isOnTrack = completedCount < expectedCompletedByNow;
-
-      // Pick next uncompleted topics
-      const nextTopics = remaining.slice(0, Math.min(subjectTopicsToday, 3));
-
-      for (const topic of nextTopics) {
-        const chapter = subject.chapters.find(ch => ch.id === topic.chapterId);
-        
-        // Priority based on progress vs expectation
-        let priority: 'high' | 'medium' | 'low';
-        if (isBehind) {
-          priority = 'high';
-        } else if (isOnTrack) {
-          priority = 'medium';
-        } else {
-          priority = 'low';
+          todayTasks.push({
+            topicId: topic.topicId,
+            topicName: topic.topicName,
+            dayNumber: topic.dayNumber,
+            subjectName: sq.subjectName,
+            subjectColor: sq.subjectColor,
+            chapterName: topic.chapterName,
+            completed: false,
+            videoLink: topic.videoLink,
+            pdfLink: topic.pdfLink,
+            priority,
+            subjectIcon: sq.subjectIcon,
+            duration: 65,
+          });
+          pickIndices[sq.subjectName] = idx + 1;
+          hasMore = true;
         }
-
-        todayTasks.push({
-          topicId: topic.id,
-          topicName: topic.name,
-          dayNumber: topic.dayNumber,
-          subjectName: subject.name,
-          subjectColor: subject.color,
-          chapterName: chapter?.name || '',
-          completed: false,
-          videoLink: topic.videoLink,
-          pdfLink: topic.pdfLink,
-          priority,
-          subjectIcon: subject.icon,
-          duration: 65, // Each lecture is ~65 minutes
-        });
       }
     }
 
     // Sort tasks: high priority first, then medium, then low
+    // But keep the round-robin interleaving within each priority level
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     todayTasks.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
-    // Limit to max 8 tasks per day
-    const finalTodayTasks = todayTasks.slice(0, 8);
+    // Limit to max 10 tasks per day
+    const finalTodayTasks = todayTasks.slice(0, 10);
 
     // Performance data - monthly breakdown
     const performanceData = [
@@ -181,9 +241,8 @@ export async function GET() {
     const streak = calculateStreak(progress);
 
     // Calculate program week
-    const currentDay = student?.currentDay || 1;
     const programWeek = Math.ceil(currentDay / 7);
-    const totalWeeks = Math.ceil((student?.totalDays || 438) / 7);
+    const totalWeeks = Math.ceil(totalDaysInPlan / 7);
     const weeksLeft = totalWeeks - programWeek;
 
     // Pacing goals
@@ -248,7 +307,6 @@ function calculateStreak(progress: { completed: boolean; dateCompleted: Date | n
   let streak = 1;
   const today = new Date().toDateString();
   
-  // Check if today or yesterday is in the streak
   const yesterday = new Date(Date.now() - 86400000).toDateString();
   if (completedDates[0] !== today && completedDates[0] !== yesterday) return 0;
 

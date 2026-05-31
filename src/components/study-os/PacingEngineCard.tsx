@@ -47,7 +47,10 @@ export function PacingEngineCard() {
   };
 
   const currentPacing = pacingGoals[activePacingGoal];
-  const daysLeft = student?.daysLeft || 423;
+  const monthsMap: Record<string, number> = { '3M': 3, '5M': 5, '6M': 6 };
+  const months = monthsMap[activePacingGoal] || 5;
+  const currentDay = student?.currentDay || 1;
+  const daysLeft = Math.max(1, (months * 30) - currentDay);
 
   return (
     <motion.div

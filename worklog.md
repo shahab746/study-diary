@@ -87,3 +87,37 @@ Stage Summary:
 - Mobile responsive with bottom nav bar
 - Priority indicators: HIGH (red pulse dot), MEDIUM (amber), LOW (gray)
 - Each mission card shows: priority, subject tag, chapter, duration (65m), video/PDF links
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix Biology data (150 topics/9 chapters) + Improve parallel task distribution + Dashboard visual fixes
+
+Work Log:
+- Fetched complete curriculum data from Google Sheet (fresh CSV export)
+- Discovered Biology only had 49 topics in 4 chapters in old JSON - the sheet had 150 topics in 9 chapters for Grade 10
+- Updated curriculum_full.json with complete Grade 10 data from all subjects
+- Re-seeded database: Physics 91 topics/9ch, Chemistry 132/8ch, CS 65/7ch, Biology 150/9ch, Maths 101/13ch = 539 total
+- Fixed topicsPerDay calculation: now uses pacing goal instead of stale student record
+  - 5M: 4 topics/day (539/134 days), 3M: 6 topics/day, 6M: 3 topics/day
+- Improved parallel task distribution algorithm:
+  - Proportional allocation based on each subject's remaining topics
+  - Round-robin interleaving ensures tasks from different subjects appear mixed
+  - Each subject gets at least 1 task per day (parallel requirement)
+  - Max 10 tasks per day limit
+- Enhanced Dashboard layout:
+  - "Today" view now includes Bento Grid with Mission Feed (2 cols) + Pacing Engine (1 col)
+  - Subject Matrix shown below Mission Feed on Today view
+  - Calendar Strip moved to sidebar alongside Pacing Engine
+- Enhanced MissionFeed component:
+  - Added subject distribution pills showing tasks per subject
+  - Added colored left borders on mission cards matching subject colors
+  - Better visual hierarchy with subject icons in tags
+- Fixed PacingEngineCard to calculate daysLeft from pacing goal dynamically
+
+Stage Summary:
+- Biology data now correct: 150 topics across 9 chapters (Ch 1-9: Gaseous Exchange through Pharmacology)
+- 16 video links available for Biology topics
+- All subjects represented in Today's Mission Feed (parallel distribution working)
+- Dashboard layout improved with Bento Grid and all key info on Today view
+- topicsPerDay now correctly reflects pacing goal (4/day for 5M)

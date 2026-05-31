@@ -83,7 +83,7 @@ function MobileBottomNav() {
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-border">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-border safe-area-bottom">
       <div className="flex items-center justify-around py-2 px-2">
         {items.map(item => (
           <button
@@ -143,7 +143,7 @@ function DashboardView() {
 
         {/* Scrollable Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 pb-20 md:pb-5 space-y-5">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 pb-24 md:pb-5 space-y-5">
             {sidebarView === 'today' && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -157,13 +157,21 @@ function DashboardView() {
                 {/* Stats Grid */}
                 <StatsGrid />
 
-                {/* Today's Mission Feed */}
-                <div className="glass-strong rounded-2xl p-5">
-                  <MissionFeed />
+                {/* Bento Grid: Mission Feed + Pacing Engine */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  {/* Mission Feed - takes 2 cols */}
+                  <div className="lg:col-span-2 glass-strong rounded-2xl p-5">
+                    <MissionFeed />
+                  </div>
+                  {/* Pacing Engine - takes 1 col */}
+                  <div className="space-y-5">
+                    <PacingEngineCard />
+                    <CalendarStrip />
+                  </div>
                 </div>
 
-                {/* Calendar Strip */}
-                <CalendarStrip />
+                {/* Subject Matrix */}
+                <SubjectMatrix />
               </motion.div>
             )}
 
@@ -208,7 +216,7 @@ function DashboardView() {
 
         {/* Footer */}
         <footer className="mt-auto border-t border-border glass">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-2.5">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5">
             <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
               <span>LectureDiary v1.0</span>
               <span className="flex items-center gap-1.5">

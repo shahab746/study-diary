@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS, TodayTask } from '@/lib/store';
 import { useState, useRef } from 'react';
-import { Check, Clock, MoreHorizontal, Play, FileText, Plus, ExternalLink } from 'lucide-react';
+import { Check, Clock, MoreHorizontal, Play, FileText, Plus } from 'lucide-react';
 
 const PRIORITY_STYLES: Record<string, { dot: string; label: string; text: string }> = {
   high: {
@@ -23,12 +23,12 @@ const PRIORITY_STYLES: Record<string, { dot: string; label: string; text: string
   },
 };
 
-const COLOR_TAG: Record<string, { bg: string; text: string }> = {
-  'Blue': { bg: 'bg-blue-500/15', text: 'text-blue-400' },
-  'Teal': { bg: 'bg-teal-500/15', text: 'text-teal-400' },
-  'Purple': { bg: 'bg-purple-500/15', text: 'text-purple-400' },
-  'Green': { bg: 'bg-green-500/15', text: 'text-green-400' },
-  'Amber': { bg: 'bg-amber-500/15', text: 'text-amber-400' },
+const COLOR_TAG: Record<string, { bg: string; text: string; border: string }> = {
+  'Blue': { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30' },
+  'Teal': { bg: 'bg-teal-500/15', text: 'text-teal-400', border: 'border-teal-500/30' },
+  'Purple': { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30' },
+  'Green': { bg: 'bg-green-500/15', text: 'text-green-400', border: 'border-green-500/30' },
+  'Amber': { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' },
 };
 
 function MissionCard({ task, onToggle }: { task: TodayTask; onToggle: (id: string) => void }) {
@@ -72,9 +72,9 @@ function MissionCard({ task, onToggle }: { task: TodayTask; onToggle: (id: strin
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className={`glass rounded-xl p-4 transition-all duration-300 ${
+      className={`glass rounded-xl p-4 transition-all duration-300 border-l-2 ${
         task.completed ? 'opacity-50' : ''
-      }`}
+      } ${colorTag.border}`}
     >
       <div className="flex items-start gap-3">
         {/* Circular checkbox */}
@@ -119,7 +119,7 @@ function MissionCard({ task, onToggle }: { task: TodayTask; onToggle: (id: strin
           {/* Course details */}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md ${colorTag.bg} ${colorTag.text}`}>
-              {task.subjectName} • Lecture
+              {task.subjectIcon} {task.subjectName} · Lecture
             </span>
             <span className="text-[10px] font-mono text-muted-foreground">
               {task.chapterName}
@@ -179,6 +179,16 @@ export function MissionFeed() {
   const totalCount = todayTasks.length;
   const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+  // Group tasks by subject for a quick overview
+  const subjectGroups = todayTasks.reduce((acc, task) => {
+    if (!acc[task.subjectName]) {
+      acc[task.subjectName] = { color: task.subjectColor, icon: task.subjectIcon, total: 0, completed: 0 };
+    }
+    acc[task.subjectName].total++;
+    if (task.completed) acc[task.subjectName].completed++;
+    return acc;
+  }, {} as Record<string, { color: string; icon: string; total: number; completed: number }>);
+
   return (
     <div>
       {/* Header */}
@@ -197,6 +207,25 @@ export function MissionFeed() {
           Add mission
         </motion.button>
       </div>
+
+      {/* Subject distribution pills */}
+      {Object.keys(subjectGroups).length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {Object.entries(subjectGroups).map(([name, info]) => {
+            const colorTag = COLOR_TAG[info.color] || COLOR_TAG['Amber'];
+            return (
+              <div
+                key={name}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono ${colorTag.bg} ${colorTag.text}`}
+              >
+                <span>{info.icon}</span>
+                <span>{name}</span>
+                <span className="opacity-60">{info.completed}/{info.total}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Progress bar */}
       <div className="mb-4">

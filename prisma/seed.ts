@@ -21,7 +21,6 @@ const SUBJECT_CONFIG: Record<string, { color: string; icon: string; order: numbe
   'Maths': { color: 'Amber', icon: '📐', order: 5, total: 101, chapters: 13 },
 };
 
-// Placeholder chapters for Maths (not in spreadsheet)
 const MATHS_CHAPTERS = [
   'Quadratic Equations', 'Theory of Quadratic Equations', 'Variations',
   'Partial Fractions', 'Sets and Functions', 'Basic Statistics',
@@ -33,9 +32,10 @@ const MATHS_CHAPTERS = [
 async function main() {
   console.log('🌱 Seeding database with REAL links...');
 
+  // Clean up
   await db.progress.deleteMany();
-  await db.topic.deleteMany()
-;  await db.chapter.deleteMany();
+  await db.topic.deleteMany();
+  await db.chapter.deleteMany();
   await db.subject.deleteMany();
   await db.specialCourse.deleteMany();
   await db.config.deleteMany();
@@ -81,11 +81,18 @@ async function main() {
   let dayCounter = 1;
   let totalTopics = 0;
 
-  // Create subjects from spreadsheet data
+  // Create subjects from spreadsheet data using nested creates
   for (const [subjectName, chaptersMap] of subjectMap) {
     const config = SUBJECT_CONFIG[subjectName] || { color: 'Gray', icon: '📚', order: 99, total: 0, chapters: 0 };
 
-    const subject = await db.subject.create({
+    const sortedChapters = [...chaptersMap.entries()].sort((a, b) => {
+      const numA = parseInt(a[0].split('|||')[0]);
+      const numB = parseInt(b[0].split('|||')[0]);
+      return numA - numB;
+    });
+
+    // Create subject with nested chapters and topics in one call
+    await db.subject.create({
       data: {
         name: subjectName,
         grade: 'Grade 10',
@@ -96,49 +103,40 @@ async function main() {
         color: config.color,
         icon: config.icon,
         order: config.order,
+        chapters: {
+          create: sortedChapters.map(([chKey, topics]) => {
+            const [numStr, chName] = chKey.split('|||');
+            const chapterNo = parseInt(numStr);
+            const currentDayStart = dayCounter;
+            const topicData = topics.map((topic, idx) => ({
+              number: topic.topic_no,
+              name: topic.topic_name,
+              videoLink: topic.has_video ? topic.video_url : '',
+              pdfLink: topic.has_pdf ? topic.pdf_url : '',
+              isFree: true,
+              dayNumber: currentDayStart + idx,
+            }));
+            dayCounter += topics.length;
+            totalTopics += topics.length;
+            return {
+              number: chapterNo,
+              name: chName,
+              topics: {
+                create: topicData,
+              },
+            };
+          }),
+        },
       },
     });
 
-    // Create chapters and topics with REAL links
-    const sortedChapters = [...chaptersMap.entries()].sort((a, b) => {
-      const numA = parseInt(a[0].split('|||')[0]);
-      const numB = parseInt(b[0].split('|||')[0]);
-      return numA - numB;
-    });
-
-    for (const [chKey, topics] of sortedChapters) {
-      const [numStr, chName] = chKey.split('|||');
-      const chapterNo = parseInt(numStr);
-
-      const chapter = await db.chapter.create({
-        data: {
-          subjectId: subject.id,
-          number: chapterNo,
-          name: chName,
-        },
-      });
-
-      for (const topic of topics) {
-        await db.topic.create({
-          data: {
-            chapterId: chapter.id,
-            number: topic.topic_no,
-            name: topic.topic_name,
-            videoLink: topic.has_video ? topic.video_url : '',
-            pdfLink: topic.has_pdf ? topic.pdf_url : '',
-            isFree: true,
-            dayNumber: dayCounter++,
-          },
-        });
-        totalTopics++;
-      }
-    }
-    console.log(`✅ ${subjectName}: ${chaptersMap.size} chapters, ${[...chaptersMap.values()].reduce((s, t) => s + t.length, 0)} topics (with REAL links)`);
+    const totalSubjectTopics = [...chaptersMap.values()].reduce((s, t) => s + t.length, 0);
+    console.log(`✅ ${subjectName}: ${chaptersMap.size} chapters, ${totalSubjectTopics} topics`);
   }
 
   // Create Maths subject (placeholder)
   const mathsConfig = SUBJECT_CONFIG['Maths'];
-  const mathsSubject = await db.subject.create({
+  await db.subject.create({
     data: {
       name: 'Maths',
       grade: 'Grade 10',
@@ -149,61 +147,59 @@ async function main() {
       color: mathsConfig.color,
       icon: mathsConfig.icon,
       order: mathsConfig.order,
+      chapters: {
+        create: MATHS_CHAPTERS.map((chName, i) => {
+          let topicCount: number;
+          if (i < 12) {
+            topicCount = Math.floor(mathsConfig.total / mathsConfig.chapters);
+          } else {
+            topicCount = mathsConfig.total - Math.floor(mathsConfig.total / mathsConfig.chapters) * 12;
+          }
+          const topicData = Array.from({ length: topicCount }, (_, t) => ({
+            number: t + 1,
+            name: `Topic ${i + 1}.${t + 1}`,
+            videoLink: '',
+            pdfLink: '',
+            isFree: true,
+            dayNumber: dayCounter++,
+          }));
+          totalTopics += topicCount;
+          return {
+            number: i + 1,
+            name: chName,
+            topics: {
+              create: topicData,
+            },
+          };
+        }),
+      },
     },
   });
-
-  for (let i = 0; i < MATHS_CHAPTERS.length; i++) {
-    const chapter = await db.chapter.create({
-      data: {
-        subjectId: mathsSubject.id,
-        number: i + 1,
-        name: MATHS_CHAPTERS[i],
-      },
-    });
-    const topicCount = Math.ceil(mathsConfig.total / mathsConfig.chapters);
-    for (let t = 1; t <= topicCount; t++) {
-      await db.topic.create({
-        data: {
-          chapterId: chapter.id,
-          number: t,
-          name: `Topic ${i + 1}.${t}`,
-          videoLink: '',
-          pdfLink: '',
-          isFree: true,
-          dayNumber: dayCounter++,
-        },
-      });
-      totalTopics++;
-    }
-  }
   console.log(`✅ Maths: ${MATHS_CHAPTERS.length} chapters (placeholder)`);
 
   // Special Courses
-  const specialCourses = [
-    { name: 'Past Papers 2025', subject: 'Physics', topic: 'Full paper walkthrough', order: 1 },
-    { name: 'Past Papers 2025', subject: 'Chemistry', topic: 'Full paper walkthrough', order: 2 },
-    { name: 'Past Papers 2025', subject: 'Biology', topic: 'Full paper walkthrough', order: 3 },
-    { name: 'Past Papers 2025', subject: 'Maths', topic: 'Full paper walkthrough', order: 4 },
-    { name: 'MCQ Practice', subject: 'All', topic: 'Mixed subject MCQs', order: 5 },
-    { name: 'Numerical Practice', subject: 'Physics', topic: 'Important numericals', order: 6 },
-    { name: 'Formula Sheet', subject: 'All', topic: 'Quick reference formulas', order: 7 },
-    { name: 'Revision Notes', subject: 'All', topic: 'Condensed chapter summaries', order: 8 },
-  ];
-  for (const course of specialCourses) {
-    await db.specialCourse.create({
-      data: { ...course, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
-    });
-  }
+  await db.specialCourse.createMany({
+    data: [
+      { name: 'Past Papers 2025', subject: 'Physics', topic: 'Full paper walkthrough', order: 1, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+      { name: 'Past Papers 2025', subject: 'Chemistry', topic: 'Full paper walkthrough', order: 2, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+      { name: 'Past Papers 2025', subject: 'Biology', topic: 'Full paper walkthrough', order: 3, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+      { name: 'Past Papers 2025', subject: 'Maths', topic: 'Full paper walkthrough', order: 4, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+      { name: 'MCQ Practice', subject: 'All', topic: 'Mixed subject MCQs', order: 5, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+      { name: 'Numerical Practice', subject: 'Physics', topic: 'Important numericals', order: 6, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+      { name: 'Formula Sheet', subject: 'All', topic: 'Quick reference formulas', order: 7, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+      { name: 'Revision Notes', subject: 'All', topic: 'Condensed chapter summaries', order: 8, videoLink: '', pdfLink: '', grade: 'Grade 10', board: 'BISE Abbottabad' },
+    ],
+  });
 
   // Config
-  for (const c of [
-    { key: 'Is_Weekend', value: 'TRUE' },
-    { key: 'App_Version', value: '1' },
-    { key: 'Active', value: '1' },
-    { key: 'Total_Topics', value: String(totalTopics) },
-  ]) {
-    await db.config.create({ data: c });
-  }
+  await db.config.createMany({
+    data: [
+      { key: 'Is_Weekend', value: 'TRUE' },
+      { key: 'App_Version', value: '1' },
+      { key: 'Active', value: '1' },
+      { key: 'Total_Topics', value: String(totalTopics) },
+    ],
+  });
 
   console.log(`✅ Total topics: ${totalTopics}`);
   console.log('🎉 Seeding with REAL links complete!');
