@@ -1,6 +1,9 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
+// Force dynamic rendering — always return fresh data from the DB
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     // Get phone from query param (sent by frontend after auth)

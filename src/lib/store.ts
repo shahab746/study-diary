@@ -195,8 +195,27 @@ export const useStudyOS = create<StudyOSState>()(
           streak: 0,
         });
         try {
+          // Trigger a curriculum sync from Google Sheets in the background
+          // This ensures the local DB is up-to-date before we read from it
+          try {
+            const syncRes = await fetch('/api/sync?type=curriculum');
+            const syncData = await syncRes.json();
+            if (syncData.success && !syncData.cooldown) {
+              console.log('🔄 Curriculum sync completed:', syncData.message);
+            }
+          } catch (syncErr) {
+            console.warn('🔄 Curriculum sync failed (non-blocking):', syncErr);
+          }
+
+          // Also sync user data from Google Sheets to keep local DB fresh
+          try {
+            await fetch('/api/sync?type=users');
+          } catch (syncErr) {
+            console.warn('🔄 User sync failed (non-blocking):', syncErr);
+          }
+
           const params = phone ? `?phone=${encodeURIComponent(phone)}` : '';
-          const res = await fetch(`/api/data${params}`);
+          const res = await fetch(`/api/data${params}`, { cache: 'no-store' });
           if (!res.ok) throw new Error('Failed to fetch');
           const data = await res.json();
           set({
