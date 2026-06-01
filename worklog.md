@@ -1,61 +1,25 @@
 ---
 Task ID: 1
 Agent: Main
-Task: Diagnose why app was not displaying anything, fix Group_Eligibility filtering, and optimize server stability
+Task: Complete UI/UX redesign of Lecture Diary to premium dark design system
 
 Work Log:
-- Diagnosed that the Next.js dev server was crashing due to memory pressure caused by the `googleapis` npm package (~600MB overhead)
-- Verified Group_Eligibility filtering was already implemented in `/api/data/route.ts`
-- Removed `googleapis` package entirely since no service account is configured
-- Rewrote `sheet-sync.ts` to be CSV-only mode (no googleapis dependency)
+- Read and analyzed all key project files (page.tsx, globals.css, layout.tsx, store.ts, LoginPage.tsx, FocusTimer.tsx)
+- Designed comprehensive premium dark design system (Linear/Arc/Raycast/Notion inspired)
+- Wrote new globals.css with complete design tokens: #0B1020 background, #7C3AED accent, gradient system, glass morphism, premium animations
+- Updated layout.tsx with Plus Jakarta Sans + Inter fonts, defaultTheme="dark"
+- Rewrote page.tsx (1295 lines) with premium dark design while preserving all functionality
+- Rewrote LoginPage.tsx (358 lines) with premium dark design, gradient buttons, glass morphism
+- Rewrote FocusTimer.tsx (403 lines) with premium dark design, gradient ring, glass modals
+- Fixed CSS variable gradient issue (var(--gradient) doesn't work as inline style background)
+- Verified lint passes cleanly
+- Verified dev server compiles and serves pages with 200 status
 
 Stage Summary:
-- Group_Eligibility filtering is fully implemented and working
-- Server memory reduced by removing googleapis
-
----
-Task ID: 2
-Agent: Main
-Task: Fix blank screen issue - dev server not running + Group_Eligibility bug in fallback path
-
-Work Log:
-- Fixed package.json dev script to remove `tee` pipe
-- Found Group_Eligibility filtering bug in fallback path
-- Fixed by adding `academicGroup` assignment in fallback block
-
-Stage Summary:
-- Dev server stability fixed
-- Group_Eligibility filtering now works in ALL code paths
-
----
-Task ID: 3
-Agent: Main
-Task: Complete UI/UX redesign to match warm terracotta academic design
-
-Work Log:
-- Rewrote `globals.css` with complete new design system: warm cream/terracotta palette (#F5F1EA bg, #B6543A accent), Fraunces serif headings, custom component CSS matching the HTML reference exactly
-- Updated `layout.tsx` with new fonts: Fraunces (display/serif), Inter (body), JetBrains Mono (monospace) replacing Space_Grotesk and Geist_Mono
-- Updated `store.ts` SidebarView type from `'today'|'tasks'|'courses'|'schedule'` to `'dashboard'|'lectures'|'calendar'|'subjects'|'insights'|'search'|'settings'`
-- Rewrote `page.tsx` as comprehensive single-file app with all views:
-  - Dashboard: greeting card, stats grid, today's lectures, weekly chart, top subjects, upcoming
-  - Lectures: filterable list with tabs (All/Unreviewed/Completed), subject filter chips
-  - Calendar: full month grid with navigation, today's schedule, upcoming events
-  - Subjects: card grid with progress stats and mastery %
-  - Insights: focus score, consistency streak, progress bars, AI recommendations, reflection quote
-  - Search: live search across topics/subjects/chapters
-  - Settings: toggle switches, profile info, theme toggle
-  - Study Session modal: timer with recording UI, subject selection, waveform animation
-  - Subject Detail View: chapter-by-chapter topic list with progress, video/PDF links
-  - Mobile bottom navigation for responsive design
-- Restyled `LoginPage.tsx` to match warm academic design with terracotta accents
-- Fixed lint error: renamed `Home` import from lucide-react to `HomeIcon` to avoid conflict with default export
-- Fixed lint error: replaced setState-in-effect with useMemo for search results
-- All lint checks pass clean
-- Verified: HTTP 200, API data flows correctly, Group_Eligibility filtering works
-
-Stage Summary:
-- Complete UI/UX redesign matching the warm terracotta academic design
-- All 7 views working with real data from the database
-- Study Session modal, Search, Calendar all functional
-- Login page restyled to match
-- Lint passes clean, all features working
+- Complete visual redesign from warm earth-tone (Fraunces/Inter) to premium dark theme (Plus Jakarta Sans/Inter)
+- All functionality preserved: auth, data fetching, task completion, subject detail, recording modal, focus timer, calendar, search, settings
+- New design features: glass morphism cards, gradient accents, floating mobile nav, premium animations
+- Color system: #0B1020 bg, #7C3AED accent, linear-gradient(135deg, #3B82F6, #7C3AED)
+- Typography: Plus Jakarta Sans (headings), Inter (body), JetBrains Mono (code)
+- Border radius: 12/16/24/28 consistent system
+- Mobile: floating bottom nav with blur backdrop

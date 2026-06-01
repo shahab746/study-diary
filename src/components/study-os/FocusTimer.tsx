@@ -99,7 +99,7 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
   }, [isOpen, onClose]);
 
   // Ring SVG params
-  const ringSize = 200;
+  const ringSize = 220;
   const strokeWidth = 6;
   const radius = (ringSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -114,7 +114,8 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[100]"
+            style={{ background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(8px)' }}
             onClick={() => {
               setIsRunning(false);
               onClose();
@@ -129,34 +130,90 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             className="fixed inset-0 z-[101] flex items-center justify-center p-4"
           >
-            <div className="glass-strong rounded-3xl p-6 sm:p-8 w-full max-w-sm relative border border-[rgba(248,250,252,0.06)] shadow-2xl" style={{ background: 'rgba(18, 20, 31, 0.95)' }}>
+            <div
+              className="rounded-3xl p-6 sm:p-8 w-full max-w-sm relative shadow-2xl"
+              style={{
+                background: 'rgba(17, 24, 39, 0.95)',
+                backdropFilter: 'blur(24px)',
+                border: '1px solid var(--border, rgba(255,255,255,0.08))',
+              }}
+            >
+              {/* Subtle gradient glow behind the card */}
+              <div
+                className="absolute inset-0 rounded-3xl opacity-20 pointer-events-none"
+                style={{
+                  background: 'radial-gradient(ellipse at 50% 0%, rgba(124, 58, 237, 0.3) 0%, transparent 60%)',
+                }}
+              />
+
               {/* Close button */}
               <button
                 onClick={() => {
                   setIsRunning(false);
                   onClose();
                 }}
-                className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
+                className="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  color: 'var(--text-muted, #64748B)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                  e.currentTarget.style.color = 'var(--text-primary, #F8FAFC)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                  e.currentTarget.style.color = 'var(--text-muted, #64748B)';
+                }}
               >
                 <X className="w-4 h-4" />
               </button>
 
               {/* Header */}
-              <div className="flex items-center gap-2.5 mb-6">
-                <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center">
-                  <Timer className="w-4.5 h-4.5 text-primary" />
+              <div className="flex items-center gap-2.5 mb-6 relative">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, #3B82F6, #7C3AED)',
+                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.35)',
+                  }}
+                >
+                  <Timer className="w-4.5 h-4.5 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-display text-lg font-bold tracking-tight">Focus Timer</h2>
-                  <p className="text-[10px] font-mono text-muted-foreground">Pomodoro session</p>
+                  <h2
+                    className="font-display text-lg font-bold tracking-tight"
+                    style={{ color: 'var(--text-primary, #F8FAFC)' }}
+                  >
+                    Focus Timer
+                  </h2>
+                  <p
+                    className="text-[10px] font-mono"
+                    style={{ color: 'var(--text-muted, #64748B)' }}
+                  >
+                    POMODORO SESSION
+                  </p>
                 </div>
               </div>
 
               {/* Timer ring */}
-              <div className="flex justify-center mb-6">
+              <div className="flex justify-center mb-6 relative">
                 <div className="relative" style={{ width: ringSize, height: ringSize }}>
+                  {/* Outer glow effect */}
+                  {isRunning && (
+                    <motion.div
+                      className="absolute inset-0 rounded-full"
+                      style={{
+                        background: 'radial-gradient(circle, rgba(124, 58, 237, 0.12) 0%, transparent 70%)',
+                      }}
+                      animate={{ scale: [1, 1.05, 1], opacity: [0.5, 0.8, 0.5] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                  )}
+
                   <svg
-                    className="transform -rotate-90"
+                    className="transform -rotate-90 relative z-10"
                     width={ringSize}
                     height={ringSize}
                     viewBox={`0 0 ${ringSize} ${ringSize}`}
@@ -167,9 +224,8 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
                       cy={ringSize / 2}
                       r={radius}
                       fill="none"
-                      stroke="currentColor"
+                      stroke="rgba(255,255,255,0.06)"
                       strokeWidth={strokeWidth}
-                      className="text-secondary"
                     />
                     {/* Progress ring */}
                     <motion.circle
@@ -178,23 +234,26 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
                       r={radius}
                       fill="none"
                       stroke="url(#focus-timer-gradient)"
-                      strokeWidth={strokeWidth + 1}
+                      strokeWidth={strokeWidth + 1.5}
                       strokeLinecap="round"
                       strokeDasharray={circumference}
                       initial={{ strokeDashoffset: circumference }}
                       animate={{ strokeDashoffset }}
                       transition={{ duration: 0.5, ease: 'easeOut' }}
+                      style={{
+                        filter: 'drop-shadow(0 0 8px rgba(124, 58, 237, 0.5))',
+                      }}
                     />
                     <defs>
                       <linearGradient id="focus-timer-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#f59e0b" />
-                        <stop offset="100%" stopColor="#d97706" />
+                        <stop offset="0%" stopColor="#3B82F6" />
+                        <stop offset="100%" stopColor="#7C3AED" />
                       </linearGradient>
                     </defs>
                   </svg>
 
                   {/* Center content */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
                     {isComplete ? (
                       <motion.div
                         initial={{ scale: 0.5, opacity: 0 }}
@@ -202,8 +261,16 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                         className="flex flex-col items-center"
                       >
-                        <CheckCircle2 className="w-10 h-10 text-primary mb-2" />
-                        <span className="text-sm font-display font-semibold text-primary">Session Complete!</span>
+                        <CheckCircle2
+                          className="w-10 h-10 mb-2"
+                          style={{ color: '#7C3AED' }}
+                        />
+                        <span
+                          className="text-sm font-display font-semibold"
+                          style={{ color: 'var(--text-primary, #F8FAFC)' }}
+                        >
+                          Session Complete!
+                        </span>
                       </motion.div>
                     ) : (
                       <>
@@ -212,10 +279,14 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
                           initial={{ opacity: 0.8 }}
                           animate={{ opacity: 1 }}
                           className="text-4xl font-display font-bold tabular-nums tracking-tight"
+                          style={{ color: 'var(--text-primary, #F8FAFC)' }}
                         >
                           {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
                         </motion.span>
-                        <span className="text-[10px] font-mono text-muted-foreground mt-1">
+                        <span
+                          className="text-[10px] font-mono mt-1 tracking-widest"
+                          style={{ color: 'var(--text-muted, #64748B)' }}
+                        >
                           {isRunning ? 'FOCUSING' : 'PAUSED'}
                         </span>
                       </>
@@ -225,18 +296,38 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
               </div>
 
               {/* Duration selector */}
-              <div className="flex gap-2 mb-6">
+              <div className="flex gap-2 mb-6 relative">
                 {TIMER_OPTIONS.map((opt) => (
                   <motion.button
                     key={opt.minutes}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleSelectMinutes(opt.minutes)}
                     disabled={isRunning}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-display font-semibold transition-all duration-200 ${
-                      selectedMinutes === opt.minutes
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                    } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-display font-semibold transition-all duration-200"
+                    style={{
+                      ...(selectedMinutes === opt.minutes
+                        ? {
+                            background: 'linear-gradient(135deg, #3B82F6, #7C3AED)',
+                            color: '#FFFFFF',
+                            boxShadow: '0 4px 16px rgba(124, 58, 237, 0.35)',
+                          }
+                        : {
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            color: 'var(--text-secondary, #94A3B8)',
+                            border: '1px solid rgba(255, 255, 255, 0.06)',
+                          }),
+                      ...(isRunning ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isRunning || selectedMinutes === opt.minutes) return;
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                      e.currentTarget.style.color = 'var(--text-primary, #F8FAFC)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isRunning || selectedMinutes === opt.minutes) return;
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                      e.currentTarget.style.color = 'var(--text-secondary, #94A3B8)';
+                    }}
                   >
                     {opt.label}
                   </motion.button>
@@ -244,27 +335,43 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
               </div>
 
               {/* Controls */}
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-3 relative">
+                {/* Reset button - glass style */}
                 <motion.button
                   whileTap={{ scale: 0.9 }}
                   onClick={handleReset}
-                  className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                  className="w-11 h-11 rounded-xl flex items-center justify-center transition-colors"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    color: 'var(--text-muted, #64748B)',
+                    backdropFilter: 'blur(10px)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                    e.currentTarget.style.color = 'var(--text-secondary, #94A3B8)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                    e.currentTarget.style.color = 'var(--text-muted, #64748B)';
+                  }}
                 >
                   <RotateCcw className="w-4 h-4" />
                 </motion.button>
 
+                {/* Play/Pause button */}
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   whileHover={{ scale: 1.05 }}
                   onClick={handleStartPause}
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all"
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-white transition-all"
                   style={{
                     background: isRunning
-                      ? 'linear-gradient(135deg, #64748B, #475569)'
-                      : 'linear-gradient(135deg, #FBBF24, #F59E0B)',
+                      ? 'linear-gradient(135deg, #475569, #334155)'
+                      : 'linear-gradient(135deg, #3B82F6, #7C3AED)',
                     boxShadow: isRunning
-                      ? '0 4px 15px rgba(100, 116, 139, 0.3)'
-                      : '0 4px 20px rgba(251, 191, 36, 0.35), 0 0 40px rgba(251, 191, 36, 0.1)',
+                      ? '0 4px 15px rgba(71, 85, 105, 0.3)'
+                      : '0 4px 20px rgba(124, 58, 237, 0.4), 0 0 40px rgba(59, 130, 246, 0.15)',
                   }}
                 >
                   {isRunning ? (
@@ -274,13 +381,17 @@ export function FocusTimer({ isOpen, onClose }: FocusTimerProps) {
                   )}
                 </motion.button>
 
-                <div className="w-11 h-11" /> {/* Spacer for centering */}
+                {/* Spacer for centering */}
+                <div className="w-11 h-11" />
               </div>
 
               {/* Session info */}
-              <div className="mt-5 text-center">
-                <p className="text-[10px] font-mono text-muted-foreground">
-                  {selectedMinutes} min focus session · Stay in the zone
+              <div className="mt-5 text-center relative">
+                <p
+                  className="text-[10px] font-mono tracking-wide"
+                  style={{ color: 'var(--text-muted, #64748B)' }}
+                >
+                  {selectedMinutes} MIN FOCUS SESSION · STAY IN THE ZONE
                 </p>
               </div>
             </div>

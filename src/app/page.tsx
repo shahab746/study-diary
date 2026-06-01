@@ -23,7 +23,7 @@ function useMounted() {
   return useSyncExternalStore(emptySubscribe, () => true, () => false);
 }
 
-// Subject color mapping
+// Subject color mapping — updated for premium dark design
 function getSubjectTagClass(subjectName: string): string {
   const lower = subjectName.toLowerCase();
   if (lower.includes('computer') || lower.includes('cs')) return 'tag-cs';
@@ -36,12 +36,12 @@ function getSubjectTagClass(subjectName: string): string {
 
 function getSubjectColor(subjectName: string): string {
   const lower = subjectName.toLowerCase();
-  if (lower.includes('computer') || lower.includes('cs')) return 'var(--violet)';
-  if (lower.includes('math')) return 'var(--amber)';
-  if (lower.includes('bio')) return 'var(--sage)';
-  if (lower.includes('phys')) return 'var(--accent)';
-  if (lower.includes('chem')) return 'var(--sage)';
-  return 'var(--violet)';
+  if (lower.includes('computer') || lower.includes('cs')) return '#8B5CF6';    // violet
+  if (lower.includes('math')) return '#F59E0B';                                  // amber
+  if (lower.includes('bio')) return '#10B981';                                    // green/emerald
+  if (lower.includes('phys')) return '#7C3AED';                                   // accent/purple
+  if (lower.includes('chem')) return '#10B981';                                    // green/emerald
+  return '#8B5CF6';                                                               // violet default
 }
 
 function getSubjectIcon(subjectName: string) {
@@ -80,11 +80,11 @@ function Sidebar() {
   ];
 
   return (
-    <aside className="sidebar-warm">
+    <aside className="sidebar-premium">
       <div className="brand">
         <div className="brand-mark"><BookOpenText width={18} height={18} /></div>
         <div className="brand-text">
-          <h1 className="serif">Lecture Diary</h1>
+          <h1 className="heading">Lecture Diary</h1>
           <span>Study Companion</span>
         </div>
       </div>
@@ -115,7 +115,7 @@ function Sidebar() {
             {item.icon}
             {item.label}
             {item.badge && (
-              <span style={{ marginLeft: 'auto', fontSize: 9, background: 'var(--accent)', color: '#fff', padding: '2px 6px', borderRadius: 8, fontWeight: 700 }}>
+              <span style={{ marginLeft: 'auto', fontSize: 9, background: 'linear-gradient(135deg, #3B82F6, #7C3AED)', color: '#fff', padding: '2px 8px', borderRadius: 8, fontWeight: 700, letterSpacing: '.06em' }}>
                 {item.badge}
               </span>
             )}
@@ -148,7 +148,7 @@ function Sidebar() {
             <div className="name">{student?.name || 'Student'}</div>
             <div className="plan">Grade {student?.grade || 10} · {student?.board || ''}</div>
           </div>
-          <MoreHorizontal width={16} height={16} style={{ color: 'var(--muted)' }} />
+          <MoreHorizontal width={16} height={16} style={{ color: 'var(--text-muted)' }} />
         </div>
       </div>
     </aside>
@@ -167,7 +167,7 @@ function Topbar({ onRecord }: { onRecord: () => void }) {
   return (
     <div className="topbar">
       <div className="search-box">
-        <Search width={16} height={16} style={{ color: 'var(--muted)' }} />
+        <Search width={16} height={16} style={{ color: 'var(--text-muted)' }} />
         <input
           placeholder="Search lectures, notes, topics..."
           value={searchQuery}
@@ -229,10 +229,10 @@ function DashboardView() {
       <div className="page-head">
         <div>
           <div className="crumbs">Home <span className="sep">/</span> <span className="cur">Dashboard</span></div>
-          <h2 className="serif">{emoji} {greeting}, {firstName}.</h2>
+          <h2 className="heading">{emoji} {greeting}, <span className="gradient-text">{firstName}</span>.</h2>
           <p>
             {nextTask
-              ? <>Your next lecture is <em style={{ color: 'var(--ink)' }}>{nextTask.topicName}</em> in {nextTask.subjectName}. Keep going!</>
+              ? <>Your next lecture is <em style={{ color: 'var(--text-primary)' }}>{nextTask.topicName}</em> in {nextTask.subjectName}. Keep going!</>
               : todayTasks.length > 0
                 ? 'All today\'s lectures are complete! Great work 🎉'
                 : 'No lectures scheduled for today. Start a study session or explore your courses.'
@@ -244,35 +244,35 @@ function DashboardView() {
         </div>
       </div>
 
-      <div className="greeting">
-        <h3 className="serif">{dateStr}</h3>
+      <div className="greeting glass">
+        <h3 className="heading">{dateStr}</h3>
         <p>Day {student?.currentDay || 1} of {student?.totalDays || 438} — stay focused and make every lecture count.</p>
         <div className="greeting-meta">
-          <div className="chip"><span className="dot" style={{ background: 'var(--sage)' }}></span>{todayTasks.length} lectures today</div>
-          <div className="chip"><span className="dot" style={{ background: 'var(--accent)' }}></span>{todayTasks.filter(t => !t.completed).length} pending</div>
-          <div className="chip"><span className="dot" style={{ background: 'var(--amber)' }}></span>Streak: {streak} days</div>
+          <div className="chip"><span className="dot" style={{ background: '#10B981' }}></span>{todayTasks.length} lectures today</div>
+          <div className="chip"><span className="dot" style={{ background: '#7C3AED' }}></span>{todayTasks.filter(t => !t.completed).length} pending</div>
+          <div className="chip"><span className="dot" style={{ background: '#F59E0B' }}></span>Streak: {streak} days</div>
         </div>
       </div>
 
       <div className="stats-grid">
         <div className="stat-card">
           <div className="label"><Mic width={13} height={13} />Lectures completed</div>
-          <div className="value serif">{totalCompleted}</div>
+          <div className="value heading">{totalCompleted}</div>
           <div className="trend up"><TrendingUp width={12} height={12} />{totalCompleted > 0 ? `+${Math.min(totalCompleted, 12)}% this month` : 'Start studying!'}</div>
         </div>
         <div className="stat-card">
           <div className="label"><Clock width={13} height={13} />Hours reviewed</div>
-          <div className="value serif">{studyHours}<small style={{ fontSize: 18, color: 'var(--muted)' }}>h</small>{studyMinsRem > 0 ? `${studyMinsRem}m` : ''}</div>
+          <div className="value heading">{studyHours}<small style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</small>{studyMinsRem > 0 ? `${studyMinsRem}m` : ''}</div>
           <div className="trend up"><TrendingUp width={12} height={12} />{studyMinutes > 0 ? `+${(studyMinutes / 60).toFixed(1)}h today` : '0h today'}</div>
         </div>
         <div className="stat-card">
           <div className="label"><BookMarked width={13} height={13} />Topics covered</div>
-          <div className="value serif">{totalTopics > 0 ? Math.round((totalCompleted / totalTopics) * 100) : 0}<small style={{ fontSize: 18, color: 'var(--muted)' }}>%</small></div>
+          <div className="value heading">{totalTopics > 0 ? Math.round((totalCompleted / totalTopics) * 100) : 0}<small style={{ fontSize: 18, color: 'var(--text-muted)' }}>%</small></div>
           <div className="trend up"><TrendingUp width={12} height={12} />{totalCompleted}/{totalTopics} total</div>
         </div>
         <div className="stat-card">
           <div className="label"><Brain width={13} height={13} />Focus score</div>
-          <div className="value serif">{focusScore}<small style={{ fontSize: 18, color: 'var(--muted)' }}>%</small></div>
+          <div className="value heading">{focusScore}<small style={{ fontSize: 18, color: 'var(--text-muted)' }}>%</small></div>
           <div className={`trend ${focusScore >= 70 ? 'up' : 'down'}`}>
             {focusScore >= 70 ? <TrendingUp width={12} height={12} /> : <TrendingDown width={12} height={12} />}
             {focusScore >= 70 ? 'Great focus!' : 'Room to improve'}
@@ -281,11 +281,11 @@ function DashboardView() {
       </div>
 
       <div className="dash-grid">
-        <div className="panel">
+        <div className="panel glass">
           <div className="panel-head">
             <div>
-              <h3 className="serif">Today&apos;s Lectures</h3>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Your study queue for today</div>
+              <h3 className="heading">Today&apos;s Lectures</h3>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Your study queue for today</div>
             </div>
             <div className="actions">
               <button className="btn ghost btn-sm" onClick={() => useStudyOS.getState().setSidebarView('lectures')}>View all</button>
@@ -296,17 +296,17 @@ function DashboardView() {
               <LectureItem key={task.topicId} task={task} />
             ))}
             {todayTasks.length === 0 && (
-              <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>
+              <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
                 No lectures scheduled. Enjoy your day off! 📚
               </div>
             )}
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel glass">
           <div className="panel-head">
-            <h3 className="serif">Study Activity</h3>
-            <div className="actions" style={{ fontSize: 12, color: 'var(--muted)' }}>This week</div>
+            <h3 className="heading">Study Activity</h3>
+            <div className="actions" style={{ fontSize: 12, color: 'var(--text-muted)' }}>This week</div>
           </div>
           <div className="chart-wrap">
             <div className="chart">
@@ -321,8 +321,8 @@ function DashboardView() {
                 <div key={i} className={w.t ? 'today' : ''}>{w.d}</div>
               ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--line-soft)', fontSize: 12, color: 'var(--muted)' }}>
-              <span>Total this week: <b style={{ color: 'var(--ink)' }}>{studyHours}h {studyMinsRem}m</b></span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
+              <span>Total this week: <b style={{ color: 'var(--text-primary)' }}>{studyHours}h {studyMinsRem}m</b></span>
               <span>Goal: {Math.ceil(totalTopics * 0.02)}h</span>
             </div>
           </div>
@@ -330,9 +330,9 @@ function DashboardView() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
-        <div className="panel">
+        <div className="panel glass">
           <div className="panel-head">
-            <h3 className="serif">Top Subjects</h3>
+            <h3 className="heading">Top Subjects</h3>
             <button className="btn ghost btn-sm" onClick={() => useStudyOS.getState().setSidebarView('subjects')}>Manage</button>
           </div>
           <div className="panel-body">
@@ -350,14 +350,14 @@ function DashboardView() {
                     <span>{s.completedTopics} done</span>
                   </div>
                 </div>
-                <ChevronRightIcon width={16} height={16} style={{ color: 'var(--muted)' }} />
+                <ChevronRightIcon width={16} height={16} style={{ color: 'var(--text-muted)' }} />
               </div>
             ))}
           </div>
         </div>
-        <div className="panel">
+        <div className="panel glass">
           <div className="panel-head">
-            <h3 className="serif">Upcoming</h3>
+            <h3 className="heading">Upcoming</h3>
             <button className="btn ghost btn-sm" onClick={() => useStudyOS.getState().setSidebarView('calendar')}>Calendar</button>
           </div>
           <div className="panel-body" style={{ padding: '16px 20px' }}>
@@ -375,7 +375,7 @@ function DashboardView() {
                 </div>
               ))}
               {todayTasks.filter(t => !t.completed).length === 0 && (
-                <div style={{ padding: 16, textAlign: 'center', color: 'var(--muted)' }}>
+                <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
                   All done for today! 🎉
                 </div>
               )}
@@ -414,8 +414,8 @@ function LectureItem({ task, onClick }: { task: TodayTask; onClick?: () => void 
       </div>
       <div className="progress-ring">
         <svg width="44" height="44" viewBox="0 0 44 44">
-          <circle cx="22" cy="22" r="18" fill="none" stroke="var(--line-soft)" strokeWidth="3" />
-          <circle cx="22" cy="22" r="18" fill="none" stroke={task.completed ? 'var(--sage)' : 'var(--accent)'} strokeWidth="3"
+          <circle cx="22" cy="22" r="18" fill="none" stroke="var(--border)" strokeWidth="3" />
+          <circle cx="22" cy="22" r="18" fill="none" stroke={task.completed ? '#10B981' : '#7C3AED'} strokeWidth="3"
             strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" />
         </svg>
         <div className="pct">{task.completed ? '✓' : `${progressPct}%`}</div>
@@ -448,15 +448,15 @@ function LecturesView() {
       <div className="page-head">
         <div>
           <div className="crumbs">Workspace <span className="sep">/</span> <span className="cur">Lectures</span></div>
-          <h2 className="serif">All Lectures</h2>
+          <h2 className="heading">All Lectures</h2>
           <p>Browse, search and revisit every lecture in your study queue.</p>
         </div>
       </div>
 
       <div className="tabs">
-        <div className={`tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>All <span style={{ color: 'var(--muted)', marginLeft: 4 }}>{todayTasks.length}</span></div>
-        <div className={`tab ${activeTab === 'unreviewed' ? 'active' : ''}`} onClick={() => setActiveTab('unreviewed')}>Unreviewed <span style={{ color: 'var(--muted)', marginLeft: 4 }}>{unreviewed.length}</span></div>
-        <div className={`tab ${activeTab === 'completed' ? 'active' : ''}`} onClick={() => setActiveTab('completed')}>Completed <span style={{ color: 'var(--muted)', marginLeft: 4 }}>{completed.length}</span></div>
+        <div className={`tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>All <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{todayTasks.length}</span></div>
+        <div className={`tab ${activeTab === 'unreviewed' ? 'active' : ''}`} onClick={() => setActiveTab('unreviewed')}>Unreviewed <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{unreviewed.length}</span></div>
+        <div className={`tab ${activeTab === 'completed' ? 'active' : ''}`} onClick={() => setActiveTab('completed')}>Completed <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{completed.length}</span></div>
       </div>
 
       <div className="filter-bar">
@@ -473,7 +473,7 @@ function LecturesView() {
         ))}
       </div>
 
-      <div className="lectures-list">
+      <div className="lectures-list glass">
         {displayedTasks.map(task => (
           <LectureItem key={task.topicId} task={task} onClick={() => {
             const subject = subjects.find(s => s.subjectName === task.subjectName);
@@ -484,7 +484,7 @@ function LecturesView() {
           }} />
         ))}
         {displayedTasks.length === 0 && (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
             No lectures found. Try a different filter.
           </div>
         )}
@@ -544,15 +544,15 @@ function CalendarView() {
       <div className="page-head">
         <div>
           <div className="crumbs">Workspace <span className="sep">/</span> <span className="cur">Calendar</span></div>
-          <h2 className="serif">{months[currentMonth]} {currentYear}</h2>
+          <h2 className="heading">{months[currentMonth]} {currentYear}</h2>
           <p>Your academic schedule and study sessions at a glance.</p>
         </div>
       </div>
 
       <div className="cal-wrap">
-        <div className="cal-card">
+        <div className="cal-card glass">
           <div className="cal-head">
-            <h3 className="serif">{months[currentMonth]} {currentYear}</h3>
+            <h3 className="heading">{months[currentMonth]} {currentYear}</h3>
             <div className="cal-nav">
               <button className="icon-btn" style={{ width: 32, height: 32 }} onClick={prevMonth}><ChevronLeft width={14} height={14} /></button>
               <button className="btn ghost btn-sm" onClick={goToday}>Today</button>
@@ -577,10 +577,10 @@ function CalendarView() {
         </div>
 
         <div>
-          <div className="cal-card" style={{ marginBottom: 16 }}>
-            <div className="panel-head" style={{ padding: '0 0 14px', borderBottom: '1px solid var(--line-soft)', marginBottom: 14 }}>
-              <h3 className="serif" style={{ fontSize: 16 }}>Today&apos;s Schedule</h3>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{todayTasks.length} lectures</span>
+          <div className="cal-card glass" style={{ marginBottom: 16 }}>
+            <div className="panel-head" style={{ padding: '0 0 14px', borderBottom: '1px solid var(--border)', marginBottom: 14 }}>
+              <h3 className="heading" style={{ fontSize: 16 }}>Today&apos;s Schedule</h3>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{todayTasks.length} lectures</span>
             </div>
             <div className="upcoming-list">
               {todayTasks.filter(t => !t.completed).slice(0, 3).map(task => (
@@ -597,9 +597,9 @@ function CalendarView() {
               ))}
             </div>
           </div>
-          <div className="cal-card">
-            <div className="panel-head" style={{ padding: '0 0 14px', borderBottom: '1px solid var(--line-soft)', marginBottom: 14 }}>
-              <h3 className="serif" style={{ fontSize: 16 }}>This Week</h3>
+          <div className="cal-card glass">
+            <div className="panel-head" style={{ padding: '0 0 14px', borderBottom: '1px solid var(--border)', marginBottom: 14 }}>
+              <h3 className="heading" style={{ fontSize: 16 }}>This Week</h3>
             </div>
             <div className="upcoming-list">
               {todayTasks.slice(0, 4).map(task => (
@@ -633,14 +633,14 @@ function SubjectsView() {
       <div className="page-head">
         <div>
           <div className="crumbs">Workspace <span className="sep">/</span> <span className="cur">Subjects</span></div>
-          <h2 className="serif">Subjects & Courses</h2>
+          <h2 className="heading">Subjects & Courses</h2>
           <p>Organise your study by subject and track mastery across the board.</p>
         </div>
       </div>
 
       <div className="subjects-grid">
         {subjects.map(s => (
-          <div key={s.subjectId} className="subject-card" onClick={() => openSubjectDetail(s.subjectId)}>
+          <div key={s.subjectId} className="subject-card glass" onClick={() => openSubjectDetail(s.subjectId)}>
             <div className="accent-bar" style={{ background: getSubjectColor(s.subjectName) }}></div>
             <div className="subject-icon" style={{ background: getSubjectColor(s.subjectName) }}>
               {getSubjectIcon(s.subjectName)}
@@ -686,13 +686,13 @@ function InsightsView() {
       <div className="page-head">
         <div>
           <div className="crumbs">Intelligence <span className="sep">/</span> <span className="cur">AI Insights</span></div>
-          <h2 className="serif">Your Study Intelligence</h2>
+          <h2 className="heading">Your Study Intelligence</h2>
           <p>Patterns, recommendations and summaries generated from your progress data.</p>
         </div>
       </div>
 
       <div className="insights-grid">
-        <div className="insight-card">
+        <div className="insight-card glass">
           <h4>Focus Score</h4>
           <p>How engaged you&apos;ve been with your study schedule this week.</p>
           <div className="big">{focusScore}<small>/100</small></div>
@@ -701,13 +701,13 @@ function InsightsView() {
             {focusScore >= 70 ? 'Great focus this week' : 'Room to improve'}
           </div>
         </div>
-        <div className="insight-card">
+        <div className="insight-card glass">
           <h4>Consistency</h4>
           <p>Your current streak of daily study sessions.</p>
           <div className="big">{streak}<small>days</small></div>
           <div className="trend up">{streak > 0 ? '🔥 Keep it going!' : 'Start your streak today!'}</div>
         </div>
-        <div className="insight-card">
+        <div className="insight-card glass">
           <h4>Progress Overview</h4>
           <p>Your subject completion rates at a glance.</p>
           <div style={{ marginTop: 14 }}>
@@ -715,31 +715,31 @@ function InsightsView() {
               <div key={s.subjectId} style={{ marginTop: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
                   <span>{s.subjectName}</span>
-                  <span style={{ color: s.progressPct >= 50 ? 'var(--sage)' : 'var(--accent)', fontWeight: 600 }}>{s.progressPct}%</span>
+                  <span style={{ color: s.progressPct >= 50 ? '#10B981' : '#7C3AED', fontWeight: 600 }}>{s.progressPct}%</span>
                 </div>
                 <div className="progress-bar-track">
-                  <div className="progress-bar-fill" style={{ width: `${s.progressPct}%`, background: s.progressPct >= 50 ? 'var(--sage)' : 'var(--accent)' }}></div>
+                  <div className="progress-bar-fill" style={{ width: `${s.progressPct}%`, background: s.progressPct >= 50 ? '#10B981' : '#7C3AED' }}></div>
                 </div>
               </div>
             ))}
           </div>
         </div>
-        <div className="insight-card">
+        <div className="insight-card glass">
           <h4>Recommended Next</h4>
           <p>Based on your pacing, study these topics today:</p>
           <div className="key-points" style={{ marginTop: 14 }}>
             {recommendations.map((r, i) => (
               <div key={r.topicId} className="key-point">
                 <div className="bullet">{i + 1}</div>
-                <div>{r.topicName} — <em style={{ color: 'var(--muted)' }}>{r.subjectName}</em></div>
+                <div>{r.topicName} — <em style={{ color: 'var(--text-muted)' }}>{r.subjectName}</em></div>
               </div>
             ))}
             {recommendations.length === 0 && (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>All caught up! No pending recommendations.</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>All caught up! No pending recommendations.</div>
             )}
           </div>
         </div>
-        <div className="insight-card quote-card">
+        <div className="insight-card quote-card glass">
           <span className="ai-badge"><Sparkles width={10} height={10} />AI reflection</span>
           <blockquote style={{ marginTop: 14 }}>
             {focusScore >= 70
@@ -783,13 +783,13 @@ function SearchView() {
       <div className="page-head">
         <div>
           <div className="crumbs">Intelligence <span className="sep">/</span> <span className="cur">Search</span></div>
-          <h2 className="serif">Search Everything</h2>
+          <h2 className="heading">Search Everything</h2>
           <p>Ask a question or search across topics, subjects and chapters.</p>
         </div>
       </div>
       <div style={{ maxWidth: 640 }}>
-        <div className="search-box" style={{ maxWidth: 'none', padding: '14px 18px' }}>
-          <Search width={18} height={18} style={{ color: 'var(--muted)' }} />
+        <div className="search-box glass" style={{ maxWidth: 'none', padding: '14px 18px' }}>
+          <Search width={18} height={18} style={{ color: 'var(--text-muted)' }} />
           <input
             placeholder="Ask anything — e.g. 'Simple Harmonic Motion'"
             style={{ fontSize: 15 }}
@@ -802,15 +802,15 @@ function SearchView() {
 
         {results.length > 0 && (
           <div style={{ marginTop: 22 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, fontWeight: 600 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, fontWeight: 600 }}>
               Results ({results.length})
             </div>
             {results.map((r, i) => (
-              <div key={i} className="lecture-item" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 16px', marginTop: 6 }}>
-                <Search width={16} height={16} style={{ color: 'var(--muted)' }} />
+              <div key={i} className="lecture-item glass" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginTop: 6 }}>
+                <Search width={16} height={16} style={{ color: 'var(--text-muted)' }} />
                 <div style={{ fontSize: 13.5 }}>
                   <div>{r.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{r.subject} · {r.type}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.subject} · {r.type}</div>
                 </div>
               </div>
             ))}
@@ -818,23 +818,23 @@ function SearchView() {
         )}
 
         {query && results.length === 0 && (
-          <div style={{ marginTop: 22, color: 'var(--muted)', fontSize: 13 }}>No results found for &ldquo;{query}&rdquo;</div>
+          <div style={{ marginTop: 22, color: 'var(--text-muted)', fontSize: 13 }}>No results found for &ldquo;{query}&rdquo;</div>
         )}
 
         {!query && (
           <div style={{ marginTop: 22 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, fontWeight: 600 }}>Quick Access</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, fontWeight: 600 }}>Quick Access</div>
             {subjects.map(s => (
-              <div key={s.subjectId} className="lecture-item" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 16px', marginTop: 6, cursor: 'pointer' }}
+              <div key={s.subjectId} className="lecture-item glass" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginTop: 6, cursor: 'pointer' }}
                 onClick={() => { useStudyOS.getState().openSubjectDetail(s.subjectId); }}>
                 <div className="subject-icon" style={{ background: getSubjectColor(s.subjectName), width: 32, height: 32, borderRadius: 8 }}>
                   {getSubjectIcon(s.subjectName)}
                 </div>
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.subjectName}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.totalTopics} topics · {s.progressPct}% done</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.totalTopics} topics · {s.progressPct}% done</div>
                 </div>
-                <ChevronRightIcon width={16} height={16} style={{ color: 'var(--muted)' }} />
+                <ChevronRightIcon width={16} height={16} style={{ color: 'var(--text-muted)' }} />
               </div>
             ))}
           </div>
@@ -871,7 +871,7 @@ function SettingsView() {
       <div className="page-head">
         <div>
           <div className="crumbs">Account <span className="sep">/</span> <span className="cur">Settings</span></div>
-          <h2 className="serif">Settings</h2>
+          <h2 className="heading">Settings</h2>
           <p>Customise your Lecture Diary experience.</p>
         </div>
       </div>
@@ -885,7 +885,7 @@ function SettingsView() {
           <div className="nav-item"><LifeBuoy width={16} height={16} />Help</div>
         </div>
 
-        <div className="cal-card">
+        <div className="cal-card glass">
           <div className="setting-row">
             <div className="info">
               <h4>Auto-track progress</h4>
@@ -970,10 +970,10 @@ function StudySessionModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   return (
     <div className="modal-overlay show" onClick={e => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div className="modal">
+      <div className="modal glass-strong">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h3 className="serif">Study Session</h3>
+            <h3 className="heading">Study Session</h3>
             <p>Start a focused study session with a timer.</p>
           </div>
           <button className="icon-btn" onClick={handleClose}><X width={16} height={16} /></button>
@@ -994,7 +994,7 @@ function StudySessionModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           }
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, height: 40, background: 'var(--bg-elev)', borderRadius: 10, padding: '0 16px', margin: '14px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, height: 40, background: 'var(--bg-secondary)', borderRadius: 10, padding: '0 16px', margin: '14px 0', border: '1px solid var(--border)' }}>
           {Array.from({ length: 40 }).map((_, i) => (
             <div
               key={i}
@@ -1029,7 +1029,7 @@ function StudySessionModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 }
 
 // ============================================
-// SUBJECT DETAIL VIEW (replaces Lecture Detail Modal)
+// SUBJECT DETAIL VIEW
 // ============================================
 function SubjectDetailView() {
   const { subjectDetail, subjectDetailLoading, closeSubjectDetail, toggleSubjectDetailTopic, highlightTopicId, setHighlightTopicId } = useStudyOS();
@@ -1048,7 +1048,7 @@ function SubjectDetailView() {
     return (
       <div className="view active" style={{ padding: 40, textAlign: 'center' }}>
         <Loader2 className="animate-spin" style={{ margin: '0 auto', color: 'var(--accent)' }} width={32} height={32} />
-        <p style={{ marginTop: 16, color: 'var(--muted)' }}>Loading subject details...</p>
+        <p style={{ marginTop: 16, color: 'var(--text-muted)' }}>Loading subject details...</p>
       </div>
     );
   }
@@ -1069,13 +1069,13 @@ function SubjectDetailView() {
             <span className="sep">/</span>
             <span className="cur">{subjectDetail.name}</span>
           </div>
-          <h2 className="serif" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2 className="heading" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="subject-icon" style={{ background: color, width: 44, height: 44, borderRadius: 12 }}>
               {getSubjectIcon(subjectDetail.name)}
             </div>
             {subjectDetail.name}
           </h2>
-          <p>{subjectDetail.chapterCount} chapters · {subjectDetail.totalTopics} topics · {totalProgress}% complete</p>
+          <p>{subjectDetail.chapterCount} chapters · {subjectDetail.totalTopics} topics · <span className="gradient-text">{totalProgress}%</span> complete</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn ghost" onClick={closeSubjectDetail}><ChevronLeft width={15} height={15} />Back</button>
@@ -1085,27 +1085,27 @@ function SubjectDetailView() {
       {/* Progress bar */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>Overall Progress</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{subjectDetail.completedTopics}/{subjectDetail.totalTopics}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>Overall Progress</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#7C3AED' }}>{subjectDetail.completedTopics}/{subjectDetail.totalTopics}</span>
         </div>
         <div className="progress-bar-track" style={{ height: 8 }}>
-          <div className="progress-bar-fill" style={{ width: `${totalProgress}%`, background: `linear-gradient(90deg, ${color}, var(--accent))` }}></div>
+          <div className="progress-bar-fill" style={{ width: `${totalProgress}%`, background: `linear-gradient(90deg, ${color}, #7C3AED)` }}></div>
         </div>
       </div>
 
       {/* Chapters */}
       {subjectDetail.chapters.map(ch => (
-        <div key={ch.id} className="panel" style={{ marginBottom: 16 }}>
+        <div key={ch.id} className="panel glass" style={{ marginBottom: 16 }}>
           <div className="panel-head">
             <div>
-              <h3 className="serif" style={{ fontSize: 16 }}>Ch {ch.number}: {ch.name}</h3>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{ch.completedTopics}/{ch.totalTopics} completed</div>
+              <h3 className="heading" style={{ fontSize: 16 }}>Ch {ch.number}: {ch.name}</h3>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{ch.completedTopics}/{ch.totalTopics} completed</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="progress-bar-track" style={{ width: 80, height: 5 }}>
                 <div className="progress-bar-fill" style={{ width: `${ch.totalTopics > 0 ? (ch.completedTopics / ch.totalTopics) * 100 : 0}%`, background: color }}></div>
               </div>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{ch.totalTopics > 0 ? Math.round((ch.completedTopics / ch.totalTopics) * 100) : 0}%</span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ch.totalTopics > 0 ? Math.round((ch.completedTopics / ch.totalTopics) * 100) : 0}%</span>
             </div>
           </div>
           <div className="panel-body" style={{ padding: '4px 8px' }}>
@@ -1121,8 +1121,8 @@ function SubjectDetailView() {
                 onClick={() => toggleSubjectDetailTopic(t.id)}
               >
                 <div className="lecture-play" style={{
-                  background: t.completed ? 'rgba(92,120,97,.15)' : 'var(--accent-soft)',
-                  color: t.completed ? 'var(--sage)' : 'var(--accent)',
+                  background: t.completed ? 'rgba(16,185,129,.12)' : 'var(--accent-soft)',
+                  color: t.completed ? '#10B981' : '#7C3AED',
                 }}>
                   {t.completed ? <CheckCircle2 width={16} height={16} /> : <Play width={16} height={16} fill="currentColor" />}
                 </div>
@@ -1132,19 +1132,19 @@ function SubjectDetailView() {
                     <span>Day {t.dayNumber}</span>
                     {t.hasVideo && (
                       <a href={t.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#7C3AED' }}>
                         <ExternalLink width={12} height={12} />Video
                       </a>
                     )}
                     {t.hasPdf && (
                       <a href={t.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--sage)' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#10B981' }}>
                         <ExternalLink width={12} height={12} />PDF
                       </a>
                     )}
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: t.completed ? 'var(--sage)' : 'var(--muted)', fontWeight: 600 }}>
+                <div style={{ fontSize: 11, color: t.completed ? '#10B981' : 'var(--text-muted)', fontWeight: 600 }}>
                   {t.completed ? 'Done' : 'To do'}
                 </div>
               </div>
@@ -1157,17 +1157,17 @@ function SubjectDetailView() {
 }
 
 // ============================================
-// MOBILE BOTTOM NAV
+// MOBILE BOTTOM NAV (Floating Premium Design)
 // ============================================
 function MobileBottomNav() {
   const { sidebarView, setSidebarView } = useStudyOS();
 
   const items: { id: ViewId; icon: React.ReactNode; label: string }[] = [
-    { id: 'dashboard', icon: <HomeIcon width={18} height={18} />, label: 'Home' },
-    { id: 'lectures', icon: <ListTodo width={18} height={18} />, label: 'Lectures' },
-    { id: 'subjects', icon: <BookOpen width={18} height={18} />, label: 'Subjects' },
+    { id: 'dashboard', icon: <LayoutDashboard width={18} height={18} />, label: 'Dashboard' },
+    { id: 'lectures', icon: <BookOpen width={18} height={18} />, label: 'Lectures' },
+    { id: 'calendar', icon: <CalendarDays width={18} height={18} />, label: 'Calendar' },
+    { id: 'subjects', icon: <Library width={18} height={18} />, label: 'Subjects' },
     { id: 'insights', icon: <Sparkles width={18} height={18} />, label: 'Insights' },
-    { id: 'settings', icon: <Settings width={18} height={18} />, label: 'Settings' },
   ];
 
   return (
@@ -1194,7 +1194,7 @@ function AuthLoadingScreen() {
     <div className="auth-loading">
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
         <div className="brand-mark" style={{ width: 48, height: 48 }}><BookOpenText width={22} height={22} /></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
           <Loader2 width={16} height={16} className="animate-spin" />
           <span style={{ fontSize: 13, fontFamily: 'var(--font-jetbrains-mono), monospace' }}>Loading session...</span>
         </div>
@@ -1206,20 +1206,20 @@ function AuthLoadingScreen() {
 function LoadingSkeleton() {
   return (
     <div className="loading-skeleton">
-      <div style={{ display: 'none', md: 'flex', flexDirection: 'column', width: 260, borderRight: '1px solid var(--line)', padding: 20, gap: 16 }}>
-        <div style={{ width: '100%', height: 40, background: 'var(--line-soft)', borderRadius: 10 }} className="shimmer" />
+      <div style={{ display: 'none', md: 'flex', flexDirection: 'column', width: 260, borderRight: '1px solid var(--border)', padding: 20, gap: 16 }}>
+        <div style={{ width: '100%', height: 40, background: 'var(--surface)', borderRadius: 10 }} className="shimmer" />
         {[...Array(4)].map((_, i) => (
-          <div key={i} style={{ width: '100%', height: 36, background: 'var(--line-soft)', borderRadius: 8 }} className="shimmer" />
+          <div key={i} style={{ width: '100%', height: 36, background: 'var(--surface)', borderRadius: 8 }} className="shimmer" />
         ))}
       </div>
       <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ height: 140, background: 'var(--line-soft)', borderRadius: 22 }} className="shimmer" />
+        <div style={{ height: 140, background: 'var(--surface)', borderRadius: 22 }} className="shimmer" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[...Array(4)].map((_, i) => (
-            <div key={i} style={{ height: 80, background: 'var(--line-soft)', borderRadius: 14 }} className="shimmer" />
+            <div key={i} style={{ height: 80, background: 'var(--surface)', borderRadius: 14 }} className="shimmer" />
           ))}
         </div>
-        <div style={{ height: 200, background: 'var(--line-soft)', borderRadius: 14 }} className="shimmer" />
+        <div style={{ height: 200, background: 'var(--surface)', borderRadius: 14 }} className="shimmer" />
       </div>
     </div>
   );
@@ -1240,6 +1240,22 @@ export default function Home() {
     }
   }, [fetchData, status, session]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        useStudyOS.getState().setSidebarView('search');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+        e.preventDefault();
+        setSessionModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   if (status === 'loading') return <AuthLoadingScreen />;
   if (status === 'unauthenticated' || !session) return <LoginPage />;
   if (isLoading) return <LoadingSkeleton />;
@@ -1248,7 +1264,7 @@ export default function Home() {
     <>
       <div className="app-shell">
         <Sidebar />
-        <div className="main-warm">
+        <div className="main-premium">
           <Topbar onRecord={() => setSessionModalOpen(true)} />
           <div className="content-area">
             {selectedSubjectId ? (
