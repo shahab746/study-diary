@@ -74,11 +74,15 @@ export async function POST(request: Request) {
     // Step 2: Not in local DB — dynamically load sheet-sync and try Google Sheet
     // This only runs for NEW users not yet synced to local DB
     console.log(`🔐 Login API: Not in local DB, trying Google Sheet...`);
-    const { findUserByPhone } = await import('@/lib/sheet-sync');
+    const { findUserByPhone, invalidateCache } = await import('@/lib/sheet-sync');
+    
+    // Invalidate the user cache to ensure we get the latest data from Google
+    invalidateCache('sheet_users');
+    
     const sheetUser = await findUserByPhone(cleanPhone, true);
 
     if (!sheetUser) {
-      console.warn(`🔐 Login API: No user found for phone="${cleanPhone}"`);
+      console.warn(`🔐 Login API: No user found for phone="${cleanPhone}" in Google Sheet`);
       return NextResponse.json(
         { success: false, error: 'No account found with this phone number. Make sure your phone number is in the sheet.' },
         { status: 401 }
@@ -138,7 +142,9 @@ export async function POST(request: Request) {
       });
       console.log(`🔐 Login API: Saved user "${sheetUser.name}" to local DB`);
     } catch (dbError) {
-      console.warn('🔐 Login API: Failed to save to local DB:', dbError);
+      // Log the error but still return success — the authorize function
+      // also has Google Sheets fallback now, so login will still work
+      console.error('🔐 Login API: Failed to save to local DB:', dbError);
     }
 
     return NextResponse.json({

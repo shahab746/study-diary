@@ -27,41 +27,107 @@ export const authOptions: NextAuthOptions = {
         const cleanPhone = credentials.phone.trim();
         const cleanPin = credentials.pin.trim();
 
-        console.log(`🔐 Auth: Looking up phone="${cleanPhone}" in local DB`);
+        console.log(`🔐 Auth: Looking up phone="${cleanPhone}"`);
 
         try {
-          // Use local database for fast lookup (no Google Sheets API call needed)
-          // The /api/login endpoint already syncs from Google Sheets
+          // Step 1: Check local database first (fast — no network calls)
           const student = await db.student.findUnique({ where: { phone: cleanPhone } });
 
-          if (!student) {
-            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in local DB`);
+          if (student) {
+            // Found in local DB - verify PIN
+            if (student.pin !== cleanPin) {
+              console.warn(`🔐 Auth: Wrong PIN for phone="${cleanPhone}" (local DB)`);
+              throw new Error('Incorrect PIN');
+            }
+
+            if (student.status === 'blocked' || student.status === 'disabled') {
+              throw new Error('Your account has been disabled. Please contact support.');
+            }
+
+            console.log(`🔐 Auth: Login successful for "${student.name}" via local DB (${student.status})`);
+
+            return {
+              id: student.phone,
+              name: student.name,
+              phone: student.phone,
+              grade: student.grade,
+              board: student.board,
+              field: student.field,
+              status: student.status,
+              academicGroup: student.academicGroup,
+            };
+          }
+
+          // Step 2: Not in local DB — try Google Sheet as fallback
+          // This handles new users who were just added to the sheet
+          console.log(`🔐 Auth: Not in local DB, trying Google Sheet...`);
+          const { findUserByPhone } = await import('@/lib/sheet-sync');
+          const sheetUser = await findUserByPhone(cleanPhone, true);
+
+          if (!sheetUser) {
+            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in local DB or Google Sheet`);
             throw new Error('No account found with this phone number. Make sure your phone number is in the sheet.');
           }
 
-          console.log(`🔐 Auth: Found user "${student.name}" (phone: ${student.phone}, status: ${student.status})`);
-
-          if (student.pin !== cleanPin) {
-            console.warn(`🔐 Auth: PIN mismatch for "${cleanPhone}"`);
+          if (sheetUser.pin !== cleanPin) {
+            console.warn(`🔐 Auth: Wrong PIN for phone="${cleanPhone}" (sheet)`);
             throw new Error('Incorrect PIN');
           }
 
-          // Check if account is active
-          if (student.status === 'blocked' || student.status === 'disabled') {
+          if (sheetUser.status === 'blocked' || sheetUser.status === 'disabled') {
             throw new Error('Your account has been disabled. Please contact support.');
           }
 
-          console.log(`🔐 Auth: Login successful for "${student.name}" (${student.status})`);
+          console.log(`🔐 Auth: Login successful for "${sheetUser.name}" via Google Sheet (${sheetUser.status})`);
+
+          // Save to local DB for future fast lookups
+          try {
+            await db.student.upsert({
+              where: { phone: sheetUser.phone },
+              create: {
+                name: sheetUser.name,
+                phone: sheetUser.phone,
+                grade: sheetUser.grade,
+                board: sheetUser.board,
+                field: sheetUser.field,
+                status: sheetUser.status,
+                startDate: sheetUser.startDate ? new Date(sheetUser.startDate) : new Date(),
+                targetDate: sheetUser.targetDate ? new Date(sheetUser.targetDate) : new Date(),
+                currentDay: sheetUser.currentDay,
+                totalDays: sheetUser.totalDays,
+                topicsDone: sheetUser.topicsDone,
+                daysLeft: sheetUser.daysLeft,
+                pin: sheetUser.pin,
+                academicGroup: sheetUser.academicGroup,
+              },
+              update: {
+                name: sheetUser.name,
+                grade: sheetUser.grade,
+                board: sheetUser.board,
+                field: sheetUser.field,
+                status: sheetUser.status,
+                currentDay: sheetUser.currentDay,
+                totalDays: sheetUser.totalDays,
+                topicsDone: sheetUser.topicsDone,
+                daysLeft: sheetUser.daysLeft,
+                pin: sheetUser.pin,
+                academicGroup: sheetUser.academicGroup,
+              },
+            });
+            console.log(`🔐 Auth: Saved user "${sheetUser.name}" to local DB`);
+          } catch (dbError) {
+            console.warn('🔐 Auth: Failed to save to local DB (non-fatal):', dbError);
+          }
 
           return {
-            id: student.phone,
-            name: student.name,
-            phone: student.phone,
-            grade: student.grade,
-            board: student.board,
-            field: student.field,
-            status: student.status,
-            academicGroup: student.academicGroup,
+            id: sheetUser.phone,
+            name: sheetUser.name,
+            phone: sheetUser.phone,
+            grade: sheetUser.grade,
+            board: sheetUser.board,
+            field: sheetUser.field,
+            status: sheetUser.status,
+            academicGroup: sheetUser.academicGroup,
           };
         } catch (error) {
           // Re-throw our own error messages
@@ -76,7 +142,7 @@ export const authOptions: NextAuthOptions = {
           }
           // Unexpected errors
           console.error('🔐 Auth: Unexpected error during authorization:', error);
-          throw new Error('Unable to connect to the database. Please try again in a moment.');
+          throw new Error('Unable to connect. Please try again in a moment.');
         }
       },
     }),
