@@ -329,57 +329,30 @@ function DashboardView() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
-        <div className="panel glass">
-          <div className="panel-head">
-            <h3 className="heading">Top Subjects</h3>
-            <button className="btn ghost btn-sm" onClick={() => useStudyOS.getState().setSidebarView('subjects')}>Manage</button>
-          </div>
-          <div className="panel-body">
-            {subjects.slice(0, 4).map(s => (
-              <div key={s.subjectId} className="lecture-item" onClick={() => {
-                useStudyOS.getState().openSubjectDetail(s.subjectId);
-              }}>
-                <div className="subject-icon" style={{ background: getSubjectColor(s.subjectName) }}>
-                  {getSubjectIcon(s.subjectName)}
+      <div className="panel glass" style={{ marginTop: 20 }}>
+        <div className="panel-head">
+          <h3 className="heading">Upcoming</h3>
+          <button className="btn ghost btn-sm" onClick={() => useStudyOS.getState().setSidebarView('calendar')}>Calendar</button>
+        </div>
+        <div className="panel-body" style={{ padding: '16px 20px' }}>
+          <div className="upcoming-list">
+            {todayTasks.filter(t => !t.completed).slice(0, 5).map(task => (
+              <div key={task.topicId} className="upcoming-item">
+                <div className="time-block">
+                  <div className="d">{new Date().getDate()}</div>
+                  <div className="m">{months[now.getMonth()].slice(0, 3)}</div>
                 </div>
-                <div className="lecture-info">
-                  <h4>{s.subjectName}</h4>
-                  <div className="meta">
-                    <span>{s.totalTopics} topics</span>
-                    <span>{s.completedTopics} done</span>
-                  </div>
+                <div style={{ flex: 1 }}>
+                  <h5>{task.topicName}</h5>
+                  <p>{task.subjectName} · {task.chapterName}</p>
                 </div>
-                <ChevronRightIcon width={16} height={16} style={{ color: 'var(--text-muted)' }} />
               </div>
             ))}
-          </div>
-        </div>
-        <div className="panel glass">
-          <div className="panel-head">
-            <h3 className="heading">Upcoming</h3>
-            <button className="btn ghost btn-sm" onClick={() => useStudyOS.getState().setSidebarView('calendar')}>Calendar</button>
-          </div>
-          <div className="panel-body" style={{ padding: '16px 20px' }}>
-            <div className="upcoming-list">
-              {todayTasks.filter(t => !t.completed).slice(0, 3).map(task => (
-                <div key={task.topicId} className="upcoming-item">
-                  <div className="time-block">
-                    <div className="d">{new Date().getDate()}</div>
-                    <div className="m">{months[now.getMonth()].slice(0, 3)}</div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h5>{task.topicName}</h5>
-                    <p>{task.subjectName} · {task.chapterName}</p>
-                  </div>
-                </div>
-              ))}
-              {todayTasks.filter(t => !t.completed).length === 0 && (
-                <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
-                  All done for today! 🎉
-                </div>
-              )}
-            </div>
+            {todayTasks.filter(t => !t.completed).length === 0 && (
+              <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
+                All done for today! 🎉
+              </div>
+            )}
           </div>
         </div>
       </div>
