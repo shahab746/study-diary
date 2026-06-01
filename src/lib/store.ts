@@ -90,7 +90,7 @@ export interface SubjectDetail {
   completedTopics: number;
 }
 
-type SidebarView = 'today' | 'tasks' | 'courses' | 'schedule';
+type SidebarView = 'dashboard' | 'lectures' | 'calendar' | 'subjects' | 'insights' | 'search' | 'settings';
 
 interface StudyOSState {
   // Data
@@ -176,7 +176,7 @@ export const useStudyOS = create<StudyOSState>()(
       selectedSubjectId: null,
       subjectDetail: null,
       subjectDetailLoading: false,
-      sidebarView: 'today',
+      sidebarView: 'dashboard',
       focusTimerActive: false,
       focusTimerMinutes: 25,
       focusTimerOpen: false,
