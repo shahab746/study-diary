@@ -379,7 +379,7 @@ export const useStudyOS = create<StudyOSState>()(
       },
 
       setSidebarView: (view: SidebarView) => {
-        set({ sidebarView: view });
+        set({ sidebarView: view, selectedSubjectId: null, subjectDetail: null });
       },
 
       toggleFocusTimer: () => {

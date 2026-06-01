@@ -858,6 +858,7 @@ function SettingsView() {
     darkMode: theme === 'dark',
     sync: true,
   });
+  const [activeSettingsTab, setActiveSettingsTab] = useState('profile');
 
   const toggle = (key: keyof typeof toggles) => {
     setToggles(prev => ({ ...prev, [key]: !prev[key] }));
@@ -865,6 +866,14 @@ function SettingsView() {
       setTheme(theme === 'dark' ? 'light' : 'dark');
     }
   };
+
+  const settingsTabs = [
+    { id: 'profile', label: 'Profile', icon: <User width={16} height={16} /> },
+    { id: 'notifications', label: 'Notifications', icon: <Bell width={16} height={16} /> },
+    { id: 'recording', label: 'Recording', icon: <Mic width={16} height={16} /> },
+    { id: 'appearance', label: 'Appearance', icon: <Settings width={16} height={16} /> },
+    { id: 'help', label: 'Help', icon: <LifeBuoy width={16} height={16} /> },
+  ];
 
   return (
     <div className="view active">
@@ -878,11 +887,16 @@ function SettingsView() {
 
       <div className="settings-grid">
         <div className="settings-nav">
-          <div className="nav-item active"><User width={16} height={16} />Profile</div>
-          <div className="nav-item"><Bell width={16} height={16} />Notifications</div>
-          <div className="nav-item"><Mic width={16} height={16} />Recording</div>
-          <div className="nav-item"><Settings width={16} height={16} />Appearance</div>
-          <div className="nav-item"><LifeBuoy width={16} height={16} />Help</div>
+          {settingsTabs.map(tab => (
+            <div
+              key={tab.id}
+              className={`nav-item ${activeSettingsTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab(tab.id)}
+            >
+              {tab.icon}
+              {tab.label}
+            </div>
+          ))}
         </div>
 
         <div className="cal-card glass">
