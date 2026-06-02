@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import { BookOpenText, Phone, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export function LoginPage() {
@@ -27,7 +26,8 @@ export function LoginPage() {
         return;
       }
 
-      // Step 1: Verify credentials against live Google Sheet
+      // Verify credentials and create session in one step
+      // The /api/login endpoint now sets the session cookie directly
       setLoginStage('verifying');
       const verifyRes = await fetch('/api/login', {
         method: 'POST',
@@ -44,25 +44,10 @@ export function LoginPage() {
         return;
       }
 
-      // Step 2: Create NextAuth session
-      setLoginStage('signing_in');
-      localStorage.removeItem('study-os-storage');
-
-      const result = await signIn('credentials', {
-        phone: cleanPhone,
-        pin: cleanPin,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Session creation failed. Please refresh and try again.');
-        setIsLoading(false);
-        setLoginStage('idle');
-        return;
-      }
-
-      // Step 3: Wait for session then reload
+      // Session cookie is now set by /api/login directly
+      // No need to call signIn() — just reload to load the dashboard
       setLoginStage('loading_dashboard');
+      localStorage.removeItem('study-os-storage');
       await new Promise(resolve => setTimeout(resolve, 500));
       window.location.reload();
     } catch (err) {
@@ -75,7 +60,6 @@ export function LoginPage() {
   const getLoadingText = () => {
     switch (loginStage) {
       case 'verifying': return 'Verifying credentials';
-      case 'signing_in': return 'Signing in';
       case 'loading_dashboard': return 'Loading dashboard';
       default: return 'Signing in';
     }
@@ -84,7 +68,6 @@ export function LoginPage() {
   const getLoadingStep = () => {
     switch (loginStage) {
       case 'verifying': return 1;
-      case 'signing_in': return 2;
       case 'loading_dashboard': return 3;
       default: return 0;
     }
@@ -301,7 +284,7 @@ export function LoginPage() {
             {isLoading && (
               <div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {['verifying', 'signing_in', 'loading_dashboard'].map((stage, i) => (
+                  {['verifying', 'loading_dashboard'].map((stage, i) => (
                     <div key={stage} style={{
                       height: 4, flex: 1, borderRadius: 2, overflow: 'hidden',
                       background: 'var(--surface)',
@@ -312,17 +295,17 @@ export function LoginPage() {
                         background: 'var(--gradient)',
                         borderRadius: 2,
                         boxShadow: '0 0 8px rgba(124,58,237,0.3)',
-                        width: getLoadingStep() > i ? '100%' : getLoadingStep() === i ? '60%' : '0%',
+                        width: getLoadingStep() > i ? '100%' : '0%',
                         transition: 'width .4s ease-out',
                       }} />
                     </div>
                   ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                  {['Verify', 'Sign in', 'Load'].map((label, i) => (
+                  {['Verify', 'Load'].map((label, i) => (
                     <span key={label} style={{
                       fontSize: 10, fontFamily: 'var(--font-jetbrains-mono), monospace',
-                      color: getLoadingStep() > i ? 'var(--accent-light)' : getLoadingStep() === i ? 'var(--text-secondary)' : 'var(--text-muted)',
+                      color: getLoadingStep() > i ? 'var(--accent-light)' : 'var(--text-muted)',
                       fontWeight: getLoadingStep() > i ? 600 : 400,
                       transition: 'all .3s',
                     }}>
