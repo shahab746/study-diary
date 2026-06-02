@@ -8,7 +8,7 @@ import { signOut } from 'next-auth/react';
 import { LoginPage } from '@/components/auth/LoginPage';
 import {
   LayoutDashboard, Mic, CalendarDays, Library, Sparkles, Search, Settings,
-  LifeBuoy, Moon, Sun, Plus, Bell, Play, Clock, User, ChevronLeft, ChevronRight,
+  LifeBuoy, Moon, Sun, Plus, Bell, Play, Clock, ChevronLeft, ChevronRight,
   TrendingUp, TrendingDown, BookMarked, Brain, ChevronRight as ChevronRightIcon,
   X, Download, Copy, SlidersHorizontal, MoreHorizontal, BookOpenText, Cpu,
   Sigma, Leaf, Atom, FlaskConical, Zap, Loader2, LogOut, CheckCircle2, ExternalLink,
@@ -821,7 +821,6 @@ function SearchView() {
 // SETTINGS VIEW
 // ============================================
 function SettingsView() {
-  const { student } = useStudyOS();
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
   const [toggles, setToggles] = useState({
@@ -831,7 +830,7 @@ function SettingsView() {
     darkMode: theme === 'dark',
     sync: true,
   });
-  const [activeSettingsTab, setActiveSettingsTab] = useState('profile');
+  const [activeSettingsTab, setActiveSettingsTab] = useState('notifications');
 
   const toggle = (key: keyof typeof toggles) => {
     setToggles(prev => ({ ...prev, [key]: !prev[key] }));
@@ -841,7 +840,6 @@ function SettingsView() {
   };
 
   const settingsTabs = [
-    { id: 'profile', label: 'Profile', icon: <User width={16} height={16} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell width={16} height={16} /> },
     { id: 'recording', label: 'Recording', icon: <Mic width={16} height={16} /> },
     { id: 'appearance', label: 'Appearance', icon: <Settings width={16} height={16} /> },
@@ -908,12 +906,7 @@ function SettingsView() {
             </div>
             <div className={`toggle ${toggles.sync ? 'on' : ''}`} onClick={() => toggle('sync')}></div>
           </div>
-          <div className="setting-row">
-            <div className="info">
-              <h4>Your Profile</h4>
-              <p>{student?.name || 'Student'} · Grade {student?.grade || 10} · {student?.board || 'Board'}</p>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>
