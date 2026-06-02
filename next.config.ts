@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // output: "standalone", // Disabled - causes issues with next start
   typescript: {
     ignoreBuildErrors: true,
   },

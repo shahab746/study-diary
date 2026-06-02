@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { signIn } from 'next-auth/react';
 import { BookOpenText, Phone, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export function LoginPage() {
@@ -26,8 +27,8 @@ export function LoginPage() {
         return;
       }
 
-      // Verify credentials and create session in one step
-      // The /api/login endpoint now sets the session cookie directly
+      // Verify credentials first via our custom endpoint
+      // This also syncs the user from Google Sheets to local DB
       setLoginStage('verifying');
       const verifyRes = await fetch('/api/login', {
         method: 'POST',
@@ -44,11 +45,24 @@ export function LoginPage() {
         return;
       }
 
-      // Session cookie is now set by /api/login directly
-      // No need to call signIn() — just reload to load the dashboard
+      // Credentials verified — now sign in via NextAuth
+      // The user is guaranteed to be in the local DB now
       setLoginStage('loading_dashboard');
+      const result = await signIn('credentials', {
+        phone: cleanPhone,
+        pin: cleanPin,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError(result.error || 'Sign in failed. Please try again.');
+        setIsLoading(false);
+        setLoginStage('idle');
+        return;
+      }
+
+      // Clear old state and reload
       localStorage.removeItem('study-os-storage');
-      await new Promise(resolve => setTimeout(resolve, 500));
       window.location.reload();
     } catch (err) {
       setError('Connection error. Please check your internet and try again.');
