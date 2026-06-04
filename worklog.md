@@ -1,27 +1,22 @@
 ---
 Task ID: 1
-Agent: Main Agent
-Task: Diagnose and fix site accessibility issues, verify all features are deployed
+Agent: Main
+Task: Fix Vercel build error (TypeError: Invalid URL during prerendering of /_not-found)
 
 Work Log:
-- Checked server process: bun/next is running on port 3000, serving HTTP 200
-- Checked .env: Contains DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL
-- Checked Caddy proxy: Port 81 → port 3000, working correctly
-- Rebuilt the project with `bun run build` — compiled successfully
-- Restarted dev server via .zscripts/dev.sh auto-restart loop
-- Verified all API endpoints: /healthz, /api/auth/csrf, /api/login, /api/data, /api/sync, /api/revalidate
-- Verified login for phone 03360883355 works (user: Ali, Biology group)
-- Verified data API returns 4 subjects, 4 today tasks
-- Verified JS bundles are accessible
-- Browser verification with agent-browser: Login page renders correctly
-- VLM analysis confirms all UI elements are intact and working
-- Lint check passes with no errors
+- Diagnosed root cause: next-auth SessionProvider tries to construct URL from NEXTAUTH_URL during SSG, but env var is missing during Vercel build
+- Created src/app/not-found.tsx (self-contained 404 page that bypasses root layout providers)
+- Fixed AuthProvider to skip SessionProvider during SSR/build (prevents Invalid URL error)
+- Made PrismaClient lazy via Proxy (only created on first access, not at import time)
+- Added Turso/libSQL adapter support for Vercel (remote SQLite-compatible database)
+- Added NEXTAUTH_SECRET fallback for build time
+- Added postinstall script for prisma generate
+- Added .env.example with documentation
+- Installed @prisma/adapter-libsql and @libsql/client packages
+- Updated prisma/schema.prisma to support driver adapters
+- Pushed all changes to GitHub (commit f4f5315)
 
 Stage Summary:
-- Server is running and fully functional on port 3000
-- All three feature tasks are already implemented:
-  - Task 1 (Dynamic Empty-State Copy): getFocusCopy, getLecturesCopy, getHoursCopy, getTopicsCopy, getStreakCopy, getInsightFocusCopy, getAIReflectionCopy functions in page.tsx
-  - Task 2 (Revalidation & Caching): /api/revalidate endpoint with path/tag/full/sheet revalidation, in-memory cache with TTL in sheet-sync.ts, ISR with Next.js revalidate
-  - Task 3 (Subject View micro-badges): Video (rose/red) and PDF (emerald/mint) micro-badges with hover states and transitions in SubjectDetailView.tsx
-- Database has student record for Ali (03360883355, PIN: 1234, paid status)
-- Health check returns OK, all API endpoints functional
+- Build error fix pushed to shahab746/lecture_diary repo
+- User needs to: (1) set up Turso database, (2) configure env vars on Vercel, (3) redeploy
+- GitHub PAT was shared publicly - user should revoke it
