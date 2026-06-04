@@ -10,53 +10,35 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // Fetch user profile from local database (fast, no Google Sheets API call)
+    // Fetch user profile from local database — lean select for performance
     let student = null;
     let academicGroup = '';
+    const studentSelect = {
+      name: true, phone: true, grade: true, board: true, field: true,
+      status: true, startDate: true, targetDate: true, currentDay: true,
+      totalDays: true, topicsDone: true, daysLeft: true, pacingGoal: true,
+      academicGroup: true,
+    } as const;
+
     if (phone) {
-      const localStudent = await db.student.findUnique({ where: { phone } });
+      const localStudent = await db.student.findUnique({
+        where: { phone },
+        select: studentSelect,
+      });
       if (localStudent) {
         academicGroup = localStudent.academicGroup || '';
-        student = {
-          name: localStudent.name,
-          phone: localStudent.phone,
-          grade: localStudent.grade,
-          board: localStudent.board,
-          field: localStudent.field,
-          status: localStudent.status,
-          startDate: localStudent.startDate,
-          targetDate: localStudent.targetDate,
-          currentDay: localStudent.currentDay,
-          totalDays: localStudent.totalDays,
-          topicsDone: localStudent.topicsDone,
-          daysLeft: localStudent.daysLeft,
-          pacingGoal: localStudent.pacingGoal,
-          academicGroup: localStudent.academicGroup || '',
-        };
+        student = localStudent;
       }
     }
 
     // Fallback: if no phone param, try first student in DB
     if (!student) {
-      const localStudent = await db.student.findFirst();
+      const localStudent = await db.student.findFirst({
+        select: studentSelect,
+      });
       if (localStudent) {
         academicGroup = localStudent.academicGroup || '';
-        student = {
-          name: localStudent.name,
-          phone: localStudent.phone,
-          grade: localStudent.grade,
-          board: localStudent.board,
-          field: localStudent.field,
-          status: localStudent.status,
-          startDate: localStudent.startDate,
-          targetDate: localStudent.targetDate,
-          currentDay: localStudent.currentDay,
-          totalDays: localStudent.totalDays,
-          topicsDone: localStudent.topicsDone,
-          daysLeft: localStudent.daysLeft,
-          pacingGoal: localStudent.pacingGoal,
-          academicGroup: localStudent.academicGroup || '',
-        };
+        student = localStudent;
       }
     }
 

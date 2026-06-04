@@ -12,15 +12,36 @@ export async function GET(
 
     const subject = await db.subject.findUnique({
       where: { id: subjectId },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        icon: true,
+        grade: true,
+        board: true,
+        field: true,
+        totalTopics: true,
+        chapterCount: true,
+        groupEligibility: true,
         chapters: {
           orderBy: { number: 'asc' },
-          include: {
+          select: {
+            id: true,
+            number: true,
+            name: true,
             topics: {
               orderBy: { number: 'asc' },
-              include: {
+              select: {
+                id: true,
+                number: true,
+                name: true,
+                videoLink: true,
+                pdfLink: true,
+                dayNumber: true,
+                isFree: true,
                 progress: {
                   where: phone ? { studentPhone: phone } : {},
+                  select: { completed: true },
                 },
               },
             },
@@ -34,9 +55,11 @@ export async function GET(
     }
 
     // Check Group_Eligibility: if the subject is restricted, verify the user is eligible
-    // Use local DB for fast lookup (no Google Sheets API call)
     if (subject.groupEligibility && subject.groupEligibility !== 'Both' && phone) {
-      const localStudent = await db.student.findUnique({ where: { phone } });
+      const localStudent = await db.student.findUnique({
+        where: { phone },
+        select: { academicGroup: true },
+      });
       const userGroup = localStudent?.academicGroup || '';
       if (userGroup && subject.groupEligibility !== userGroup) {
         return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });

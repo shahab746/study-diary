@@ -124,18 +124,21 @@ function TopicRow({
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      {/* Action Buttons — Premium Micro-Badges */}
+      <div className="flex items-center gap-2 flex-shrink-0">
         {topic.hasVideo && topic.videoLink && (
           <a
             href={topic.videoLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-semibold
-              bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200
+            className="group/badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-display font-bold tracking-wide uppercase
+              bg-rose-500/10 text-rose-400 border border-rose-500/20
+              hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300 hover:shadow-[0_0_12px_rgba(244,63,94,0.15)]
+              active:scale-95
+              transition-all duration-200 ease-out
               group-hover:opacity-100 sm:opacity-70"
           >
-            <Play className="w-3 h-3" />
+            <Play className="w-3 h-3 fill-current" />
             <span className="hidden sm:inline">Watch</span>
           </a>
         )}
@@ -145,8 +148,11 @@ function TopicRow({
             href={topic.pdfLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-semibold
-              bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all duration-200
+            className="group/badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-display font-bold tracking-wide uppercase
+              bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+              hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-300 hover:shadow-[0_0_12px_rgba(16,185,129,0.15)]
+              active:scale-95
+              transition-all duration-200 ease-out
               group-hover:opacity-100 sm:opacity-70"
           >
             <FileText className="w-3 h-3" />

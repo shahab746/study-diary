@@ -42,12 +42,14 @@ export async function GET(request: Request) {
     }
 
     if (type === 'full') {
-      const userResult = await syncUsers();
-      const curriculumResult = await syncCurriculum();
+      const userRes = await syncUsers();
+      const curriculumRes = await syncCurriculum();
+      const userData = await userRes.json();
+      const curriculumData = await curriculumRes.json();
       return NextResponse.json({
         success: true,
-        users: userResult,
-        curriculum: curriculumResult,
+        users: userData,
+        curriculum: curriculumData,
       });
     }
 
@@ -95,7 +97,7 @@ async function syncUsers() {
     }
   }
 
-  return { synced, updated, total: sheetUsers.length };
+  return NextResponse.json({ synced, updated, total: sheetUsers.length });
 }
 
 async function syncSubjectsEligibility() {

@@ -12,11 +12,96 @@ import {
   TrendingUp, TrendingDown, BookMarked, Brain, ChevronRight as ChevronRightIcon,
   X, Download, Copy, SlidersHorizontal, MoreHorizontal, BookOpenText, Cpu,
   Sigma, Leaf, Atom, FlaskConical, Zap, Loader2, LogOut, CheckCircle2, ExternalLink,
-  Home as HomeIcon, ListTodo, BookOpen, Timer
+  Home as HomeIcon, ListTodo, BookOpen, Timer, FileText
 } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 
 type ViewId = 'dashboard' | 'lectures' | 'calendar' | 'subjects' | 'insights' | 'search' | 'settings';
+
+// ============================================
+// DYNAMIC EMPTY-STATE COPY CONFIGURATION
+// ============================================
+
+interface MetricCopyConfig {
+  trendIcon: 'up' | 'down';
+  trendText: string;
+}
+
+/**
+ * Returns contextual copy for dashboard metrics based on user activity state.
+ * Condition A (New User / Zero Data): Welcoming, high-encouragement copy
+ * Condition B (Active User falling behind): Constructive feedback loop
+ */
+function getFocusCopy(focusScore: number, totalCompleted: number): MetricCopyConfig {
+  // Condition A: New user — no data yet
+  if (totalCompleted === 0) {
+    return {
+      trendIcon: 'up',
+      trendText: 'Your journey starts here!',
+    };
+  }
+  // High performers
+  if (focusScore >= 70) {
+    return {
+      trendIcon: 'up',
+      trendText: 'Great focus!',
+    };
+  }
+  // Condition B: Active user falling behind
+  if (focusScore >= 40) {
+    return {
+      trendIcon: 'down',
+      trendText: 'Room to improve',
+    };
+  }
+  return {
+    trendIcon: 'down',
+    trendText: "Let's pick up the pace",
+  };
+}
+
+function getLecturesCopy(totalCompleted: number): string {
+  if (totalCompleted === 0) return 'Ready to start your first session!';
+  if (totalCompleted <= 5) return `+${Math.min(totalCompleted, 12)}% this month — great start!`;
+  return `+${Math.min(totalCompleted, 12)}% this month`;
+}
+
+function getHoursCopy(studyMinutes: number, totalCompleted: number): string {
+  if (totalCompleted === 0) return 'Your study hours await!';
+  if (studyMinutes > 0) return `+${(studyMinutes / 60).toFixed(1)}h today`;
+  return '0h today';
+}
+
+function getTopicsCopy(totalCompleted: number, totalTopics: number): string {
+  if (totalCompleted === 0) return '0% — let\'s change that!';
+  return `${totalCompleted}/${totalTopics} total`;
+}
+
+function getStreakCopy(streak: number, totalCompleted: number): string {
+  if (totalCompleted === 0) return "Let's kick off your streak! 🔥";
+  if (streak > 0) return '🔥 Keep it going!';
+  return 'Start your streak today!';
+}
+
+function getInsightFocusCopy(focusScore: number, totalCompleted: number): string {
+  if (totalCompleted === 0) return 'Ready to start your first session!';
+  if (focusScore >= 70) return 'Great focus this week';
+  if (focusScore >= 40) return 'Room to improve';
+  return "Let's pick up the pace";
+}
+
+function getAIReflectionCopy(focusScore: number, totalCompleted: number): string {
+  if (totalCompleted === 0) {
+    return '"Welcome aboard! 🚀 Your study journey is about to begin. Start with your first lecture today — every great achievement starts with a single step. You\'ve got this!"';
+  }
+  if (focusScore >= 70) {
+    return `"You're making excellent progress! Your focus score is strong at ${focusScore}%. Keep maintaining this momentum and consider increasing your daily target."`;
+  }
+  if (focusScore >= 40) {
+    return `"Your focus score is at ${focusScore}%. Try breaking study sessions into shorter, focused blocks. Even 25 minutes of deep focus beats an hour of distracted reading."`;
+  }
+  return `"Your focus score is at ${focusScore}%. Don't worry — every expert was once a beginner. Try tackling just one topic today to build momentum. Small wins compound fast!"`;
+}
 
 const emptySubscribe = () => () => {};
 function useMounted() {
@@ -258,24 +343,24 @@ function DashboardView() {
         <div className="stat-card">
           <div className="label"><Mic width={13} height={13} />Lectures completed</div>
           <div className="value heading">{totalCompleted}</div>
-          <div className="trend up"><TrendingUp width={12} height={12} />{totalCompleted > 0 ? `+${Math.min(totalCompleted, 12)}% this month` : 'Start studying!'}</div>
+          <div className="trend up"><TrendingUp width={12} height={12} />{getLecturesCopy(totalCompleted)}</div>
         </div>
         <div className="stat-card">
           <div className="label"><Clock width={13} height={13} />Hours reviewed</div>
           <div className="value heading">{studyHours}<small style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</small>{studyMinsRem > 0 ? `${studyMinsRem}m` : ''}</div>
-          <div className="trend up"><TrendingUp width={12} height={12} />{studyMinutes > 0 ? `+${(studyMinutes / 60).toFixed(1)}h today` : '0h today'}</div>
+          <div className="trend up"><TrendingUp width={12} height={12} />{getHoursCopy(studyMinutes, totalCompleted)}</div>
         </div>
         <div className="stat-card">
           <div className="label"><BookMarked width={13} height={13} />Topics covered</div>
           <div className="value heading">{totalTopics > 0 ? Math.round((totalCompleted / totalTopics) * 100) : 0}<small style={{ fontSize: 18, color: 'var(--text-muted)' }}>%</small></div>
-          <div className="trend up"><TrendingUp width={12} height={12} />{totalCompleted}/{totalTopics} total</div>
+          <div className="trend up"><TrendingUp width={12} height={12} />{getTopicsCopy(totalCompleted, totalTopics)}</div>
         </div>
         <div className="stat-card">
           <div className="label"><Brain width={13} height={13} />Focus score</div>
           <div className="value heading">{focusScore}<small style={{ fontSize: 18, color: 'var(--text-muted)' }}>%</small></div>
-          <div className={`trend ${focusScore >= 70 ? 'up' : 'down'}`}>
-            {focusScore >= 70 ? <TrendingUp width={12} height={12} /> : <TrendingDown width={12} height={12} />}
-            {focusScore >= 70 ? 'Great focus!' : 'Room to improve'}
+          <div className={`trend ${getFocusCopy(focusScore, totalCompleted).trendIcon}`}>
+            {getFocusCopy(focusScore, totalCompleted).trendIcon === 'up' ? <TrendingUp width={12} height={12} /> : <TrendingDown width={12} height={12} />}
+            {getFocusCopy(focusScore, totalCompleted).trendText}
           </div>
         </div>
       </div>
@@ -669,16 +754,16 @@ function InsightsView() {
           <h4>Focus Score</h4>
           <p>How engaged you&apos;ve been with your study schedule this week.</p>
           <div className="big">{focusScore}<small>/100</small></div>
-          <div className={`trend ${focusScore >= 70 ? 'up' : 'down'}`}>
-            {focusScore >= 70 ? <TrendingUp width={12} height={12} /> : <TrendingDown width={12} height={12} />}
-            {focusScore >= 70 ? 'Great focus this week' : 'Room to improve'}
+          <div className={`trend ${getInsightFocusCopy(focusScore, totalCompleted) === 'Room to improve' || getInsightFocusCopy(focusScore, totalCompleted) === "Let's pick up the pace" ? 'down' : 'up'}`}>
+            {(getInsightFocusCopy(focusScore, totalCompleted) === 'Room to improve' || getInsightFocusCopy(focusScore, totalCompleted) === "Let's pick up the pace") ? <TrendingDown width={12} height={12} /> : <TrendingUp width={12} height={12} />}
+            {getInsightFocusCopy(focusScore, totalCompleted)}
           </div>
         </div>
         <div className="insight-card glass">
           <h4>Consistency</h4>
           <p>Your current streak of daily study sessions.</p>
           <div className="big">{streak}<small>days</small></div>
-          <div className="trend up">{streak > 0 ? '🔥 Keep it going!' : 'Start your streak today!'}</div>
+          <div className="trend up">{getStreakCopy(streak, totalCompleted)}</div>
         </div>
         <div className="insight-card glass">
           <h4>Progress Overview</h4>
@@ -715,10 +800,7 @@ function InsightsView() {
         <div className="insight-card quote-card glass">
           <span className="ai-badge"><Sparkles width={10} height={10} />AI reflection</span>
           <blockquote style={{ marginTop: 14 }}>
-            {focusScore >= 70
-              ? `"You're making excellent progress! Your focus score is strong at ${focusScore}%. Keep maintaining this momentum and consider increasing your daily target."`
-              : `"Your focus score is at ${focusScore}%. Try breaking study sessions into shorter, focused blocks. Even 25 minutes of deep focus beats an hour of distracted reading."`
-            }
+            {getAIReflectionCopy(focusScore, totalCompleted)}
           </blockquote>
           <div className="src">— Generated from your study data</div>
         </div>
@@ -1112,14 +1194,20 @@ function SubjectDetailView() {
                     <span>Day {t.dayNumber}</span>
                     {t.hasVideo && (
                       <a href={t.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#7C3AED' }}>
-                        <ExternalLink width={12} height={12} />Video
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                          bg-rose-500/10 text-rose-400 border border-rose-500/20
+                          hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300
+                          transition-all duration-200 active:scale-95">
+                        <Play width={10} height={10} fill="currentColor" />Video
                       </a>
                     )}
                     {t.hasPdf && (
                       <a href={t.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#10B981' }}>
-                        <ExternalLink width={12} height={12} />PDF
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                          bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+                          hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-300
+                          transition-all duration-200 active:scale-95">
+                        <FileText width={10} height={10} />PDF
                       </a>
                     )}
                   </div>
