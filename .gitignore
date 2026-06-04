@@ -52,3 +52,28 @@ prompt
 server.log
 # Skills directory
 /skills/
+# Sandbox-only files
+.zscripts/
+upload/
+*.png
+*.jpeg
+*.jpg
+*.zip
+Caddyfile
+daemon*.sh
+dev-watchdog.sh
+launch-server.sh
+start-server.sh
+start.sh
+supervisor.sh
+config_csv.json
+curriculum_csv.json
+progress_csv.json
+special_csv.json
+subjects_csv.json
+sheet_data.json
+image_analysis.json
+examples/
+scripts/
+agent-ctx/
+db/

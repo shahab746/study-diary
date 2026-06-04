@@ -5,6 +5,9 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
+// Force dynamic rendering — this app is authenticated and can't be statically generated
+export const dynamic = 'force-dynamic';
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
