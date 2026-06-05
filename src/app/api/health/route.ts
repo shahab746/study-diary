@@ -46,16 +46,17 @@ export async function GET() {
     diagnostics.libsqlDirectConnection = { status: 'skipped', reason: 'LIBSQL_URL not set' };
   }
 
-  // Test 2: Check if Prisma with adapter can query
+  // Test 2: Check if db layer can query (uses libsql on Vercel, Prisma locally)
   try {
     const { db } = await import('@/lib/db');
     const studentCount = await db.student.count();
-    diagnostics.prismaConnection = {
+    diagnostics.dbConnection = {
       status: 'ok',
       studentCount,
+      mode: process.env.LIBSQL_URL ? 'libsql-direct' : 'prisma-local',
     };
   } catch (err) {
-    diagnostics.prismaConnection = {
+    diagnostics.dbConnection = {
       status: 'failed',
       error: err instanceof Error ? err.message : String(err),
       errorType: err instanceof Error ? err.constructor.name : 'Unknown',
@@ -82,7 +83,7 @@ export async function GET() {
   }
 
   const hasErrors = (diagnostics.libsqlDirectConnection as any)?.status === 'failed' ||
-                    (diagnostics.prismaConnection as any)?.status === 'failed';
+                    (diagnostics.dbConnection as any)?.status === 'failed';
 
   return NextResponse.json(diagnostics, {
     status: hasErrors ? 500 : 200,
