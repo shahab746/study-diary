@@ -265,11 +265,7 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
           <div className="stat-value">{store.streak}</div>
           <div className="stat-sub">days in a row</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Program Week</div>
-          <div className="stat-value">W{store.programWeek}</div>
-          <div className="stat-sub">{store.weeksLeft} weeks left</div>
-        </div>
+
       </div>
 
       {/* Mission Section */}
