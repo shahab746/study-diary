@@ -24,10 +24,17 @@ function getTursoClient() {
     // Dynamic import to avoid loading @libsql/client in local dev
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createClient } = require('@libsql/client') as typeof import('@libsql/client')
-    const url = process.env.LIBSQL_URL!
-    const authToken = process.env.LIBSQL_AUTH_TOKEN || undefined
-    console.log(`📦 DB: Creating LibSQL client for ${url}`)
-    _tursoClient = createClient({ url, authToken })
+    const url = process.env.LIBSQL_URL
+    const authToken = process.env.LIBSQL_AUTH_TOKEN
+
+    if (!url) throw new Error('LIBSQL_URL environment variable is not set')
+    console.log(`📦 DB: Creating LibSQL client for ${url} (authToken: ${authToken ? authToken.substring(0, 10) + '...' : 'NOT SET'})`)
+
+    if (!authToken) {
+      console.warn('📦 DB: WARNING - No LIBSQL_AUTH_TOKEN set. Turso requires authentication.')
+    }
+
+    _tursoClient = createClient({ url, authToken: authToken || undefined })
   }
   return _tursoClient
 }

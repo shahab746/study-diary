@@ -25,9 +25,21 @@ export async function GET() {
   if (process.env.LIBSQL_URL) {
     try {
       const { createClient } = await import('@libsql/client');
+      const url = process.env.LIBSQL_URL;
+      const authToken = process.env.LIBSQL_AUTH_TOKEN;
+      
+      // Log the full URL and token prefix for debugging
+      diagnostics.connectionDetails = {
+        url: url,
+        urlProtocol: url?.split('://')[0],
+        authTokenSet: !!authToken,
+        authTokenPrefix: authToken ? authToken.substring(0, 15) + '...' : 'NOT SET',
+        authTokenLength: authToken?.length || 0,
+      };
+      
       const libsql = createClient({
-        url: process.env.LIBSQL_URL,
-        authToken: process.env.LIBSQL_AUTH_TOKEN || undefined,
+        url,
+        authToken: authToken || undefined,
       });
       const result = await libsql.execute('SELECT 1 as test');
       diagnostics.libsqlDirectConnection = {
@@ -40,6 +52,8 @@ export async function GET() {
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
         errorType: err instanceof Error ? err.constructor.name : 'Unknown',
+        errorCode: (err as any)?.code,
+        fullError: JSON.stringify(err, Object.getOwnPropertyNames(err), 2),
       };
     }
   } else {
