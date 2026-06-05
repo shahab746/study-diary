@@ -18,6 +18,127 @@ const globalForPrisma = globalThis as unknown as {
 // ─── Turso Direct Client (used on Vercel) ────────────────────────────────────
 
 let _tursoClient: any
+let _tablesInitialized = false
+
+const TURSO_SCHEMA = `
+CREATE TABLE IF NOT EXISTS Student (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL UNIQUE,
+  grade INTEGER NOT NULL,
+  board TEXT NOT NULL,
+  field TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'paid',
+  startDate DATETIME NOT NULL,
+  targetDate DATETIME NOT NULL,
+  currentDay INTEGER NOT NULL DEFAULT 1,
+  totalDays INTEGER NOT NULL,
+  topicsDone INTEGER NOT NULL DEFAULT 0,
+  daysLeft INTEGER NOT NULL,
+  pacingGoal TEXT NOT NULL DEFAULT '5M',
+  pin TEXT NOT NULL DEFAULT '1234',
+  academicGroup TEXT NOT NULL DEFAULT '',
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS Subject (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  grade TEXT NOT NULL,
+  board TEXT NOT NULL,
+  field TEXT NOT NULL,
+  totalTopics INTEGER NOT NULL,
+  chapterCount INTEGER NOT NULL,
+  color TEXT NOT NULL,
+  icon TEXT NOT NULL,
+  "order" INTEGER NOT NULL DEFAULT 0,
+  groupEligibility TEXT NOT NULL DEFAULT 'Both',
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS Chapter (
+  id TEXT PRIMARY KEY NOT NULL,
+  subjectId TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (subjectId) REFERENCES Subject(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Topic (
+  id TEXT PRIMARY KEY NOT NULL,
+  chapterId TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  videoLink TEXT NOT NULL DEFAULT '',
+  pdfLink TEXT NOT NULL DEFAULT '',
+  isFree BOOLEAN NOT NULL DEFAULT true,
+  dayNumber INTEGER NOT NULL DEFAULT 0,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (chapterId) REFERENCES Chapter(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Progress (
+  id TEXT PRIMARY KEY NOT NULL,
+  topicId TEXT NOT NULL,
+  studentPhone TEXT NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  dateCompleted DATETIME,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (topicId) REFERENCES Topic(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE(topicId, studentPhone)
+);
+
+CREATE TABLE IF NOT EXISTS SpecialCourse (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  videoLink TEXT NOT NULL DEFAULT '',
+  pdfLink TEXT NOT NULL DEFAULT '',
+  grade TEXT NOT NULL,
+  board TEXT NOT NULL,
+  "order" INTEGER NOT NULL DEFAULT 0,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS Config (
+  id TEXT PRIMARY KEY NOT NULL,
+  key TEXT NOT NULL UNIQUE,
+  value TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS Chapter_subjectId_idx ON Chapter(subjectId);
+CREATE INDEX IF NOT EXISTS Topic_chapterId_idx ON Topic(chapterId);
+CREATE INDEX IF NOT EXISTS Progress_topicId_idx ON Progress(topicId);
+CREATE INDEX IF NOT EXISTS Progress_studentPhone_idx ON Progress(studentPhone);
+`
+
+async function ensureTablesExist(client: any) {
+  if (_tablesInitialized) return
+  try {
+    // Check if Student table exists
+    const result = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Student'")
+    if (result.rows.length === 0) {
+      console.log('📦 DB: Tables not found in Turso, creating them...')
+      await client.executeMultiple(TURSO_SCHEMA)
+      console.log('📦 DB: Tables created successfully in Turso')
+    } else {
+      console.log('📦 DB: Tables already exist in Turso')
+    }
+    _tablesInitialized = true
+  } catch (err) {
+    console.error('📦 DB: Failed to initialize tables:', err)
+    // Don't throw - let queries fail naturally with clear error messages
+    _tablesInitialized = true
+  }
+}
 
 function getTursoClient() {
   if (!_tursoClient) {
@@ -71,6 +192,7 @@ function toCamelCase(row: Record<string, any>): Record<string, any> {
 
 async function tursoQuery(model: string, method: string, args: any[]): Promise<any> {
   const turso = getTursoClient()
+  await ensureTablesExist(turso)
 
   // ─── STUDENT ─────────────────────────────────────────────────────────
   if (model === 'student') {
