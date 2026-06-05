@@ -132,8 +132,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('🔐 Login API error:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { success: false, error: 'Unable to connect. Please try again in a moment.' },
+      { success: false, error: 'Unable to connect. Please try again in a moment.', debug: message },
       { status: 500 }
     );
   }

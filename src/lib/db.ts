@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
+import { PrismaLibSQL } from '@prisma/adapter-libsql'
 import { createClient } from '@libsql/client'
 
 const globalForPrisma = globalThis as unknown as {
@@ -18,18 +18,28 @@ let _prismaClient: PrismaClient | undefined;
 
 function createPrismaClient(): PrismaClient {
   const libsqlUrl = process.env.LIBSQL_URL;
+  const libsqlAuthToken = process.env.LIBSQL_AUTH_TOKEN;
+
+  console.log(`📦 DB: Creating PrismaClient (LIBSQL_URL=${libsqlUrl ? 'set' : 'not set'}, AUTH_TOKEN=${libsqlAuthToken ? 'set' : 'not set'})`);
 
   if (libsqlUrl) {
-    // Turso / libSQL remote database (for Vercel deployment)
-    const libsql = createClient({
-      url: libsqlUrl,
-      authToken: process.env.LIBSQL_AUTH_TOKEN,
-    });
-    const adapter = new PrismaLibSql(libsql);
-    return new PrismaClient({ adapter } as any);
+    try {
+      // Turso / libSQL remote database (for Vercel deployment)
+      const libsql = createClient({
+        url: libsqlUrl,
+        authToken: libsqlAuthToken,
+      });
+      const adapter = new PrismaLibSQL(libsql);
+      const client = new PrismaClient({ adapter } as any);
+      console.log('📦 DB: PrismaClient created with LibSQL adapter (Turso)');
+      return client;
+    } catch (err) {
+      console.error('📦 DB: Failed to create LibSQL adapter, falling back to SQLite:', err);
+    }
   }
 
   // Local SQLite database (for development / sandbox)
+  console.log('📦 DB: PrismaClient created with local SQLite');
   return new PrismaClient({
     // log: ['query'], // Disabled - causes memory/stability issues in production
   });
