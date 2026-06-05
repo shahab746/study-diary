@@ -418,14 +418,14 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
             {task.videoLink && (
               <a href={task.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
                 <button className="watch-btn" style={{ padding: '4px 10px' }}>
-                  <Play width={11} height={11} /> Video
+                  <Play width={11} height={11} /> Watch
                 </button>
               </a>
             )}
             {task.pdfLink && (
               <a href={task.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                <button className="btn btn-ghost btn-sm" style={{ padding: '4px 10px', fontSize: 11 }}>
-                  <PdfIcon width={11} height={11} /> PDF
+                <button className="watch-btn" style={{ padding: '4px 10px', background: '#FF3B30' }}>
+                  <FileText width={11} height={11} /> Notes
                 </button>
               </a>
             )}
