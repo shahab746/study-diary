@@ -843,7 +843,7 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                       </button>
                     </a>
                   )}
-                  {!topic.hasVideo && !topic.hasPdf && !topic.isFree !== undefined && !topic.isFree && (
+                  {!topic.hasVideo && !topic.hasPdf && topic.isFree === false && (
                     <span style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Lock width={12} height={12} /> Premium
                     </span>

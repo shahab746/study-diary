@@ -50,6 +50,12 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Your account has been disabled. Please contact support.');
           }
 
+          // Normalize status from Google Sheet: "true" = paid, "false" = free
+          const normalizedStatus = student.status?.toLowerCase().trim();
+          if (normalizedStatus === 'blocked' || normalizedStatus === 'disabled') {
+            throw new Error('Your account has been disabled. Please contact support.');
+          }
+
           console.log(`🔐 Auth: Login successful for "${student.name}" (${student.status})`);
 
           return {

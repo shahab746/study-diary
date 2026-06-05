@@ -1,6 +1,26 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
+// ─── Color & Icon Mapping (same as /api/data) ─────────────────────────────────
+const COLOR_MAP: Record<string, string> = {
+  'Blue': '#3B82F6', 'Teal': '#14B8A6', 'Purple': '#8B5CF6', 'Green': '#22C55E',
+  'Amber': '#F59E0B', 'Rose': '#F43F5E', 'Sky': '#0EA5E9', 'Orange': '#F97316',
+  'Emerald': '#10B981', 'Gray': '#6B7280', 'Red': '#EF4444',
+};
+const SUBJECT_ICON_MAP: Record<string, string> = {
+  'Physics': 'atom', 'Chemistry': 'beaker', 'Computer Science': 'cpu',
+  'Biology': 'beaker', 'Mathematics': 'pi', 'Maths': 'pi',
+  'English': 'book', 'Urdu': 'book', 'Pak Studies': 'landmark', 'Islamiat': 'landmark',
+};
+function mapColor(color: string): string {
+  if (color?.startsWith('#')) return color;
+  return COLOR_MAP[color] || '#6B7280';
+}
+function mapIcon(icon: string, name?: string): string {
+  if (name && SUBJECT_ICON_MAP[name]) return SUBJECT_ICON_MAP[name];
+  return 'book';
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ subjectId: string }> }
@@ -93,8 +113,8 @@ export async function GET(
       const result = {
         id: subject.id,
         name: subject.name,
-        color: subject.color,
-        icon: subject.icon,
+        color: mapColor(subject.color),
+        icon: mapIcon(subject.icon, subject.name),
         grade: subject.grade,
         board: subject.board,
         field: subject.field,
@@ -114,6 +134,7 @@ export async function GET(
             hasPdf: !!(t.pdfLink && t.pdfLink.startsWith('http')),
             dayNumber: t.dayNumber || 0,
             completed: completedTopicIds.has(t.id),
+            isFree: !!t.isFree,
           })),
           completedTopics: (topicsByChapter.get(ch.id) || []).filter((t: any) => completedTopicIds.has(t.id)).length,
           totalTopics: (topicsByChapter.get(ch.id) || []).length,
@@ -169,8 +190,8 @@ export async function GET(
       const result = {
         id: subject.id,
         name: subject.name,
-        color: subject.color,
-        icon: subject.icon,
+        color: mapColor(subject.color),
+        icon: mapIcon(subject.icon, subject.name),
         grade: subject.grade,
         board: subject.board,
         field: subject.field,
@@ -190,6 +211,7 @@ export async function GET(
             hasPdf: !!(t.pdfLink && t.pdfLink.startsWith('http')),
             dayNumber: t.dayNumber,
             completed: t.progress.some((p: any) => p.completed),
+            isFree: !!t.isFree,
           })),
           completedTopics: ch.topics.filter((t: any) => t.progress.some((p: any) => p.completed)).length,
           totalTopics: ch.topics.length,

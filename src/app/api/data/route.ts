@@ -1,6 +1,94 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
+// ─── Color & Icon Mapping ───────────────────────────────────────────────────────
+// The Google Sheet stores color names ("Blue", "Teal") and emoji icons ("⚛️").
+// The UI needs hex colors and Lucide icon component names.
+
+const COLOR_MAP: Record<string, string> = {
+  'Blue': '#3B82F6',
+  'Teal': '#14B8A6',
+  'Purple': '#8B5CF6',
+  'Green': '#22C55E',
+  'Amber': '#F59E0B',
+  'Rose': '#F43F5E',
+  'Sky': '#0EA5E9',
+  'Orange': '#F97316',
+  'Emerald': '#10B981',
+  'Gray': '#6B7280',
+  'Red': '#EF4444',
+};
+
+const ICON_MAP: Record<string, string> = {
+  '⚛️': 'atom',
+  '🧪': 'beaker',
+  '💻': 'cpu',
+  '🧬': 'beaker',
+  '📐': 'pi',
+  '📖': 'book',
+  '📝': 'book',
+  '🇵🇰': 'landmark',
+  '☪️': 'landmark',
+  '📚': 'book',
+  // Also support direct Lucide names
+  'sigma': 'sigma',
+  'cpu': 'cpu',
+  'zap': 'zap',
+  'book': 'book',
+  'beaker': 'beaker',
+  'atom': 'atom',
+  'pi': 'pi',
+  'landmark': 'landmark',
+};
+
+// Subject name → Lucide icon (canonical mapping)
+const SUBJECT_ICON_MAP: Record<string, string> = {
+  'Physics': 'atom',
+  'Chemistry': 'beaker',
+  'Computer Science': 'cpu',
+  'Biology': 'beaker',
+  'Mathematics': 'pi',
+  'Maths': 'pi',
+  'English': 'book',
+  'Urdu': 'book',
+  'Pak Studies': 'landmark',
+  'Islamiat': 'landmark',
+};
+
+function mapColor(color: string): string {
+  // If already a hex color, return as-is
+  if (color?.startsWith('#')) return color;
+  return COLOR_MAP[color] || '#6B7280';
+}
+
+function mapIcon(icon: string, subjectName?: string): string {
+  // Prefer subject-name-based mapping
+  if (subjectName && SUBJECT_ICON_MAP[subjectName]) {
+    return SUBJECT_ICON_MAP[subjectName];
+  }
+  // Then try emoji/icon mapping
+  if (icon && ICON_MAP[icon]) {
+    return ICON_MAP[icon];
+  }
+  // If it's already a valid Lucide name, return it
+  const validIcons = ['sigma', 'cpu', 'zap', 'book', 'beaker', 'atom', 'pi', 'landmark'];
+  if (validIcons.includes(icon?.toLowerCase())) {
+    return icon.toLowerCase();
+  }
+  return 'book';
+}
+
+// Normalize student status from Google Sheet values
+// Sheet has: "true" = paid, "false" = free
+function normalizeStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
+
 // Force dynamic rendering — always return fresh data from the DB
 export const dynamic = 'force-dynamic';
 
@@ -166,7 +254,7 @@ export async function GET(request: Request) {
       progress.filter((p: any) => p.completed).map((p: any) => p.topicId)
     );
 
-    const isFreeUser = student?.status === 'free';
+    const isFreeUser = normalizeStatus(student?.status || '') === 'free';
     const subjectProgress = eligibleSubjects.map((subject: any) => {
       const allTopics = subject.chapters.flatMap((ch: any) => ch.topics || []);
       const completedTopics = allTopics.filter((t: any) => progressSet.has(t.id));
@@ -175,8 +263,8 @@ export async function GET(request: Request) {
       return {
         subjectId: subject.id,
         subjectName: subject.name,
-        color: subject.color,
-        icon: subject.icon,
+        color: mapColor(subject.color),
+        icon: mapIcon(subject.icon, subject.name),
         totalTopics: availableTopics.length,
         completedTopics: completedTopics.filter((t: any) =>
           isFreeUser ? allTopics.find((at: any) => at.id === t.id)?.isFree : true

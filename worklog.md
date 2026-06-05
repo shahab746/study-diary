@@ -1,37 +1,26 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Replace mock data with real sheets data respecting user auth
+Task: Replace mock data with real Google Sheets data with proper user auth
 
 Work Log:
-- Read and analyzed all project files: page.tsx, store.ts, sheet-sync.ts, API routes, auth.ts, layout.tsx, LoginPage.tsx
-- Identified that page.tsx had hardcoded mock data (COURSES, INITIAL_TASKS, SCHEDULE_WEEKS, CALCULUS_LECTURES) that needed replacement
-- Mapped mock data to real store/API data:
-  - COURSES → store.subjects (SubjectProgress from /api/data)
-  - INITIAL_TASKS → store.todayTasks (TodayTask from /api/data)
-  - SCHEDULE_WEEKS → computed from store.student pacing data
-  - CALCULUS_LECTURES → store.subjectDetail (from /api/subject/[id])
-  - Stats → store.focusScore, store.streak, store.programWeek, etc.
-- Rewrote entire page.tsx (~1050 lines) to use useStudyOS() Zustand store
-- Added useSession() from next-auth/react for auth gating
-- Added LoginPage component for unauthenticated users
-- Added sign out button in sidebar
-- Added loading skeleton for dashboard while data loads
-- Made all task toggling use store.toggleTaskComplete() which calls /api/progress
-- Made subject detail use store.openSubjectDetail() which calls /api/subject/[id]
-- Computed schedule weeks from real student pacing data (startDate, totalDays, currentDay)
-- Fixed React hooks rules violations (useCallback before conditional returns)
-- Fixed setState-in-effect lint error (focus timer)
-- Added AuthProvider (SessionProvider) to root layout.tsx
-- Added null-safe handling for useSession() during SSR
-- Build passes clean, lint passes clean
-- Dev server running on port 3000, returns 200
-- Browser verified: login page renders correctly for unauthenticated users
+- Analyzed the entire codebase: page.tsx, store.ts, auth.ts, sheet-sync.ts, db.ts, all API routes
+- Discovered the database tables didn't exist (Prisma schema was defined but never pushed)
+- Pushed Prisma schema with `bun run db:push` to create all tables
+- Seeded the database from Google Sheets via `/api/seed` - got 3 students, 9 subjects, 86 chapters, 1029 topics
+- Fixed color mapping: DB stores color names ("Blue", "Teal") but UI needs hex codes ("#3B82F6", "#14B8A6") - added mapColor() in /api/data and /api/subject/[subjectId]
+- Fixed icon mapping: DB stores emojis ("⚛️", "🧪") but UI needs Lucide component names ("atom", "beaker") - added mapIcon() with subject-name-based canonical mapping
+- Fixed student status: Google Sheet has "true"/"false" but app expects "paid"/"free" - added normalizeStatus() in auth.ts, login route, and data route
+- Added `isFree` field to SubjectDetailTopic type in store.ts
+- Added `isLocked` field to SubjectProgress type in store.ts
+- Fixed buggy `isFree` check in SubjectDetailView: `!topic.isFree !== undefined` → `topic.isFree === false`
+- Added `isFree` field to subject detail API responses (both Turso and Prisma paths)
+- Rebuilt Next.js app and verified all APIs work correctly
+- Tested end-to-end: login → dashboard shows real data → courses view shows real subjects → progress API works
 
 Stage Summary:
-- All mock data replaced with real data from Zustand store + API
-- Auth gating works: unauthenticated → login page, authenticated → dashboard with real data
-- Subject detail view fetches real chapters/topics from API
-- Task completion persists to database via /api/progress
-- Schedule computed from real pacing data
-- Sign out functionality added
+- Database is now populated with real Google Sheets data (3 students, 9 subjects, 86 chapters, 1029 topics)
+- All API routes return properly mapped colors (hex) and icons (Lucide names)
+- Student status normalization handles "true"/"false" → "paid"/"free"
+- Auth flow works: phone/PIN login → NextAuth session → data fetch filtered by user's phone, grade, board, field, and academicGroup
+- Browser verified: Login as Ali (03360883355) → Dashboard shows "Good afternoon, Ali." with 474 topics, 4 today tasks from real Physics/Chemistry/Biology/Mathematics curriculum

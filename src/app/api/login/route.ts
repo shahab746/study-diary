@@ -121,6 +121,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Normalize status from Google Sheet: "true" = paid, "false" = free
+    const normalizedStatus = student.status?.toLowerCase().trim();
+    if (normalizedStatus === 'blocked' || normalizedStatus === 'disabled') {
+      return NextResponse.json(
+        { success: false, error: 'Your account has been disabled. Please contact support.' },
+        { status: 403 }
+      );
+    }
+
     console.log(`🔐 Login API: Success for "${student.name}" (${student.status})`);
 
     // Return user data — the client will use NextAuth signIn() to create the session

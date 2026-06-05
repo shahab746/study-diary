@@ -11,6 +11,7 @@ export interface SubjectProgress {
   completedTopics: number;
   progressPct: number;
   chapterCount?: number;
+  isLocked?: boolean;
   chapters: {
     id: string;
     number: number;
@@ -65,6 +66,7 @@ export interface SubjectDetailTopic {
   hasPdf: boolean;
   dayNumber: number;
   completed: boolean;
+  isFree?: boolean;
 }
 
 export interface SubjectDetailChapter {
