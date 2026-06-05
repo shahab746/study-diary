@@ -1,3 +1,12 @@
+// CRITICAL: Set DATABASE_URL before importing Prisma.
+// When using the Turso driver adapter on Vercel, DATABASE_URL is not used
+// for actual queries (the adapter handles that), but Prisma's generated
+// client still validates it at import time. If it's undefined, Prisma throws:
+// "URL_INVALID: The URL 'undefined' is not in a valid format"
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'file:./dummy.db';
+}
+
 import { PrismaClient } from '@prisma/client'
 import { PrismaLibSQL } from '@prisma/adapter-libsql'
 import { createClient } from '@libsql/client'
@@ -33,14 +42,6 @@ function createPrismaClient(): PrismaClient {
         authToken: libsqlAuthToken || undefined,
       });
       const adapter = new PrismaLibSQL(libsql);
-
-      // When using driver adapters, DATABASE_URL is not used for actual queries.
-      // But Prisma still requires it for schema resolution. On Vercel, a local
-      // file path won't work, so we provide a dummy value.
-      if (!process.env.DATABASE_URL) {
-        process.env.DATABASE_URL = 'file:./dummy.db';
-      }
-
       const client = new PrismaClient({ adapter } as any);
       console.log('📦 DB: PrismaClient created with LibSQL adapter (Turso)');
       return client;
