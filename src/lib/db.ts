@@ -1,9 +1,3 @@
-// CRITICAL: Import prisma-init before any Prisma imports!
-// This sets DATABASE_URL to a safe default if it's undefined.
-// Prisma's generated client validates DATABASE_URL at import time
-// and crashes with "URL_INVALID: The URL 'undefined' is not valid" if missing.
-import './prisma-init';
-
 import { PrismaClient } from '@prisma/client'
 import { PrismaLibSQL } from '@prisma/adapter-libsql'
 import { createClient } from '@libsql/client'
@@ -16,21 +10,21 @@ const globalForPrisma = globalThis as unknown as {
  * Lazy PrismaClient singleton with Turso/libSQL support.
  *
  * - On Vercel: Set LIBSQL_URL and LIBSQL_AUTH_TOKEN to use Turso (remote SQLite).
- * - Locally: Falls back to DATABASE_URL (local SQLite file).
- * - Client is created lazily on first access to prevent crashes during build
- *   when environment variables may not be available.
+ * - Locally: Falls back to the hardcoded SQLite URL in schema (file:./db.db).
+ *
+ * The Prisma schema uses a hardcoded URL (file:./db.db) instead of env("DATABASE_URL")
+ * to avoid URL_INVALID errors on Vercel. When using the driver adapter, the actual
+ * database connection goes through the adapter — the schema URL is only for Prisma's
+ * internal validation and is never used for real queries.
  */
 let _prismaClient: PrismaClient | undefined;
-
-// Safe fallback for DATABASE_URL — used in PrismaClient constructor
-const safeDatabaseUrl = process.env.DATABASE_URL || 'file:./dummy.db';
 
 function createPrismaClient(): PrismaClient {
   const libsqlUrl = process.env.LIBSQL_URL;
   const libsqlAuthToken = process.env.LIBSQL_AUTH_TOKEN;
   const isVercel = !!process.env.VERCEL;
 
-  console.log(`📦 DB: Creating PrismaClient (LIBSQL_URL=${libsqlUrl ? 'set' : 'not set'}, AUTH_TOKEN=${libsqlAuthToken ? 'set' : 'not set'}, VERCEL=${isVercel}, DATABASE_URL=${process.env.DATABASE_URL ? 'set' : 'NOT SET'})`);
+  console.log(`📦 DB: Creating PrismaClient (LIBSQL_URL=${libsqlUrl ? 'set' : 'not set'}, AUTH_TOKEN=${libsqlAuthToken ? 'set' : 'not set'}, VERCEL=${isVercel})`);
 
   if (libsqlUrl) {
     try {
@@ -42,15 +36,7 @@ function createPrismaClient(): PrismaClient {
         authToken: libsqlAuthToken || undefined,
       });
       const adapter = new PrismaLibSQL(libsql);
-
-      // KEY FIX: Pass datasourceUrl explicitly to override Prisma's internal
-      // env var resolution. Without this, Prisma's generated code tries to
-      // read DATABASE_URL from process.env and gets 'undefined' on Vercel,
-      // even when using the driver adapter which doesn't need it.
-      const client = new PrismaClient({
-        adapter,
-        datasourceUrl: safeDatabaseUrl,
-      } as any);
+      const client = new PrismaClient({ adapter } as any);
       console.log('📦 DB: PrismaClient created with LibSQL adapter (Turso)');
       return client;
     } catch (err) {
@@ -66,11 +52,9 @@ function createPrismaClient(): PrismaClient {
   }
 
   // Local SQLite database (for development / sandbox)
+  // Uses the hardcoded URL from the Prisma schema (file:./db.db)
   console.log('📦 DB: PrismaClient created with local SQLite');
-  return new PrismaClient({
-    datasourceUrl: safeDatabaseUrl,
-    // log: ['query'], // Disabled - causes memory/stability issues in production
-  });
+  return new PrismaClient();
 }
 
 export function getDb(): PrismaClient {
