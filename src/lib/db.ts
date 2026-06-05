@@ -22,12 +22,15 @@ const globalForPrisma = globalThis as unknown as {
  */
 let _prismaClient: PrismaClient | undefined;
 
+// Safe fallback for DATABASE_URL — used in PrismaClient constructor
+const safeDatabaseUrl = process.env.DATABASE_URL || 'file:./dummy.db';
+
 function createPrismaClient(): PrismaClient {
   const libsqlUrl = process.env.LIBSQL_URL;
   const libsqlAuthToken = process.env.LIBSQL_AUTH_TOKEN;
   const isVercel = !!process.env.VERCEL;
 
-  console.log(`📦 DB: Creating PrismaClient (LIBSQL_URL=${libsqlUrl ? 'set' : 'not set'}, AUTH_TOKEN=${libsqlAuthToken ? 'set' : 'not set'}, VERCEL=${isVercel})`);
+  console.log(`📦 DB: Creating PrismaClient (LIBSQL_URL=${libsqlUrl ? 'set' : 'not set'}, AUTH_TOKEN=${libsqlAuthToken ? 'set' : 'not set'}, VERCEL=${isVercel}, DATABASE_URL=${process.env.DATABASE_URL ? 'set' : 'NOT SET'})`);
 
   if (libsqlUrl) {
     try {
@@ -39,7 +42,15 @@ function createPrismaClient(): PrismaClient {
         authToken: libsqlAuthToken || undefined,
       });
       const adapter = new PrismaLibSQL(libsql);
-      const client = new PrismaClient({ adapter } as any);
+
+      // KEY FIX: Pass datasourceUrl explicitly to override Prisma's internal
+      // env var resolution. Without this, Prisma's generated code tries to
+      // read DATABASE_URL from process.env and gets 'undefined' on Vercel,
+      // even when using the driver adapter which doesn't need it.
+      const client = new PrismaClient({
+        adapter,
+        datasourceUrl: safeDatabaseUrl,
+      } as any);
       console.log('📦 DB: PrismaClient created with LibSQL adapter (Turso)');
       return client;
     } catch (err) {
@@ -57,6 +68,7 @@ function createPrismaClient(): PrismaClient {
   // Local SQLite database (for development / sandbox)
   console.log('📦 DB: PrismaClient created with local SQLite');
   return new PrismaClient({
+    datasourceUrl: safeDatabaseUrl,
     // log: ['query'], // Disabled - causes memory/stability issues in production
   });
 }
