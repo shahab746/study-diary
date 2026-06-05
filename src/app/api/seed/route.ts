@@ -9,20 +9,22 @@ import { fetchUsersFromSheet, fetchCurriculumFromSheet, invalidateCache } from '
  * GET /api/seed          — Syncs users + curriculum
  * GET /api/seed?type=users       — Syncs users only
  * GET /api/seed?type=curriculum  — Syncs curriculum only
+ * GET /api/seed?debug=1          — Includes detailed error messages
  */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'full';
+    const debug = url.searchParams.get('debug') === '1';
 
     const results: Record<string, unknown> = { timestamp: new Date().toISOString() };
 
     if (type === 'users' || type === 'full') {
-      results.users = await seedUsers();
+      results.users = await seedUsers(debug);
     }
 
     if (type === 'curriculum' || type === 'full') {
-      results.curriculum = await seedCurriculum();
+      results.curriculum = await seedCurriculum(debug);
     }
 
     // Invalidate cache so fresh data is served
@@ -41,7 +43,7 @@ export async function GET(request: Request) {
   }
 }
 
-async function seedUsers() {
+async function seedUsers(debug: boolean) {
   console.log('🌱 Seeding users from Google Sheets...');
   const sheetUsers = await fetchUsersFromSheet(true);
 
@@ -52,6 +54,7 @@ async function seedUsers() {
   let synced = 0;
   let updated = 0;
   let errors = 0;
+  const errorDetails: string[] = [];
 
   for (const su of sheetUsers) {
     try {
@@ -86,14 +89,24 @@ async function seedUsers() {
       }
     } catch (err) {
       console.error(`🌱 Error syncing user ${su.phone}:`, err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      errorDetails.push(`User ${su.phone} (${su.name}): ${errMsg}`);
       errors++;
     }
   }
 
-  return { synced, updated, errors, totalInSheet: sheetUsers.length };
+  const result: Record<string, unknown> = { synced, updated, errors, totalInSheet: sheetUsers.length };
+  if (debug || errors > 0) {
+    result.errorDetails = errorDetails;
+    // Also include first user's raw data for debugging
+    if (sheetUsers.length > 0) {
+      result.sampleUser = sheetUsers[0];
+    }
+  }
+  return result;
 }
 
-async function seedCurriculum() {
+async function seedCurriculum(debug: boolean) {
   console.log('🌱 Seeding curriculum from Google Sheets...');
   const curriculum = await fetchCurriculumFromSheet(true);
 
@@ -128,6 +141,7 @@ async function seedCurriculum() {
   let chaptersCreated = 0;
   let topicsCreated = 0;
   let errors = 0;
+  const errorDetails: string[] = [];
 
   for (const [subjectKey, rows] of subjectGroups) {
     try {
@@ -231,11 +245,13 @@ async function seedCurriculum() {
       }
     } catch (err) {
       console.error(`🌱 Error seeding subject ${subjectKey}:`, err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      errorDetails.push(`Subject ${subjectKey}: ${errMsg}`);
       errors++;
     }
   }
 
-  return {
+  const result: Record<string, unknown> = {
     subjectsCreated,
     subjectsUpdated,
     chaptersCreated,
@@ -244,4 +260,11 @@ async function seedCurriculum() {
     totalCurriculumRows: curriculum.length,
     totalSubjectGroups: subjectGroups.size,
   };
+  if (debug || errors > 0) {
+    result.errorDetails = errorDetails;
+    if (curriculum.length > 0) {
+      result.sampleRow = curriculum[0];
+    }
+  }
+  return result;
 }
