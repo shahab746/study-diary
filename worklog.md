@@ -20,3 +20,27 @@ Stage Summary:
 - Build error fix pushed to shahab746/lecture_diary repo
 - User needs to: (1) set up Turso database, (2) configure env vars on Vercel, (3) redeploy
 - GitHub PAT was shared publicly - user should revoke it
+---
+Task ID: 1
+Agent: main
+Task: Fix subjects not visible in app and optimize slow performance
+
+Work Log:
+- Read and analyzed db.ts, data API, subject detail API, store, and seed endpoint
+- Identified root cause: N+1 query pattern on Turso (500+ sequential HTTP round-trips per page load)
+- Rewrote /api/data/route.ts to use batch SQL queries (5 parallel queries instead of 500+ sequential)
+- Rewrote /api/subject/[subjectId]/route.ts with batch SQL and JOIN queries
+- Fixed seed endpoint to use parameterized queries instead of string concatenation (more reliable)
+- Added reset parameter to seed endpoint for clean re-seeding
+- Removed fire-and-forget sync calls from store that added latency on every page load
+- Verified app works locally with Agent Browser (login, dashboard, subjects, subject detail)
+- Pushed changes to GitHub (Vercel auto-deploys)
+- Reset and re-seeded Turso database: 9 subjects, 86 chapters, 1029 topics, 0 errors
+- Verified Vercel deployment works end-to-end with Agent Browser
+
+Stage Summary:
+- Root cause fixed: N+1 queries replaced with batch SQL (5 queries vs 500+)
+- Seed completed: 1029 topics (was 37), 86 chapters (was 1), 0 errors (was 9)
+- Subject details now visible on both local and Vercel
+- App performance significantly improved by eliminating sequential query overhead
+- Vercel URL: https://lecture-diary-s24q.vercel.app
