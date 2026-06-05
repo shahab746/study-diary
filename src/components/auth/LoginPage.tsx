@@ -123,7 +123,7 @@ export function LoginPage() {
             fontFamily: 'var(--font-plus-jakarta), var(--font-inter), system-ui, sans-serif',
             color: 'var(--text-primary)', fontWeight: 700,
           }}>
-            Lecture Diary
+            Study Diary
           </h1>
           <p style={{
             fontSize: 11, color: 'var(--accent-light)', fontWeight: 600,

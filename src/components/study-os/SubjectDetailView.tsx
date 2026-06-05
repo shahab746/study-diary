@@ -428,7 +428,7 @@ export function SubjectDetailView() {
       <footer className="mt-auto border-t border-border glass">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
-            <span>{detail.name} · LectureDiary</span>
+            <span>{detail.name} · StudyDiary</span>
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               {totalVideoTopics} video lessons available

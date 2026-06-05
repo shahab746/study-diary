@@ -1,5 +1,5 @@
 /**
- * Database layer for Lecture Diary.
+ * Database layer for Study Diary.
  *
  * On Vercel (when LIBSQL_URL is set): Uses @libsql/client directly, bypassing
  * Prisma entirely. This avoids Prisma's "URL_INVALID: The URL 'undefined' is

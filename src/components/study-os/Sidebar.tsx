@@ -45,7 +45,7 @@ export function Sidebar() {
           </motion.div>
           <div>
             <h1 className="font-display text-base font-bold tracking-tight">
-              Lecture<span className="gradient-text">Diary</span>
+              Study<span className="gradient-text">Diary</span>
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-[8px] text-white font-bold shadow-sm">

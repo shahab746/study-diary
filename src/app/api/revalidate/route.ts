@@ -53,7 +53,7 @@ import { invalidateCache } from '@/lib/sheet-sync';
  *   }
  */
 
-const REVALIDATION_SECRET = process.env.REVALIDATION_SECRET || 'lecture-diary-revalidation-2024';
+const REVALIDATION_SECRET = process.env.REVALIDATION_SECRET || 'study-diary-revalidation-2024';
 
 // Map friendly sheet names to in-memory cache keys used by sheet-sync.ts
 const SHEET_CACHE_KEY_MAP: Record<string, string> = {

@@ -31,7 +31,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Student's Diary — Lecture Tracker",
+  title: "Study Diary — Lecture Tracker",
   description: "Track lectures, manage study schedules, and crush your curriculum with elegance.",
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Lecture Diary',
+    title: 'Study Diary',
   },
 };
 

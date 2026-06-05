@@ -93,7 +93,7 @@ function Sidebar({ currentView, setCurrentView, onClose, studentName, totalLecs 
       <div className="sidebar-brand">
         <BookOpenText width={22} height={22} style={{ color: '#FF3B30' }} />
         <div>
-          <h1 className="heading">Student&apos;s Diary</h1>
+          <h1 className="heading">Study Diary</h1>
           <span>{studentName || 'Student'} · {totalLecs} Topics</span>
         </div>
       </div>

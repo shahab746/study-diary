@@ -118,6 +118,6 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/',
   },
-  secret: process.env.NEXTAUTH_SECRET || 'lecture-diary-dev-secret-fallback',
+  secret: process.env.NEXTAUTH_SECRET || 'study-diary-dev-secret-fallback',
   debug: false,
 };
