@@ -1269,3 +1269,42 @@
   backdrop-filter: blur(20px);
   border: 1px solid var(--border);
 }
+
+/* ============================================
+   LOGIN PAGE
+   ============================================ */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #121212;
+  position: relative;
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  position: relative;
+  z-index: 1;
+}
+
+.login-card-inner {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+}
+
+@media (max-width: 420px) {
+  .login-card {
+    max-width: 100%;
+  }
+  .login-card-inner {
+    padding: 20px;
+    border-radius: 16px;
+  }
+}
