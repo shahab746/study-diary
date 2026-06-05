@@ -39,7 +39,7 @@ function normalizeValue(v: any): any {
 function normalizeData(data: Record<string, any>): { cols: string[]; vals: any[] } {
   const entries = Object.entries(data).filter(([, v]) => v !== undefined)
   return {
-    cols: entries.map(([k]) => k),
+    cols: entries.map(([k]) => `"${k}"`),  // Always quote column names to handle reserved words like "order"
     vals: entries.map(([, v]) => normalizeValue(v)),
   }
 }
