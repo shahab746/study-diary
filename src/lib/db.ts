@@ -39,9 +39,14 @@ function normalizeValue(v: any): any {
 function normalizeData(data: Record<string, any>): { cols: string[]; vals: any[] } {
   const entries = Object.entries(data).filter(([, v]) => v !== undefined)
   return {
-    cols: entries.map(([k]) => `"${k}"`),  // Always quote column names to handle reserved words like "order"
+    cols: entries.map(([k]) => quoteCol(k)),
     vals: entries.map(([, v]) => normalizeValue(v)),
   }
+}
+
+/** Quote a column name to avoid SQL reserved word conflicts (e.g. "order", "key") */
+function quoteCol(name: string): string {
+  return `"${name}"`
 }
 
 // ─── Turso Direct Client (used on Vercel) ────────────────────────────────────
@@ -270,7 +275,7 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       if (orderBy) {
         const field = Object.keys(orderBy)[0]
         const dir = orderBy[field] === 'desc' ? 'DESC' : 'ASC'
-        sql += ` ORDER BY ${field} ${dir}`
+        sql += ` ORDER BY ${quoteCol(field)} ${dir}`
       }
       const result = await turso.execute({ sql, args: sqlArgs })
       return result.rows.map((r: any) => toCamelCase(r as Record<string, any>))
@@ -360,44 +365,44 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       if (where) {
         if (where.grade) {
           if (where.grade?.in) {
-            conditions.push(`grade IN (${where.grade.in.map(() => '?').join(', ')})`)
+            conditions.push(`${quoteCol('grade')} IN (${where.grade.in.map(() => '?').join(', ')})`)
             sqlArgs.push(...where.grade.in)
           } else {
-            conditions.push('grade = ?'); sqlArgs.push(where.grade)
+            conditions.push(`${quoteCol('grade')} = ?`); sqlArgs.push(where.grade)
           }
         }
         if (where.board) {
           if (where.board?.in) {
-            conditions.push(`board IN (${where.board.in.map(() => '?').join(', ')})`)
+            conditions.push(`${quoteCol('board')} IN (${where.board.in.map(() => '?').join(', ')})`)
             sqlArgs.push(...where.board.in)
           } else {
-            conditions.push('board = ?'); sqlArgs.push(where.board)
+            conditions.push(`${quoteCol('board')} = ?`); sqlArgs.push(where.board)
           }
         }
         if (where.name) {
           if (where.name?.in) {
-            conditions.push(`name IN (${where.name.in.map(() => '?').join(', ')})`)
+            conditions.push(`${quoteCol('name')} IN (${where.name.in.map(() => '?').join(', ')})`)
             sqlArgs.push(...where.name.in)
           } else {
-            conditions.push('name = ?'); sqlArgs.push(where.name)
+            conditions.push(`${quoteCol('name')} = ?`); sqlArgs.push(where.name)
           }
         }
         if (where.field) {
           if (where.field?.in) {
-            conditions.push(`field IN (${where.field.in.map(() => '?').join(', ')})`)
+            conditions.push(`${quoteCol('field')} IN (${where.field.in.map(() => '?').join(', ')})`)
             sqlArgs.push(...where.field.in)
           } else {
-            conditions.push('field = ?'); sqlArgs.push(where.field)
+            conditions.push(`${quoteCol('field')} = ?`); sqlArgs.push(where.field)
           }
         }
         if (where.AND) {
           for (const cond of (where.AND as any[])) {
             for (const [key, val] of Object.entries(cond)) {
               if (val && typeof val === 'object' && (val as any).in) {
-                conditions.push(`${key} IN (${(val as any).in.map(() => '?').join(', ')})`)
+                conditions.push(`${quoteCol(key)} IN (${(val as any).in.map(() => '?').join(', ')})`)
                 sqlArgs.push(...(val as any).in)
               } else {
-                conditions.push(`${key} = ?`)
+                conditions.push(`${quoteCol(key)} = ?`)
                 sqlArgs.push(val)
               }
             }
@@ -431,17 +436,17 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       const sqlArgs: any[] = []
       const conditions: string[] = []
       if (where) {
-        if (where.grade) { conditions.push('grade = ?'); sqlArgs.push(where.grade) }
-        if (where.board) { conditions.push('board = ?'); sqlArgs.push(where.board) }
-        if (where.field) { conditions.push('field = ?'); sqlArgs.push(where.field) }
+        if (where.grade) { conditions.push(`${quoteCol('grade')} = ?`); sqlArgs.push(where.grade) }
+        if (where.board) { conditions.push(`${quoteCol('board')} = ?`); sqlArgs.push(where.board) }
+        if (where.field) { conditions.push(`${quoteCol('field')} = ?`); sqlArgs.push(where.field) }
         if (where.AND) {
           for (const cond of (where.AND as any[])) {
             for (const [key, val] of Object.entries(cond)) {
               if (val && typeof val === 'object' && (val as any).in) {
-                conditions.push(`${key} IN (${(val as any).in.map(() => '?').join(', ')})`)
+                conditions.push(`${quoteCol(key)} IN (${(val as any).in.map(() => '?').join(', ')})`)
                 sqlArgs.push(...(val as any).in)
               } else {
-                conditions.push(`${key} = ?`)
+                conditions.push(`${quoteCol(key)} = ?`)
                 sqlArgs.push(val)
               }
             }
@@ -452,7 +457,7 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       if (orderBy) {
         const field = Object.keys(orderBy)[0]
         const dir = orderBy[field] === 'desc' ? 'DESC' : 'ASC'
-        sql += ` ORDER BY ${field} ${dir}`
+        sql += ` ORDER BY ${quoteCol(field)} ${dir}`
       } else {
         sql += ' ORDER BY `order` ASC'
       }
@@ -746,8 +751,8 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       const sqlArgs: any[] = []
       const conditions: string[] = []
       if (where) {
-        if (where.grade) { conditions.push('grade = ?'); sqlArgs.push(where.grade) }
-        if (where.board) { conditions.push('board = ?'); sqlArgs.push(where.board) }
+        if (where.grade) { conditions.push(`${quoteCol('grade')} = ?`); sqlArgs.push(where.grade) }
+        if (where.board) { conditions.push(`${quoteCol('board')} = ?`); sqlArgs.push(where.board) }
       }
       if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ')
       sql += ' ORDER BY `order` ASC'
@@ -771,14 +776,13 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       const existing = await turso.execute({ sql: 'SELECT id FROM Config WHERE `key` = ?', args: [where.key] })
       if (existing.rows.length > 0) {
         const { cols, vals } = normalizeData(update as Record<string, any>)
-        const setClauses = cols.map(c => `\`${c}\` = ?`)
+        const setClauses = cols.map(c => `${c} = ?`)
         vals.push(where.key)
         await turso.execute({ sql: `UPDATE Config SET ${setClauses.join(', ')} WHERE \`key\` = ?`, args: vals })
       } else {
         const data = ensureId(create as Record<string, any>)
         const { cols, vals } = normalizeData(data)
-        const escapedCols = cols.map(c => `\`${c}\``)
-        await turso.execute({ sql: `INSERT INTO Config (${escapedCols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`, args: vals })
+        await turso.execute({ sql: `INSERT INTO Config (${cols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`, args: vals })
       }
       const result = await turso.execute({ sql: 'SELECT * FROM Config WHERE `key` = ?', args: [where.key] })
       return result.rows[0] ? toCamelCase(result.rows[0] as Record<string, any>) : null
