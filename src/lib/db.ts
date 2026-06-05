@@ -488,7 +488,7 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
         const dir = orderBy[field] === 'desc' ? 'DESC' : 'ASC'
         sql += ` ORDER BY ${quoteCol(field)} ${dir}`
       } else {
-        sql += ' ORDER BY `order` ASC'
+        sql += ' ORDER BY "order" ASC'
       }
       const result = await turso.execute({ sql, args: sqlArgs })
       const subjects = result.rows.map((r: any) => toCamelCase(r as Record<string, any>))
@@ -798,7 +798,7 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
         }
       }
       if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ')
-      sql += ' ORDER BY `order` ASC'
+      sql += ' ORDER BY "order" ASC'
       const result = await turso.execute({ sql, args: sqlArgs })
       return result.rows.map((r: any) => toCamelCase(r as Record<string, any>))
     }
@@ -809,25 +809,25 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
     if (method === 'findUnique') {
       const where = args[0]?.where
       if (where?.key) {
-        const result = await turso.execute({ sql: 'SELECT * FROM Config WHERE `key` = ?', args: [where.key] })
+        const result = await turso.execute({ sql: 'SELECT * FROM Config WHERE "key" = ?', args: [where.key] })
         return result.rows[0] ? toCamelCase(result.rows[0] as Record<string, any>) : null
       }
       return null
     }
     if (method === 'upsert') {
       const { where, create, update } = args[0]
-      const existing = await turso.execute({ sql: 'SELECT id FROM Config WHERE `key` = ?', args: [where.key] })
+      const existing = await turso.execute({ sql: 'SELECT id FROM Config WHERE "key" = ?', args: [where.key] })
       if (existing.rows.length > 0) {
         const { cols, vals } = normalizeData(update as Record<string, any>)
         const setClauses = cols.map(c => `${c} = ?`)
         vals.push(where.key)
-        await turso.execute({ sql: `UPDATE Config SET ${setClauses.join(', ')} WHERE \`key\` = ?`, args: vals })
+        await turso.execute({ sql: `UPDATE Config SET ${setClauses.join(', ')} WHERE "key" = ?`, args: vals })
       } else {
         const data = ensureId(create as Record<string, any>)
         const { cols, vals } = normalizeData(data)
         await turso.execute({ sql: `INSERT INTO Config (${cols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`, args: vals })
       }
-      const result = await turso.execute({ sql: 'SELECT * FROM Config WHERE `key` = ?', args: [where.key] })
+      const result = await turso.execute({ sql: 'SELECT * FROM Config WHERE "key" = ?', args: [where.key] })
       return result.rows[0] ? toCamelCase(result.rows[0] as Record<string, any>) : null
     }
   }

@@ -96,7 +96,7 @@ async function seedUsers() {
 // ─── Curriculum (FAST: uses direct batch SQL to avoid timeout) ────────────────
 
 async function seedCurriculumFast() {
-  console.log('🌱 Seeding curriculum (FAST batch mode)...');
+  console.log('🌱 Seeding curriculum (ULTRA-FAST batch mode)...');
   const startTime = Date.now();
 
   const curriculum = await fetchCurriculumFromSheet(true);
@@ -113,7 +113,7 @@ async function seedCurriculumFast() {
     return seedCurriculumViaDbProxy(curriculum);
   }
 
-  // ─── TURSO: Use direct batch SQL ──────────────────────────────────────
+  // ─── TURSO: Ultra-fast approach — minimize HTTP round-trips ──────────
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createClient } = require('@libsql/client') as typeof import('@libsql/client');
   const client = createClient({
@@ -142,7 +142,35 @@ async function seedCurriculumFast() {
     return `'${s}'`
   }
 
-  // Group by subject-grade
+  // ─── STEP 1: Fetch ALL existing data in just 3 queries ─────────────
+  const [existingSubjects, existingChapters, existingTopics] = await Promise.all([
+    client.execute('SELECT id, name, grade FROM Subject'),
+    client.execute('SELECT id, subjectId, number FROM Chapter'),
+    client.execute('SELECT id, chapterId, number FROM Topic'),
+  ]);
+
+  // Build lookup maps
+  const subjectMap = new Map<string, { id: string }>(); // "name||grade" -> { id }
+  for (const row of existingSubjects.rows) {
+    const key = `${(row as any).name}|||${(row as any).grade}`;
+    subjectMap.set(key, { id: (row as any).id as string });
+  }
+
+  const chapterMap = new Map<string, { id: string }>(); // "subjectId||chapterNo" -> { id }
+  for (const row of existingChapters.rows) {
+    const key = `${(row as any).subjectId}|||${(row as any).number}`;
+    chapterMap.set(key, { id: (row as any).id as string });
+  }
+
+  const topicSet = new Set<string>(); // "chapterId||topicNo"
+  for (const row of existingTopics.rows) {
+    const key = `${(row as any).chapterId}|||${(row as any).number}`;
+    topicSet.add(key);
+  }
+
+  console.log(`🌱 Existing: ${subjectMap.size} subjects, ${chapterMap.size} chapters, ${topicSet.size} topics`);
+
+  // ─── STEP 2: Group curriculum data ──────────────────────────────────
   const subjectGroups = new Map<string, typeof curriculum>();
   for (const row of curriculum) {
     const key = `${row.subject}|||${row.grade}`;
@@ -157,15 +185,9 @@ async function seedCurriculumFast() {
   let errors = 0;
   const errorDetails: string[] = [];
 
-  // Step 1: Create all subjects in one batch
-  const subjectIdMap = new Map<string, string>(); // "subjectName||grade" -> id
-
-  // First, check which subjects already exist
-  const existingSubjects = await client.execute('SELECT id, name, grade FROM Subject');
-  for (const row of existingSubjects.rows) {
-    const key = `${(row as any).name}|||${(row as any).grade}`;
-    subjectIdMap.set(key, (row as any).id as string);
-  }
+  // ─── STEP 3: Build ALL SQL statements in memory ─────────────────────
+  const allSqlStatements: string[] = [];
+  const subjectUpdateArgs: Array<{ sql: string; args: any[] }> = [];
 
   for (const [subjectKey, rows] of subjectGroups) {
     try {
@@ -186,81 +208,92 @@ async function seedCurriculumFast() {
       const totalTopics = rows.length;
       const totalChapters = chapterGroups.size;
 
-      const existingId = subjectIdMap.get(`${subjectName}|||${gradeDisplay}`);
-
+      // Check if subject exists
+      const existingSubj = subjectMap.get(`${subjectName}|||${gradeDisplay}`);
       let subjectId: string;
-      if (existingId) {
-        // Update existing subject
-        await client.execute({
+
+      if (existingSubj) {
+        subjectId = existingSubj.id;
+        // Queue update
+        subjectUpdateArgs.push({
           sql: `UPDATE Subject SET "totalTopics" = ?, "chapterCount" = ?, color = ?, icon = ?, board = ?, field = ?, "groupEligibility" = ? WHERE id = ?`,
-          args: [totalTopics, totalChapters, styling.color, styling.icon, board, field, firstRow.groupEligibility || 'Both', existingId],
+          args: [totalTopics, totalChapters, styling.color, styling.icon, board, field, firstRow.groupEligibility || 'Both', subjectId],
         });
-        subjectId = existingId;
         subjectsUpdated++;
       } else {
-        // Create new subject
         subjectId = `subj_${subjectName.toLowerCase().replace(/[^a-z0-9]/g, '')}_${grade}_${Date.now()}`;
-        await client.execute({
-          sql: `INSERT INTO Subject (id, name, grade, board, field, "totalTopics", "chapterCount", color, icon, "order", "groupEligibility") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [subjectId, subjectName, gradeDisplay, board, field, totalTopics, totalChapters, styling.color, styling.icon, styling.order, firstRow.groupEligibility || 'Both'],
-        });
+        allSqlStatements.push(
+          `INSERT INTO Subject (id, name, grade, board, field, "totalTopics", "chapterCount", color, icon, "order", "groupEligibility") VALUES (${esc(subjectId)}, ${esc(subjectName)}, ${esc(gradeDisplay)}, ${esc(board)}, ${esc(field)}, ${totalTopics}, ${totalChapters}, ${esc(styling.color)}, ${esc(styling.icon)}, ${styling.order}, ${esc(firstRow.groupEligibility || 'Both')})`
+        );
         subjectsCreated++;
+        // Add to map so chapters can reference it
+        subjectMap.set(`${subjectName}|||${gradeDisplay}`, { id: subjectId });
       }
 
-      subjectIdMap.set(subjectKey, subjectId);
-
-      // Step 2: Create chapters for this subject (batch)
-      // Check existing chapters
-      const existingChapters = await client.execute({ sql: 'SELECT id, number FROM Chapter WHERE subjectId = ?', args: [subjectId] });
-      const chapterIdMap = new Map<number, string>();
-      for (const ch of existingChapters.rows) {
-        chapterIdMap.set((ch as any).number as number, (ch as any).id as string);
-      }
-
+      // Process chapters and topics
       for (const [chapterKey, chapterRows] of chapterGroups) {
         const [chapterNoStr, chapterName] = chapterKey.split('|||');
         const chapterNo = parseInt(chapterNoStr) || 0;
-        const existingChId = chapterIdMap.get(chapterNo);
+        const existingCh = chapterMap.get(`${subjectId}|||${chapterNo}`);
 
         let chapterId: string;
-        if (existingChId) {
-          chapterId = existingChId;
+        if (existingCh) {
+          chapterId = existingCh.id;
         } else {
           chapterId = `ch_${subjectId}_${chapterNo}`;
-          await client.execute({
-            sql: `INSERT INTO Chapter (id, subjectId, number, name) VALUES (?, ?, ?, ?)`,
-            args: [chapterId, subjectId, chapterNo, chapterName],
-          });
+          allSqlStatements.push(
+            `INSERT INTO Chapter (id, subjectId, number, name) VALUES (${esc(chapterId)}, ${esc(subjectId)}, ${chapterNo}, ${esc(chapterName)})`
+          );
           chaptersCreated++;
+          // Add to map
+          chapterMap.set(`${subjectId}|||${chapterNo}`, { id: chapterId });
         }
 
-        // Step 3: Create topics for this chapter (batch via executeMultiple)
-        // Check existing topics
-        const existingTopics = await client.execute({ sql: 'SELECT number FROM Topic WHERE chapterId = ?', args: [chapterId] });
-        const existingTopicNumbers = new Set((existingTopics.rows as any[]).map(r => r.number as number));
-
-        const topicInserts: string[] = [];
+        // Queue topic inserts
         for (const row of chapterRows) {
-          if (!existingTopicNumbers.has(row.topicNo)) {
+          const topicKey = `${chapterId}|||${row.topicNo}`;
+          if (!topicSet.has(topicKey)) {
             const topicId = `topic_${chapterId}_${row.topicNo}`;
             const isFree = row.isFree ? 1 : 0;
-            topicInserts.push(
+            allSqlStatements.push(
               `INSERT INTO Topic (id, chapterId, number, name, videoLink, pdfLink, isFree, dayNumber) VALUES (${esc(topicId)}, ${esc(chapterId)}, ${row.topicNo}, ${esc(row.topicName)}, ${esc(row.videoLink || '')}, ${esc(row.pdfLink || '')}, ${isFree}, ${row.totalDays || 0})`
             );
             topicsCreated++;
+            topicSet.add(topicKey);
           }
-        }
-
-        // Send all topic inserts for this chapter as one batch
-        if (topicInserts.length > 0) {
-          const batchSql = topicInserts.join(';\n');
-          await client.executeMultiple(batchSql);
         }
       }
     } catch (err) {
-      console.error(`🌱 Error seeding subject ${subjectKey}:`, err);
+      console.error(`🌱 Error building SQL for subject ${subjectKey}:`, err);
       const errMsg = err instanceof Error ? err.message : String(err);
       errorDetails.push(`Subject ${subjectKey}: ${errMsg}`);
+      errors++;
+    }
+  }
+
+  // ─── STEP 4: Execute all SQL ─────────────────────────────────────────
+  // First, execute subject updates (parameterized)
+  for (const upd of subjectUpdateArgs) {
+    try {
+      await client.execute(upd);
+    } catch (err) {
+      console.error('🌱 Subject update error:', err);
+      errors++;
+    }
+  }
+
+  // Then, execute all INSERT statements in batches via executeMultiple
+  // Split into chunks of 100 statements to avoid oversized SQL strings
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < allSqlStatements.length; i += BATCH_SIZE) {
+    const batch = allSqlStatements.slice(i, i + BATCH_SIZE);
+    const batchSql = batch.join(';\n');
+    try {
+      await client.executeMultiple(batchSql);
+    } catch (err) {
+      console.error(`🌱 Batch insert error (statements ${i}-${i + batch.length}):`, err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      errorDetails.push(`Batch ${i}-${i + batch.length}: ${errMsg}`);
       errors++;
     }
   }
@@ -279,6 +312,7 @@ async function seedCurriculumFast() {
     elapsedMs: elapsed,
     totalCurriculumRows: curriculum.length,
     totalSubjectGroups: subjectGroups.size,
+    totalSqlStatements: allSqlStatements.length + subjectUpdateArgs.length,
     errorDetails: errors > 0 ? errorDetails : undefined,
   };
 }

@@ -320,7 +320,13 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Error fetching data:', error);
-    return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined;
+    return NextResponse.json({ 
+      error: 'Failed to fetch data', 
+      detail: errMsg,
+      stack: errStack,
+    }, { status: 500 });
   }
 }
 

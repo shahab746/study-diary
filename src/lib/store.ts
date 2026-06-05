@@ -195,39 +195,37 @@ export const useStudyOS = create<StudyOSState>()(
           streak: 0,
         });
         try {
-          // Trigger a curriculum sync from Google Sheets in the background
-          // This ensures the local DB is up-to-date before we read from it
-          try {
-            const syncRes = await fetch('/api/sync?type=curriculum');
-            const syncData = await syncRes.json();
-            if (syncData.success && !syncData.cooldown) {
-              console.log('🔄 Curriculum sync completed:', syncData.message);
-            }
-          } catch (syncErr) {
-            console.warn('🔄 Curriculum sync failed (non-blocking):', syncErr);
-          }
+          // Fire-and-forget sync calls — do NOT await them.
+          // These can take 10-20 seconds on Vercel and would block the dashboard.
+          // The DB should already have data from the seed endpoint.
+          fetch('/api/sync?type=curriculum').catch(() => {});
+          fetch('/api/sync?type=users').catch(() => {});
 
-          // Also sync user data from Google Sheets to keep local DB fresh
-          try {
-            await fetch('/api/sync?type=users');
-          } catch (syncErr) {
-            console.warn('🔄 User sync failed (non-blocking):', syncErr);
-          }
-
+          // Fetch actual dashboard data immediately (no sync wait)
           const params = phone ? `?phone=${encodeURIComponent(phone)}` : '';
           const res = await fetch(`/api/data${params}`, { cache: 'no-store' });
-          if (!res.ok) throw new Error('Failed to fetch');
+          if (!res.ok) {
+            const errText = await res.text().catch(() => 'Unknown error');
+            console.error('Data API error:', res.status, errText);
+            throw new Error(`Failed to fetch data: ${res.status}`);
+          }
           const data = await res.json();
+          
+          if (data.error) {
+            console.error('Data API returned error:', data.error);
+            throw new Error(data.error);
+          }
+          
           set({
             student: data.student,
-            subjects: data.subjects,
-            specialCourses: data.specialCourses,
-            todayTasks: data.todayTasks,
-            performanceData: data.performanceData,
-            pacingGoals: data.pacingGoals,
-            totalTopics: data.totalTopics,
-            totalCompleted: data.totalCompleted,
-            topicsPerDay: data.topicsPerDay,
+            subjects: data.subjects || [],
+            specialCourses: data.specialCourses || [],
+            todayTasks: data.todayTasks || [],
+            performanceData: data.performanceData || [],
+            pacingGoals: data.pacingGoals || {},
+            totalTopics: data.totalTopics || 0,
+            totalCompleted: data.totalCompleted || 0,
+            topicsPerDay: data.topicsPerDay || 0,
             focusScore: data.focusScore || 0,
             streak: data.streak || 0,
             programWeek: data.programWeek || 3,
