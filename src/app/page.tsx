@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
 import { LoginPage } from '@/components/auth/LoginPage';
 import {
-  Home as HomeIcon, ListTodo, BookOpen, CalendarDays, Timer, Download, Moon, Sun,
+  Home as HomeIcon, ListTodo, BookOpen, Timer, Download, Moon, Sun,
   Search, Plus, Star, Clock, Play, MoreHorizontal, X, ChevronLeft,
   Check, Flame, RotateCcw, BookOpenText, ArrowLeft,
   FileText, Menu, LogOut, Sigma, Cpu, Zap, Beaker, Atom, Pi, Landmark,
@@ -33,7 +33,7 @@ function getIcon(iconName: string): React.ReactNode {
 // ============================================
 // TYPES
 // ============================================
-type ViewId = 'today' | 'tasks' | 'courses' | 'schedule' | 'focus-timer' | 'export';
+type ViewId = 'today' | 'tasks' | 'courses' | 'focus-timer' | 'export';
 
 // ============================================
 // HELPERS
@@ -77,7 +77,6 @@ function Sidebar({ currentView, setCurrentView, onClose, studentName, totalLecs 
     { id: 'today', label: 'Today', icon: <HomeIcon width={18} height={18} /> },
     { id: 'tasks', label: 'Tasks', icon: <ListTodo width={18} height={18} /> },
     { id: 'courses', label: 'Courses', icon: <BookOpen width={18} height={18} /> },
-    { id: 'schedule', label: 'Schedule', icon: <CalendarDays width={18} height={18} /> },
   ];
 
   const bottomItems: { id: ViewId; label: string; icon: React.ReactNode }[] = [
@@ -159,7 +158,6 @@ function MobileNav({ currentView, setCurrentView }: {
     { id: 'today', label: 'Today', icon: <HomeIcon width={22} height={22} /> },
     { id: 'tasks', label: 'Tasks', icon: <ListTodo width={22} height={22} /> },
     { id: 'courses', label: 'Courses', icon: <BookOpen width={22} height={22} /> },
-    { id: 'schedule', label: 'Schedule', icon: <CalendarDays width={22} height={22} /> },
     { id: 'focus-timer', label: 'Timer', icon: <Timer width={22} height={22} /> },
   ];
 
@@ -471,79 +469,7 @@ function CoursesView({ onCourseClick }: { onCourseClick: (subjectId: string) => 
   );
 }
 
-// ============================================
-// SCHEDULE VIEW
-// ============================================
-function ScheduleView() {
-  const store = useStudyOS();
-  const student = store.student;
-  const subjects = store.subjects;
 
-  // Build schedule weeks from real data
-  const currentDay = student?.currentDay || 1;
-  const totalDays = student?.totalDays || 150;
-  const startDate = student?.startDate ? new Date(student.startDate) : new Date();
-
-  const totalWeeks = Math.ceil(totalDays / 7);
-  const currentWeekNum = Math.ceil(currentDay / 7);
-
-  // Generate week data
-  const weeks = Array.from({ length: Math.min(totalWeeks, 20) }, (_, i) => {
-    const weekNum = i + 1;
-    const weekStart = new Date(startDate);
-    weekStart.setDate(weekStart.getDate() + i * 7);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
-    const dateRange = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-    const isCompleted = weekNum < currentWeekNum;
-    const isCurrent = weekNum === currentWeekNum;
-
-    return {
-      weekNum,
-      dateRange,
-      isCompleted,
-      isCurrent,
-      subjects: subjects.map(s => ({
-        name: s.subjectName,
-        color: s.color,
-        topicsPerWeek: s.totalTopics > 0 ? Math.max(1, Math.round(s.totalTopics / totalWeeks)) : 0,
-      })),
-    };
-  });
-
-  return (
-    <div className="view active">
-      <h2 className="heading" style={{ fontSize: 28, color: '#fff', marginBottom: 4 }}>Schedule</h2>
-      <p style={{ fontSize: 14, color: '#888', marginBottom: 24 }}>
-        Day {currentDay} of {totalDays} · Week {currentWeekNum} of {totalWeeks}
-      </p>
-
-      <div className="schedule-grid">
-        {weeks.map(week => (
-          <div key={week.weekNum} className="schedule-card" style={week.isCurrent ? { borderColor: '#FF3B30', borderWidth: 2 } : {}}>
-            <div className="schedule-week-title">
-              Week {week.weekNum}
-              {week.isCurrent && <span style={{ fontSize: 10, color: '#FF3B30', marginLeft: 8, fontWeight: 700 }}>CURRENT</span>}
-            </div>
-            <div className="schedule-date-range">{week.dateRange}</div>
-            {week.subjects.filter(s => s.topicsPerWeek > 0).map((subject, i) => (
-              <div key={i} className="schedule-course-item">
-                <div className="schedule-course-dot" style={{ background: subject.color }} />
-                {subject.name} <span className="schedule-course-lectures">· ~{subject.topicsPerWeek} topics</span>
-              </div>
-            ))}
-            {week.isCompleted && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, color: '#10B981', fontSize: 12, fontWeight: 600 }}>
-                <Check width={14} height={14} /> Completed
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ============================================
 // FOCUS TIMER VIEW
@@ -1072,8 +998,6 @@ export default function Home() {
         return <TasksView onNewTask={handleNewTask} />;
       case 'courses':
         return <CoursesView onCourseClick={handleCourseClick} />;
-      case 'schedule':
-        return <ScheduleView />;
       case 'focus-timer':
         return <FocusTimerView />;
       case 'export':
