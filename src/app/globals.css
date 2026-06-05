@@ -1131,42 +1131,100 @@
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
 /* ============================================
-   MOBILE BOTTOM NAV
+   MOBILE SWIPEABLE NAV
    ============================================ */
-.mobile-nav {
+.mobile-swipe-nav {
   display: none;
 }
 @media (max-width: 768px) {
-  .mobile-nav {
+  .mobile-swipe-nav {
     display: flex;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 50;
-    background: rgba(18,18,18,0.95);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border);
-    padding: 6px 0;
-    padding-bottom: calc(env(safe-area-inset-bottom, 6px) + 6px);
-    justify-content: space-around;
+    background: rgba(18,18,18,0.96);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 8px 12px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 8px);
   }
-  .mobile-nav-item {
+  .mobile-swipe-track {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 6px 12px;
-    cursor: pointer;
-    color: #666;
-    font-size: 9px;
-    font-weight: 600;
-    transition: all .15s;
-    -webkit-tap-highlight-color: transparent;
+    gap: 6px;
+    width: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
-  .mobile-nav-item svg { width: 22px; height: 22px; }
-  .mobile-nav-item.active { color: #FF3B30; }
-  .mobile-nav-item:active { transform: scale(0.92); }
+  .mobile-swipe-track::-webkit-scrollbar { display: none; }
+  .mobile-swipe-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid transparent;
+    color: #8E8E93;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    scroll-snap-align: start;
+    white-space: nowrap;
+    transition: all .2s cubic-bezier(.4,0,.2,1);
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+  }
+  .mobile-swipe-item:active {
+    transform: scale(0.94);
+  }
+  .mobile-swipe-item.active {
+    background: #FF3B30;
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 2px 12px rgba(255,59,48,0.35);
+  }
+  .mobile-swipe-item.active svg {
+    color: #fff;
+  }
+  .mobile-swipe-item:not(.active):hover {
+    background: rgba(255,255,255,0.08);
+    color: #ccc;
+  }
+  .mobile-more-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    background: #1E1E1E;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+    min-width: 160px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    z-index: 60;
+  }
+  .mobile-more-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: #ccc;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .mobile-more-item:hover {
+    background: rgba(255,255,255,0.06);
+  }
 }
 
 /* ============================================
@@ -1174,19 +1232,6 @@
    ============================================ */
 .hamburger-btn {
   display: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--surface-solid);
-  border: 1px solid var(--border);
-  color: #8E8E93;
-  place-items: center;
-  cursor: pointer;
-  transition: all .15s;
-}
-.hamburger-btn:hover { color: #fff; border-color: var(--border-hover); }
-@media (max-width: 768px) {
-  .hamburger-btn { display: grid; }
 }
 
 /* ============================================

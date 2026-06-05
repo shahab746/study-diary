@@ -147,31 +147,63 @@ function Sidebar({ currentView, setCurrentView, onClose, studentName, totalLecs 
 }
 
 // ============================================
-// MOBILE BOTTOM NAV
+// MOBILE SWIPEABLE NAV
 // ============================================
 function MobileNav({ currentView, setCurrentView }: {
   currentView: ViewId;
   setCurrentView: (v: ViewId) => void;
 }) {
+  const { theme, setTheme } = useTheme();
+  const [showMore, setShowMore] = useState(false);
+
   const items: { id: ViewId; label: string; icon: React.ReactNode }[] = [
-    { id: 'today', label: 'Today', icon: <HomeIcon width={22} height={22} /> },
-    { id: 'tasks', label: 'Tasks', icon: <ListTodo width={22} height={22} /> },
-    { id: 'courses', label: 'Courses', icon: <BookOpen width={22} height={22} /> },
-    { id: 'focus-timer', label: 'Timer', icon: <Timer width={22} height={22} /> },
+    { id: 'today', label: 'Today', icon: <HomeIcon width={20} height={20} /> },
+    { id: 'tasks', label: 'Tasks', icon: <ListTodo width={20} height={20} /> },
+    { id: 'courses', label: 'Courses', icon: <BookOpen width={20} height={20} /> },
+    { id: 'focus-timer', label: 'Timer', icon: <Timer width={20} height={20} /> },
   ];
 
   return (
-    <nav className="mobile-nav">
-      {items.map(item => (
-        <div
-          key={item.id}
-          className={`mobile-nav-item ${currentView === item.id ? 'active' : ''}`}
-          onClick={() => setCurrentView(item.id)}
+    <nav className="mobile-swipe-nav">
+      <div className="mobile-swipe-track">
+        {items.map(item => (
+          <button
+            key={item.id}
+            className={`mobile-swipe-item ${currentView === item.id ? 'active' : ''}`}
+            onClick={() => setCurrentView(item.id)}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+        <button
+          className={`mobile-swipe-item ${showMore ? 'active' : ''}`}
+          onClick={() => setShowMore(!showMore)}
+          style={{ position: 'relative' }}
         >
-          {item.icon}
-          {item.label}
-        </div>
-      ))}
+          <MoreHorizontal width={20} height={20} />
+          <span>More</span>
+          {showMore && (
+            <div className="mobile-more-menu">
+              <button
+                className="mobile-more-item"
+                onClick={(e) => { e.stopPropagation(); setTheme(theme === 'dark' ? 'light' : 'dark'); }}
+              >
+                {theme === 'dark' ? <Sun width={16} height={16} /> : <Moon width={16} height={16} />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </button>
+              <button
+                className="mobile-more-item"
+                style={{ color: '#FF6B60' }}
+                onClick={(e) => { e.stopPropagation(); signOut({ callbackUrl: '/' }); }}
+              >
+                <LogOut width={16} height={16} />
+                Sign out
+              </button>
+            </div>
+          )}
+        </button>
+      </div>
     </nav>
   );
 }
@@ -890,7 +922,7 @@ export default function Home() {
   const [currentView, setCurrentView] = useState<ViewId>('today');
   const [showModal, setShowModal] = useState(false);
   const [subjectDetailId, setSubjectDetailId] = useState<string | null>(null);
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
   const [initialFetchDone, setInitialFetchDone] = useState(false);
 
   // All hooks must be called before any conditional returns
@@ -979,26 +1011,11 @@ export default function Home() {
         totalLecs={totalLecs}
       />
 
-      {/* Mobile Sidebar Overlay */}
-      <div
-        className={`mobile-sidebar-overlay ${mobileDrawerOpen ? 'open' : ''}`}
-        onClick={() => setMobileDrawerOpen(false)}
-      />
-      <div className={`mobile-sidebar-drawer ${mobileDrawerOpen ? 'open' : ''}`}>
-        <Sidebar
-          currentView={currentView}
-          setCurrentView={(v) => { handleViewChange(v); setMobileDrawerOpen(false); }}
-          onClose={() => setMobileDrawerOpen(false)}
-          studentName={studentName}
-          totalLecs={totalLecs}
-        />
-      </div>
-
       {/* Main Content */}
       <div className="main-content">
         <Topbar
           onNewTask={handleNewTask}
-          onHamburger={() => setMobileDrawerOpen(true)}
+          onHamburger={() => {}}
         />
         <div className="content-area">
           {renderContent()}
