@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
 import { LoginPage } from '@/components/auth/LoginPage';
 import {
-  Home as HomeIcon, ListTodo, BookOpen, Timer, Download, Moon, Sun,
+  Home as HomeIcon, ListTodo, BookOpen, Timer, Moon, Sun,
   Search, Plus, Star, Clock, Play, MoreHorizontal, X, ChevronLeft,
   Check, Flame, RotateCcw, BookOpenText, ArrowLeft,
   FileText, Menu, LogOut, Sigma, Cpu, Zap, Beaker, Atom, Pi, Landmark,
@@ -33,7 +33,7 @@ function getIcon(iconName: string): React.ReactNode {
 // ============================================
 // TYPES
 // ============================================
-type ViewId = 'today' | 'tasks' | 'courses' | 'focus-timer' | 'export';
+type ViewId = 'today' | 'tasks' | 'courses' | 'focus-timer';
 
 // ============================================
 // HELPERS
@@ -81,7 +81,6 @@ function Sidebar({ currentView, setCurrentView, onClose, studentName, totalLecs 
 
   const bottomItems: { id: ViewId; label: string; icon: React.ReactNode }[] = [
     { id: 'focus-timer', label: 'Focus timer', icon: <Timer width={18} height={18} /> },
-    { id: 'export', label: 'Export notes', icon: <Download width={18} height={18} /> },
   ];
 
   const handleNav = (id: ViewId) => {
@@ -572,37 +571,6 @@ function FocusTimerView() {
 }
 
 // ============================================
-// EXPORT VIEW
-// ============================================
-function ExportView() {
-  const store = useStudyOS();
-  return (
-    <div className="view active">
-      <h2 className="heading" style={{ fontSize: 28, color: '#fff', marginBottom: 12 }}>Export Notes</h2>
-      <p style={{ color: '#8E8E93', marginBottom: 24 }}>Export your lecture notes and study progress.</p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => window.open('/api/download?format=md', '_blank')}>
-          <div className="stat-label"><FileText width={13} height={13} />Markdown</div>
-          <div className="stat-value" style={{ fontSize: 18 }}>All notes</div>
-          <div className="stat-sub">{store.totalCompleted} completed topics</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => window.open('/api/download?format=csv', '_blank')}>
-          <div className="stat-label"><Download width={13} height={13} />CSV</div>
-          <div className="stat-value" style={{ fontSize: 18 }}>Lecture data</div>
-          <div className="stat-sub">Export as .csv file</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'pointer' }}>
-          <div className="stat-label"><BookOpenText width={13} height={13} />Progress</div>
-          <div className="stat-value" style={{ fontSize: 18 }}>Summary report</div>
-          <div className="stat-sub">{Math.round(store.totalTopics > 0 ? (store.totalCompleted / store.totalTopics) * 100 : 0)}% complete</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
 // SUBJECT DETAIL VIEW
 // ============================================
 function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: () => void }) {
@@ -742,20 +710,20 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                         Day {topic.dayNumber}
                       </span>
                     )}
-                    {topic.hasPdf && (
-                      <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
-                        <span className="difficulty-tag" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', cursor: 'pointer' }}>
-                          Notes
-                        </span>
-                      </a>
-                    )}
                   </div>
                 </div>
-                <div className="lecture-actions">
+                <div className="lecture-actions" style={{ display: 'flex', gap: 6 }}>
                   {topic.hasVideo && (
                     <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
                       <button className="watch-btn">
                         <Play width={12} height={12} /> Watch
+                      </button>
+                    </a>
+                  )}
+                  {topic.hasPdf && (
+                    <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                      <button className="watch-btn" style={{ background: '#FF3B30' }}>
+                        <FileText width={12} height={12} /> Notes
                       </button>
                     </a>
                   )}
@@ -996,8 +964,6 @@ export default function Home() {
         return <CoursesView onCourseClick={handleCourseClick} />;
       case 'focus-timer':
         return <FocusTimerView />;
-      case 'export':
-        return <ExportView />;
       default:
         return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
     }
