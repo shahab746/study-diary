@@ -126,17 +126,32 @@ async function ensureTablesExist(client: any) {
     // Check if Student table exists
     const result = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Student'")
     if (result.rows.length === 0) {
-      console.log('📦 DB: Tables not found in Turso, creating them...')
-      await client.executeMultiple(TURSO_SCHEMA)
+      console.log('📦 DB: Tables not found in Turso, creating them one by one...')
+      // Execute each statement individually for better error reporting
+      const statements = TURSO_SCHEMA.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+      for (const stmt of statements) {
+        try {
+          await client.execute(stmt)
+        } catch (stmtErr: any) {
+          // Ignore "already exists" errors (race condition with another serverless instance)
+          if (stmtErr?.message?.includes('already exists')) {
+            console.log(`📦 DB: Table already exists (race condition), skipping: ${stmt.substring(0, 50)}...`)
+          } else {
+            console.error(`📦 DB: Failed to execute: ${stmt.substring(0, 80)}...`, stmtErr?.message)
+            throw stmtErr
+          }
+        }
+      }
       console.log('📦 DB: Tables created successfully in Turso')
     } else {
       console.log('📦 DB: Tables already exist in Turso')
     }
     _tablesInitialized = true
   } catch (err) {
-    console.error('📦 DB: Failed to initialize tables:', err)
-    // Don't throw - let queries fail naturally with clear error messages
-    _tablesInitialized = true
+    console.error('📦 DB: CRITICAL - Failed to initialize tables:', err)
+    // Reset so next request retries
+    _tablesInitialized = false
+    throw new Error(`Database table initialization failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 

@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     let student = await db.student.findUnique({ where: { phone: cleanPhone } });
 
     // Step 2: If not in local DB, try Google Sheet
+    let sheetErrorDetail: string | null = null;
     if (!student) {
       console.log(`🔐 Login API: Not in local DB, trying Google Sheet...`);
       try {
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
             console.log(`🔐 Login API: Saved user "${sheetUser.name}" to local DB`);
           } catch (dbError) {
             console.error('🔐 Login API: Failed to save to local DB:', dbError);
+            sheetErrorDetail = `DB save failed: ${dbError instanceof Error ? dbError.message : String(dbError)}`;
           }
 
           // Re-fetch from local DB to get the student record
@@ -88,14 +90,18 @@ export async function POST(request: Request) {
         }
       } catch (sheetError) {
         console.error('🔐 Login API: Google Sheet lookup failed:', sheetError);
+        sheetErrorDetail = sheetError instanceof Error ? sheetError.message : String(sheetError);
         // Continue - we'll just report user not found
       }
     }
 
     if (!student) {
       console.warn(`🔐 Login API: No user found for phone="${cleanPhone}"`);
+      const errorDetail = sheetErrorDetail
+        ? `No account found. (Sheet lookup error: ${sheetErrorDetail})`
+        : 'No account found with this phone number. Make sure your phone number is in the sheet.';
       return NextResponse.json(
-        { success: false, error: 'No account found with this phone number. Make sure your phone number is in the sheet.' },
+        { success: false, error: errorDetail },
         { status: 401 }
       );
     }
