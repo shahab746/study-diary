@@ -224,7 +224,7 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
       {/* Hero Card */}
       <div className="hero-card">
         <div className="hero-date">{getDateLine()}</div>
-        <div className="hero-greeting">{getGreeting()}, {student?.name || 'Student'}.</div>
+        <div className="hero-greeting">{getGreeting()}, <span style={{ color: '#FF3B30' }}>{student?.name || 'Student'}</span>.</div>
         <div className="hero-message">
           {nextTask
             ? `Your next move is ${nextTask.topicName} in ${nextTask.subjectName}.`
@@ -293,7 +293,7 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
                 <div style={{ fontSize: 14, fontWeight: 500, color: task.completed ? '#666' : '#fff', textDecoration: task.completed ? 'line-through' : 'none' }}>
                   {task.topicName}
                 </div>
-                <div style={{ fontSize: 12, color: '#888' }}>{task.subjectName} · {task.chapterName}</div>
+                <div style={{ fontSize: 12, color: '#8E8E93' }}>{task.subjectName} · {task.chapterName}</div>
               </div>
               <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor, flexShrink: 0 }}>
                 {task.subjectName} · D{task.dayNumber}
@@ -334,7 +334,7 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
         <div>
           <h2 className="heading" style={{ fontSize: 28, color: '#fff' }}>Tasks</h2>
-          <p style={{ fontSize: 14, color: '#888', marginTop: 4 }}>
+          <p style={{ fontSize: 14, color: '#8E8E93', marginTop: 4 }}>
             {tasks.filter(t => t.completed).length} of {tasks.length} tasks completed
           </p>
         </div>
@@ -583,7 +583,7 @@ function ExportView() {
   return (
     <div className="view active">
       <h2 className="heading" style={{ fontSize: 28, color: '#fff', marginBottom: 12 }}>Export Notes</h2>
-      <p style={{ color: '#888', marginBottom: 24 }}>Export your lecture notes and study progress.</p>
+      <p style={{ color: '#8E8E93', marginBottom: 24 }}>Export your lecture notes and study progress.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
         <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => window.open('/api/download?format=md', '_blank')}>
@@ -649,7 +649,7 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
         <button className="back-btn" onClick={onBack}>
           <ArrowLeft width={16} height={16} /> Back to subjects
         </button>
-        <div style={{ textAlign: 'center', padding: 60, color: '#888' }}>
+        <div style={{ textAlign: 'center', padding: 60, color: '#8E8E93' }}>
           Loading subject details...
         </div>
       </div>
@@ -719,11 +719,11 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
       <div style={{ background: 'var(--surface-solid)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
         {filteredChapters.map(chapter => (
           <div key={chapter.id}>
-            <div style={{ padding: '12px 16px', background: '#1a1a1a', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '12px 16px', background: '#1A1A1A', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#ccc' }}>
                 Ch {chapter.number}: {chapter.name}
               </span>
-              <span style={{ fontSize: 11, color: '#888' }}>
+              <span style={{ fontSize: 11, color: '#8E8E93' }}>
                 {chapter.completedTopics}/{chapter.totalTopics}
               </span>
             </div>
@@ -771,7 +771,7 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                     </a>
                   )}
                   {!topic.hasVideo && !topic.hasPdf && topic.isFree === false && (
-                    <span style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Lock width={12} height={12} /> Premium
                     </span>
                   )}
@@ -976,8 +976,8 @@ export default function Home() {
   // Loading while checking auth
   if (status === 'loading') {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#000' }}>
-        <div style={{ textAlign: 'center', color: '#888' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#121212' }}>
+        <div style={{ textAlign: 'center', color: '#8E8E93' }}>
           <BookOpenText width={32} height={32} style={{ color: '#FF3B30', margin: '0 auto 12px' }} />
           <p>Loading...</p>
         </div>
