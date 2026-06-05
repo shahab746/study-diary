@@ -344,7 +344,7 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
 // ============================================
 // TASKS VIEW
 // ============================================
-function TasksView({ onNewTask }: { onNewTask: () => void }) {
+function TasksView({ onNewTask, onOpenPdf }: { onNewTask: () => void; onOpenPdf: (url: string, title: string) => void }) {
   const store = useStudyOS();
   const tasks = store.todayTasks;
   const toggleTask = store.toggleTaskComplete;
@@ -423,11 +423,13 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
               </a>
             )}
             {task.pdfLink && (
-              <a href={task.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                <button className="btn btn-ghost btn-sm" style={{ padding: '4px 10px', fontSize: 11 }}>
-                  <PdfIcon width={11} height={11} /> PDF
-                </button>
-              </a>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ padding: '4px 10px', fontSize: 11 }}
+                onClick={(e) => { e.stopPropagation(); onOpenPdf(task.pdfLink, task.topicName); }}
+              >
+                <PdfIcon width={11} height={11} /> PDF
+              </button>
             )}
           </div>
         </div>
@@ -605,7 +607,7 @@ function FocusTimerView() {
 // ============================================
 // SUBJECT DETAIL VIEW
 // ============================================
-function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: () => void }) {
+function SubjectDetailView({ subjectId, onBack, onOpenPdf }: { subjectId: string; onBack: () => void; onOpenPdf: (url: string, title: string) => void }) {
   const store = useStudyOS();
   const subject = store.subjects.find(s => s.subjectId === subjectId);
   const detail = store.subjectDetail;
@@ -753,11 +755,13 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                     </a>
                   )}
                   {topic.hasPdf && (
-                    <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                      <button className="watch-btn" style={{ background: '#FF3B30' }}>
-                        <FileText width={12} height={12} /> Notes
-                      </button>
-                    </a>
+                    <button
+                      className="watch-btn"
+                      style={{ background: '#FF3B30' }}
+                      onClick={(e) => { e.stopPropagation(); onOpenPdf(topic.pdfLink, topic.name); }}
+                    >
+                      <FileText width={12} height={12} /> Notes
+                    </button>
                   )}
                   {!topic.hasVideo && !topic.hasPdf && topic.isFree === false && (
                     <span style={{ fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -885,6 +889,60 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
 }
 
 // ============================================
+// PDF VIEWER OVERLAY
+// ============================================
+function PdfViewer({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+
+  return (
+    <div className="pdf-overlay" onClick={onClose}>
+      <div className="pdf-container" onClick={e => e.stopPropagation()}>
+        <div className="pdf-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+            <FileText width={18} height={18} style={{ color: '#FF3B30', flexShrink: 0 }} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title || 'Notes'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+              style={{ padding: '6px 10px', fontSize: 12 }}
+            >
+              <ExternalLink width={14} height={14} /> Open in browser
+            </a>
+            <button className="modal-close" onClick={onClose}>
+              <X width={18} height={18} />
+            </button>
+          </div>
+        </div>
+        <div className="pdf-body">
+          {loading && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8E8E93', zIndex: 1 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 32, height: 32, border: '3px solid #2A2A2A', borderTopColor: '#FF3B30', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+                <p>Loading PDF...</p>
+              </div>
+            </div>
+          )}
+          <iframe
+            src={url}
+            width="100%"
+            height="100%"
+            style={{ border: 'none', background: '#fff', borderRadius: '0 0 12px 12px' }}
+            onLoad={() => setLoading(false)}
+            title={title || 'PDF Viewer'}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // TOPBAR COMPONENT
 // ============================================
 function Topbar({ onNewTask, onHamburger }: { onNewTask: () => void; onHamburger: () => void }) {
@@ -922,6 +980,8 @@ export default function Home() {
   const [currentView, setCurrentView] = useState<ViewId>('today');
   const [showModal, setShowModal] = useState(false);
   const [subjectDetailId, setSubjectDetailId] = useState<string | null>(null);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState('');
 
   const [initialFetchDone, setInitialFetchDone] = useState(false);
 
@@ -938,6 +998,16 @@ export default function Home() {
 
   const handleCourseClick = useCallback((subjectId: string) => {
     setSubjectDetailId(subjectId);
+  }, []);
+
+  const openPdf = useCallback((url: string, title: string) => {
+    setPdfViewerUrl(url);
+    setPdfViewerTitle(title);
+  }, []);
+
+  const closePdf = useCallback(() => {
+    setPdfViewerUrl(null);
+    setPdfViewerTitle('');
   }, []);
 
   const closeSubjectDetail = store.closeSubjectDetail;
@@ -984,14 +1054,14 @@ export default function Home() {
 
     // If a subject detail is open, show it
     if (subjectDetailId) {
-      return <SubjectDetailView subjectId={subjectDetailId} onBack={handleBackFromCourse} />;
+      return <SubjectDetailView subjectId={subjectDetailId} onBack={handleBackFromCourse} onOpenPdf={openPdf} />;
     }
 
     switch (currentView) {
       case 'today':
         return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
       case 'tasks':
-        return <TasksView onNewTask={handleNewTask} />;
+        return <TasksView onNewTask={handleNewTask} onOpenPdf={openPdf} />;
       case 'courses':
         return <CoursesView onCourseClick={handleCourseClick} />;
       case 'focus-timer':
@@ -1030,6 +1100,9 @@ export default function Home() {
 
       {/* Quick Add Modal */}
       {showModal && <QuickAddModal onClose={() => setShowModal(false)} />}
+
+      {/* PDF Viewer */}
+      {pdfViewerUrl && <PdfViewer url={pdfViewerUrl} title={pdfViewerTitle} onClose={closePdf} />}
     </div>
   );
 }
