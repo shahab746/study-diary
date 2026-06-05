@@ -736,37 +736,23 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                     <span style={{ color: '#666', marginRight: 8 }}>{topic.number}.</span>
                     {topic.name}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {topic.dayNumber > 0 && (
+                  {topic.dayNumber > 0 && (
+                    <div style={{ marginTop: 6 }}>
                       <span className="difficulty-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>
                         Day {topic.dayNumber}
                       </span>
-                    )}
-                    {topic.hasVideo && (
-                      <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
-                        <span className="difficulty-tag" style={{ background: 'rgba(255,59,48,0.15)', color: '#FF3B30', cursor: 'pointer' }}>
-                          Video
-                        </span>
-                      </a>
-                    )}
-                    {topic.hasPdf && (
-                      <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
-                        <span className="difficulty-tag" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', cursor: 'pointer' }}>
-                          PDF
-                        </span>
-                      </a>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
                 <div className="lecture-actions">
-                  {topic.hasVideo && (
-                    <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                  {topic.hasPdf && (
+                    <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
                       <button className="watch-btn">
-                        <Play width={12} height={12} /> Watch
+                        <FileText width={12} height={12} /> Notes
                       </button>
                     </a>
                   )}
-                  {!topic.hasVideo && !topic.hasPdf && topic.isFree === false && (
+                  {!topic.hasPdf && !topic.hasVideo && topic.isFree === false && (
                     <span style={{ fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Lock width={12} height={12} /> Premium
                     </span>
