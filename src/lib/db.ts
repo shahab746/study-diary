@@ -436,9 +436,38 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       const sqlArgs: any[] = []
       const conditions: string[] = []
       if (where) {
-        if (where.grade) { conditions.push(`${quoteCol('grade')} = ?`); sqlArgs.push(where.grade) }
-        if (where.board) { conditions.push(`${quoteCol('board')} = ?`); sqlArgs.push(where.board) }
-        if (where.field) { conditions.push(`${quoteCol('field')} = ?`); sqlArgs.push(where.field) }
+        if (where.grade) {
+          if (where.grade?.in) {
+            conditions.push(`${quoteCol('grade')} IN (${where.grade.in.map(() => '?').join(', ')})`)
+            sqlArgs.push(...where.grade.in)
+          } else {
+            conditions.push(`${quoteCol('grade')} = ?`); sqlArgs.push(where.grade)
+          }
+        }
+        if (where.board) {
+          if (where.board?.in) {
+            conditions.push(`${quoteCol('board')} IN (${where.board.in.map(() => '?').join(', ')})`)
+            sqlArgs.push(...where.board.in)
+          } else {
+            conditions.push(`${quoteCol('board')} = ?`); sqlArgs.push(where.board)
+          }
+        }
+        if (where.field) {
+          if (where.field?.in) {
+            conditions.push(`${quoteCol('field')} IN (${where.field.in.map(() => '?').join(', ')})`)
+            sqlArgs.push(...where.field.in)
+          } else {
+            conditions.push(`${quoteCol('field')} = ?`); sqlArgs.push(where.field)
+          }
+        }
+        if (where.name) {
+          if (where.name?.in) {
+            conditions.push(`${quoteCol('name')} IN (${where.name.in.map(() => '?').join(', ')})`)
+            sqlArgs.push(...where.name.in)
+          } else {
+            conditions.push(`${quoteCol('name')} = ?`); sqlArgs.push(where.name)
+          }
+        }
         if (where.AND) {
           for (const cond of (where.AND as any[])) {
             for (const [key, val] of Object.entries(cond)) {
@@ -751,8 +780,22 @@ async function tursoQuery(model: string, method: string, args: any[]): Promise<a
       const sqlArgs: any[] = []
       const conditions: string[] = []
       if (where) {
-        if (where.grade) { conditions.push(`${quoteCol('grade')} = ?`); sqlArgs.push(where.grade) }
-        if (where.board) { conditions.push(`${quoteCol('board')} = ?`); sqlArgs.push(where.board) }
+        if (where.grade) {
+          if (where.grade?.in) {
+            conditions.push(`${quoteCol('grade')} IN (${where.grade.in.map(() => '?').join(', ')})`)
+            sqlArgs.push(...where.grade.in)
+          } else {
+            conditions.push(`${quoteCol('grade')} = ?`); sqlArgs.push(where.grade)
+          }
+        }
+        if (where.board) {
+          if (where.board?.in) {
+            conditions.push(`${quoteCol('board')} IN (${where.board.in.map(() => '?').join(', ')})`)
+            sqlArgs.push(...where.board.in)
+          } else {
+            conditions.push(`${quoteCol('board')} = ?`); sqlArgs.push(where.board)
+          }
+        }
       }
       if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ')
       sql += ' ORDER BY `order` ASC'
