@@ -354,8 +354,8 @@ export async function GET(request: Request) {
 
       subjectQueues.push({
         subjectName: subject.name,
-        subjectColor: subject.color,
-        subjectIcon: subject.icon,
+        subjectColor: mapColor(subject.color),
+        subjectIcon: mapIcon(subject.icon, subject.name),
         remaining,
         totalTopics: allSubjectTopics.length,
         completedCount,

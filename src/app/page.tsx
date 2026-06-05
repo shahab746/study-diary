@@ -690,11 +690,12 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
   const loading = store.subjectDetailLoading;
 
   // Fetch detail on mount
+  const openSubjectDetail = store.openSubjectDetail;
   useEffect(() => {
     if (subjectId) {
-      store.openSubjectDetail(subjectId);
+      openSubjectDetail(subjectId);
     }
-  }, [subjectId, store]);
+  }, [subjectId, openSubjectDetail]);
 
   const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
 
@@ -1017,20 +1018,22 @@ export default function Home() {
     setSubjectDetailId(subjectId);
   }, []);
 
+  const closeSubjectDetail = store.closeSubjectDetail;
   const handleBackFromCourse = useCallback(() => {
-    store.closeSubjectDetail();
+    closeSubjectDetail();
     setSubjectDetailId(null);
-  }, [store]);
+  }, [closeSubjectDetail]);
 
   // Fetch data when session is available
+  const fetchData = store.fetchData;
   useEffect(() => {
     if (status === 'authenticated' && session?.user && !initialFetchDone) {
       const phone = (session.user as Record<string, unknown>).phone as string;
       if (phone) {
-        store.fetchData(phone).then(() => setInitialFetchDone(true));
+        fetchData(phone).then(() => setInitialFetchDone(true));
       }
     }
-  }, [status, session, initialFetchDone, store]);
+  }, [status, session, initialFetchDone, fetchData]);
 
   // Show login page if not authenticated
   if (status === 'unauthenticated') {
