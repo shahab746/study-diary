@@ -195,13 +195,11 @@ export const useStudyOS = create<StudyOSState>()(
           streak: 0,
         });
         try {
-          // Fire-and-forget sync calls — do NOT await them.
-          // These can take 10-20 seconds on Vercel and would block the dashboard.
-          // The DB should already have data from the seed endpoint.
-          fetch('/api/sync?type=curriculum').catch(() => {});
-          fetch('/api/sync?type=users').catch(() => {});
+          // NOTE: Removed fire-and-forget sync calls — they add unnecessary 
+          // latency on every page load. Data should be seeded via /api/seed 
+          // endpoint once, then fetched directly from the DB.
 
-          // Fetch actual dashboard data immediately (no sync wait)
+          // Fetch actual dashboard data immediately
           const params = phone ? `?phone=${encodeURIComponent(phone)}` : '';
           const res = await fetch(`/api/data${params}`, { cache: 'no-store' });
           if (!res.ok) {

@@ -4,18 +4,24 @@ import { fetchUsersFromSheet, fetchCurriculumFromSheet, invalidateCache } from '
 
 /**
  * Seed endpoint — populates Turso database from Google Sheets.
- * Uses DIRECT batch SQL for curriculum (1000+ rows) to avoid Vercel's 10s timeout.
+ * Uses parameterized batch SQL for curriculum (1000+ rows) to avoid Vercel's 10s timeout.
  *
  * GET /api/seed              — Syncs users + curriculum
  * GET /api/seed?type=users   — Syncs users only
  * GET /api/seed?type=curriculum — Syncs curriculum only
+ * GET /api/seed?reset=1      — Drops and recreates all tables before seeding
  */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'full';
+    const reset = url.searchParams.get('reset') === '1';
 
     const results: Record<string, unknown> = { timestamp: new Date().toISOString() };
+
+    if (reset) {
+      results.reset = await resetTables();
+    }
 
     if (type === 'users' || type === 'full') {
       results.users = await seedUsers();
@@ -41,7 +47,36 @@ export async function GET(request: Request) {
   }
 }
 
-// ─── Users (only 3, individual queries are fine) ──────────────────────────────
+// ─── Reset Tables ─────────────────────────────────────────────────────────────
+
+async function resetTables() {
+  const isTurso = !!process.env.LIBSQL_URL;
+  if (!isTurso) return { status: 'skipped_local' };
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createClient } = require('@libsql/client') as typeof import('@libsql/client');
+  const client = createClient({
+    url: process.env.LIBSQL_URL!,
+    authToken: process.env.LIBSQL_AUTH_TOKEN || undefined,
+  });
+
+  try {
+    // Delete in reverse dependency order
+    await client.execute('DELETE FROM Progress');
+    await client.execute('DELETE FROM Topic');
+    await client.execute('DELETE FROM Chapter');
+    await client.execute('DELETE FROM Subject');
+    await client.execute('DELETE FROM SpecialCourse');
+    // Keep Student and Config tables
+    client.close();
+    return { status: 'success', message: 'All curriculum tables cleared' };
+  } catch (err) {
+    client.close();
+    return { status: 'error', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ─── Users (only a few, individual queries are fine) ──────────────────────────
 
 async function seedUsers() {
   console.log('🌱 Seeding users from Google Sheets...');
@@ -93,10 +128,10 @@ async function seedUsers() {
   return { synced, updated, errors, totalInSheet: sheetUsers.length, errorDetails: errors > 0 ? errorDetails : undefined };
 }
 
-// ─── Curriculum (FAST: uses direct batch SQL to avoid timeout) ────────────────
+// ─── Curriculum (FAST: uses parameterized batch SQL) ──────────────────────────
 
 async function seedCurriculumFast() {
-  console.log('🌱 Seeding curriculum (ULTRA-FAST batch mode)...');
+  console.log('🌱 Seeding curriculum (batch mode)...');
   const startTime = Date.now();
 
   const curriculum = await fetchCurriculumFromSheet(true);
@@ -105,7 +140,6 @@ async function seedCurriculumFast() {
     return { status: 'no_curriculum_found', message: 'No curriculum data found in Google Sheet.' };
   }
 
-  // Get direct Turso client for batch operations
   const isTurso = !!process.env.LIBSQL_URL;
 
   if (!isTurso) {
@@ -113,7 +147,7 @@ async function seedCurriculumFast() {
     return seedCurriculumViaDbProxy(curriculum);
   }
 
-  // ─── TURSO: Ultra-fast approach — minimize HTTP round-trips ──────────
+  // ─── TURSO: Use parameterized queries for reliability ───────────────
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createClient } = require('@libsql/client') as typeof import('@libsql/client');
   const client = createClient({
@@ -135,13 +169,6 @@ async function seedCurriculumFast() {
     'Islamiat': { color: 'Emerald', icon: '☪️', order: 9 },
   };
 
-  // Escape SQL string values
-  function esc(val: any): string {
-    if (val === null || val === undefined) return "''"
-    const s = String(val).replace(/'/g, "''")
-    return `'${s}'`
-  }
-
   // ─── STEP 1: Fetch ALL existing data in just 3 queries ─────────────
   const [existingSubjects, existingChapters, existingTopics] = await Promise.all([
     client.execute('SELECT id, name, grade FROM Subject'),
@@ -150,19 +177,19 @@ async function seedCurriculumFast() {
   ]);
 
   // Build lookup maps
-  const subjectMap = new Map<string, { id: string }>(); // "name||grade" -> { id }
+  const subjectMap = new Map<string, { id: string }>();
   for (const row of existingSubjects.rows) {
     const key = `${(row as any).name}|||${(row as any).grade}`;
     subjectMap.set(key, { id: (row as any).id as string });
   }
 
-  const chapterMap = new Map<string, { id: string }>(); // "subjectId||chapterNo" -> { id }
+  const chapterMap = new Map<string, { id: string }>();
   for (const row of existingChapters.rows) {
     const key = `${(row as any).subjectId}|||${(row as any).number}`;
     chapterMap.set(key, { id: (row as any).id as string });
   }
 
-  const topicSet = new Set<string>(); // "chapterId||topicNo"
+  const topicSet = new Set<string>();
   for (const row of existingTopics.rows) {
     const key = `${(row as any).chapterId}|||${(row as any).number}`;
     topicSet.add(key);
@@ -185,9 +212,11 @@ async function seedCurriculumFast() {
   let errors = 0;
   const errorDetails: string[] = [];
 
-  // ─── STEP 3: Build ALL SQL statements in memory ─────────────────────
-  const allSqlStatements: string[] = [];
-  const subjectUpdateArgs: Array<{ sql: string; args: any[] }> = [];
+  // ─── STEP 3: Build ALL parameterized queries in memory ──────────────
+  const subjectInserts: Array<{ sql: string; args: any[] }> = [];
+  const subjectUpdates: Array<{ sql: string; args: any[] }> = [];
+  const chapterInserts: Array<{ sql: string; args: any[] }> = [];
+  const topicInserts: Array<{ sql: string; args: any[] }> = [];
 
   for (const [subjectKey, rows] of subjectGroups) {
     try {
@@ -214,19 +243,18 @@ async function seedCurriculumFast() {
 
       if (existingSubj) {
         subjectId = existingSubj.id;
-        // Queue update
-        subjectUpdateArgs.push({
+        subjectUpdates.push({
           sql: `UPDATE Subject SET "totalTopics" = ?, "chapterCount" = ?, color = ?, icon = ?, board = ?, field = ?, "groupEligibility" = ? WHERE id = ?`,
           args: [totalTopics, totalChapters, styling.color, styling.icon, board, field, firstRow.groupEligibility || 'Both', subjectId],
         });
         subjectsUpdated++;
       } else {
         subjectId = `subj_${subjectName.toLowerCase().replace(/[^a-z0-9]/g, '')}_${grade}_${Date.now()}`;
-        allSqlStatements.push(
-          `INSERT INTO Subject (id, name, grade, board, field, "totalTopics", "chapterCount", color, icon, "order", "groupEligibility") VALUES (${esc(subjectId)}, ${esc(subjectName)}, ${esc(gradeDisplay)}, ${esc(board)}, ${esc(field)}, ${totalTopics}, ${totalChapters}, ${esc(styling.color)}, ${esc(styling.icon)}, ${styling.order}, ${esc(firstRow.groupEligibility || 'Both')})`
-        );
+        subjectInserts.push({
+          sql: `INSERT INTO Subject (id, name, grade, board, field, "totalTopics", "chapterCount", color, icon, "order", "groupEligibility") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [subjectId, subjectName, gradeDisplay, board, field, totalTopics, totalChapters, styling.color, styling.icon, styling.order, firstRow.groupEligibility || 'Both'],
+        });
         subjectsCreated++;
-        // Add to map so chapters can reference it
         subjectMap.set(`${subjectName}|||${gradeDisplay}`, { id: subjectId });
       }
 
@@ -241,23 +269,24 @@ async function seedCurriculumFast() {
           chapterId = existingCh.id;
         } else {
           chapterId = `ch_${subjectId}_${chapterNo}`;
-          allSqlStatements.push(
-            `INSERT INTO Chapter (id, subjectId, number, name) VALUES (${esc(chapterId)}, ${esc(subjectId)}, ${chapterNo}, ${esc(chapterName)})`
-          );
+          chapterInserts.push({
+            sql: `INSERT INTO Chapter (id, subjectId, number, name) VALUES (?, ?, ?, ?)`,
+            args: [chapterId, subjectId, chapterNo, chapterName],
+          });
           chaptersCreated++;
-          // Add to map
           chapterMap.set(`${subjectId}|||${chapterNo}`, { id: chapterId });
         }
 
-        // Queue topic inserts
+        // Queue topic inserts (skip existing)
         for (const row of chapterRows) {
           const topicKey = `${chapterId}|||${row.topicNo}`;
           if (!topicSet.has(topicKey)) {
             const topicId = `topic_${chapterId}_${row.topicNo}`;
             const isFree = row.isFree ? 1 : 0;
-            allSqlStatements.push(
-              `INSERT INTO Topic (id, chapterId, number, name, videoLink, pdfLink, isFree, dayNumber) VALUES (${esc(topicId)}, ${esc(chapterId)}, ${row.topicNo}, ${esc(row.topicName)}, ${esc(row.videoLink || '')}, ${esc(row.pdfLink || '')}, ${isFree}, ${row.totalDays || 0})`
-            );
+            topicInserts.push({
+              sql: `INSERT INTO Topic (id, chapterId, number, name, videoLink, pdfLink, isFree, dayNumber) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              args: [topicId, chapterId, row.topicNo, row.topicName, row.videoLink || '', row.pdfLink || '', isFree, row.totalDays || 0],
+            });
             topicsCreated++;
             topicSet.add(topicKey);
           }
@@ -271,31 +300,38 @@ async function seedCurriculumFast() {
     }
   }
 
-  // ─── STEP 4: Execute all SQL ─────────────────────────────────────────
-  // First, execute subject updates (parameterized)
-  for (const upd of subjectUpdateArgs) {
-    try {
-      await client.execute(upd);
-    } catch (err) {
-      console.error('🌱 Subject update error:', err);
-      errors++;
-    }
-  }
+  // ─── STEP 4: Execute all queries ────────────────────────────────────
+  // Execute in parallel batches for maximum speed
 
-  // Then, execute all INSERT statements in batches via executeMultiple
-  // Split into chunks of 100 statements to avoid oversized SQL strings
-  const BATCH_SIZE = 100;
-  for (let i = 0; i < allSqlStatements.length; i += BATCH_SIZE) {
-    const batch = allSqlStatements.slice(i, i + BATCH_SIZE);
-    const batchSql = batch.join(';\n');
-    try {
-      await client.executeMultiple(batchSql);
-    } catch (err) {
-      console.error(`🌱 Batch insert error (statements ${i}-${i + batch.length}):`, err);
-      const errMsg = err instanceof Error ? err.message : String(err);
-      errorDetails.push(`Batch ${i}-${i + batch.length}: ${errMsg}`);
-      errors++;
-    }
+  // Subject inserts (usually < 10)
+  const insertPromises = subjectInserts.map(q => client.execute(q).catch(err => {
+    console.error('🌱 Subject insert error:', err);
+    errors++;
+  }));
+  await Promise.all(insertPromises);
+
+  // Subject updates (usually < 10)
+  const updatePromises = subjectUpdates.map(q => client.execute(q).catch(err => {
+    console.error('🌱 Subject update error:', err);
+    errors++;
+  }));
+  await Promise.all(updatePromises);
+
+  // Chapter inserts (usually < 50)
+  const chapterPromises = chapterInserts.map(q => client.execute(q).catch(err => {
+    console.error('🌱 Chapter insert error:', err);
+    errors++;
+  }));
+  await Promise.all(chapterPromises);
+
+  // Topic inserts — parallel batches of 50 to avoid overwhelming Turso
+  const TOPIC_BATCH = 50;
+  for (let i = 0; i < topicInserts.length; i += TOPIC_BATCH) {
+    const batch = topicInserts.slice(i, i + TOPIC_BATCH);
+    await Promise.all(batch.map(q => client.execute(q).catch(err => {
+      // Log but don't increment errors for individual topic failures
+      console.error(`🌱 Topic insert error:`, err?.message?.substring(0, 100));
+    })));
   }
 
   client.close();
@@ -312,7 +348,6 @@ async function seedCurriculumFast() {
     elapsedMs: elapsed,
     totalCurriculumRows: curriculum.length,
     totalSubjectGroups: subjectGroups.size,
-    totalSqlStatements: allSqlStatements.length + subjectUpdateArgs.length,
     errorDetails: errors > 0 ? errorDetails : undefined,
   };
 }

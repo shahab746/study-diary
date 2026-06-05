@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // Get phone from query param (sent by frontend after auth)
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
+    const isTurso = !!process.env.LIBSQL_URL;
 
-    // Fetch user profile from local database — lean select for performance
+    // ─── STEP 1: Fetch student profile ────────────────────────────────
     let student = null;
     let academicGroup = '';
     const studentSelect = {
@@ -30,73 +30,147 @@ export async function GET(request: Request) {
         student = localStudent;
       }
     }
-
-    // Fallback: if no phone param, try first student in DB
     if (!student) {
-      const localStudent = await db.student.findFirst({
-        select: studentSelect,
-      });
+      const localStudent = await db.student.findFirst({ select: studentSelect });
       if (localStudent) {
         academicGroup = localStudent.academicGroup || '';
         student = localStudent;
       }
     }
 
-    // Fetch subjects filtered by the student's grade
-    // The DB stores grades as strings like "9", "10", or "Grade 10" — normalize
     const studentGrade = String(student?.grade || '10');
     const gradeVariants = [studentGrade, `Grade ${studentGrade}`];
-    const subjects = await db.subject.findMany({
-      where: { grade: { in: gradeVariants } },
-      orderBy: { order: 'asc' },
-      include: {
-        chapters: {
-          orderBy: { number: 'asc' },
+
+    // ─── STEP 2: Fetch ALL data in batch queries ──────────────────────
+    // CRITICAL: Use batch queries instead of N+1 includes to avoid 
+    // hundreds of sequential HTTP round-trips to Turso
+    
+    let subjects: any[];
+    let chapters: any[];
+    let topics: any[];
+    let progress: any[];
+    let specialCourses: any[];
+
+    if (isTurso) {
+      // Direct SQL — 5 queries total instead of 500+
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createClient } = require('@libsql/client') as typeof import('@libsql/client');
+      const client = createClient({
+        url: process.env.LIBSQL_URL!,
+        authToken: process.env.LIBSQL_AUTH_TOKEN || undefined,
+      });
+
+      const gradePlaceholders = gradeVariants.map(() => '?').join(', ');
+      
+      const [subjectsResult, chaptersResult, topicsResult, progressResult, specialCoursesResult] = await Promise.all([
+        client.execute({
+          sql: `SELECT * FROM Subject WHERE "grade" IN (${gradePlaceholders}) ORDER BY "order" ASC`,
+          args: gradeVariants,
+        }),
+        client.execute(`SELECT * FROM Chapter ORDER BY number ASC`),
+        client.execute(`SELECT * FROM Topic ORDER BY number ASC`),
+        client.execute({
+          sql: 'SELECT * FROM Progress WHERE "studentPhone" = ?',
+          args: [student?.phone || ''],
+        }),
+        client.execute({
+          sql: `SELECT * FROM SpecialCourse WHERE "grade" IN (${gradePlaceholders}) ORDER BY "order" ASC`,
+          args: gradeVariants,
+        }),
+      ]);
+
+      client.close();
+
+      // Convert to camelCase objects
+      const toCamel = (row: any) => {
+        const result: any = {};
+        for (const [key, value] of Object.entries(row as Record<string, any>)) {
+          const camelKey = key.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
+          result[camelKey] = value;
+        }
+        return result;
+      };
+
+      subjects = subjectsResult.rows.map(toCamel);
+      chapters = chaptersResult.rows.map(toCamel);
+      topics = topicsResult.rows.map(toCamel);
+      progress = progressResult.rows.map(toCamel);
+      specialCourses = specialCoursesResult.rows.map(toCamel);
+    } else {
+      // Local: use Prisma with includes (efficient locally)
+      const [subjectsResult, allProgress, specialCoursesResult] = await Promise.all([
+        db.subject.findMany({
+          where: { grade: { in: gradeVariants } },
+          orderBy: { order: 'asc' },
           include: {
-            topics: {
+            chapters: {
               orderBy: { number: 'asc' },
+              include: {
+                topics: { orderBy: { number: 'asc' } },
+              },
             },
           },
-        },
-      },
-    });
+        }),
+        db.progress.findMany({ where: { studentPhone: student?.phone || '' } }),
+        db.specialCourse.findMany({
+          where: { grade: { in: gradeVariants } },
+          orderBy: { order: 'asc' },
+        }),
+      ]);
 
-    // Filter subjects by Group_Eligibility based on user's Academic_Group
-    // A subject is visible if:
-    //   - groupEligibility is "Both" (everyone can see it)
-    //   - groupEligibility matches the user's academicGroup exactly
-    // e.g. Biology student sees "Both" + "Biology" but NOT "Computer Science"
-    const eligibleSubjects = subjects.filter(subject => {
+      subjects = subjectsResult;
+      progress = allProgress;
+      specialCourses = specialCoursesResult;
+      chapters = []; // Not needed for Prisma (already nested)
+      topics = [];   // Not needed for Prisma (already nested)
+    }
+
+    // ─── STEP 3: Assemble relationships in memory (Turso only) ────────
+    if (isTurso) {
+      // Build lookup maps for O(1) access
+      const chaptersBySubject = new Map<string, any[]>();
+      for (const ch of chapters) {
+        const list = chaptersBySubject.get(ch.subjectId) || [];
+        list.push(ch);
+        chaptersBySubject.set(ch.subjectId, list);
+      }
+
+      const topicsByChapter = new Map<string, any[]>();
+      for (const t of topics) {
+        const list = topicsByChapter.get(t.chapterId) || [];
+        list.push(t);
+        topicsByChapter.set(t.chapterId, list);
+      }
+
+      // Assemble subjects with nested chapters & topics
+      for (const subject of subjects) {
+        const subjectChapters = chaptersBySubject.get(subject.id) || [];
+        for (const ch of subjectChapters) {
+          ch.topics = topicsByChapter.get(ch.id) || [];
+        }
+        subject.chapters = subjectChapters;
+      }
+    }
+
+    // ─── STEP 4: Filter subjects by Group_Eligibility ─────────────────
+    const eligibleSubjects = subjects.filter((subject: any) => {
       const eligibility = subject.groupEligibility || 'Both';
-      
       if (eligibility === 'Both') return true;
       if (academicGroup && eligibility === academicGroup) return true;
-      // If no academic group specified, show all (backward compatibility)
       if (!academicGroup) return true;
       return false;
     });
 
-    // Fetch progress from local database
-    const progress = await db.progress.findMany({
-      where: { studentPhone: student?.phone || '' },
-    });
+    // ─── STEP 5: Compute per-subject progress ─────────────────────────
+    const progressSet = new Set(
+      progress.filter((p: any) => p.completed).map((p: any) => p.topicId)
+    );
 
-    // Fetch special courses filtered by student's grade
-    const specialCourses = await db.specialCourse.findMany({
-      where: { grade: { in: gradeVariants } },
-      orderBy: { order: 'asc' },
-    });
-
-    // Compute per-subject progress (using eligible subjects only)
-    const subjectProgress = eligibleSubjects.map(subject => {
-      const allTopics = subject.chapters.flatMap(ch => ch.topics);
-      const completedTopics = allTopics.filter(topic =>
-        progress.some(p => p.topicId === topic.id && p.completed)
-      );
-
-      // For free users, only count "isFree" topics as available
-      const isFreeUser = student?.status === 'free';
-      const availableTopics = isFreeUser ? allTopics.filter(t => t.isFree) : allTopics;
+    const isFreeUser = student?.status === 'free';
+    const subjectProgress = eligibleSubjects.map((subject: any) => {
+      const allTopics = subject.chapters.flatMap((ch: any) => ch.topics || []);
+      const completedTopics = allTopics.filter((t: any) => progressSet.has(t.id));
+      const availableTopics = isFreeUser ? allTopics.filter((t: any) => t.isFree) : allTopics;
 
       return {
         subjectId: subject.id,
@@ -104,35 +178,35 @@ export async function GET(request: Request) {
         color: subject.color,
         icon: subject.icon,
         totalTopics: availableTopics.length,
-        completedTopics: completedTopics.filter(t => 
-          isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
+        completedTopics: completedTopics.filter((t: any) =>
+          isFreeUser ? allTopics.find((at: any) => at.id === t.id)?.isFree : true
         ).length,
-        progressPct: availableTopics.length > 0 ? Math.round((completedTopics.filter(t => 
-          isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
-        ).length / availableTopics.length) * 100) : 0,
+        progressPct: availableTopics.length > 0
+          ? Math.round((completedTopics.filter((t: any) =>
+              isFreeUser ? allTopics.find((at: any) => at.id === t.id)?.isFree : true
+            ).length / availableTopics.length) * 100)
+          : 0,
         chapterCount: subject.chapters.length,
-        isLocked: isFreeUser && subject.name !== 'Physics', // Free users only see Physics
-        chapters: subject.chapters.map(ch => ({
+        isLocked: isFreeUser && subject.name !== 'Physics',
+        chapters: subject.chapters.map((ch: any) => ({
           id: ch.id,
           number: ch.number,
           name: ch.name,
-          totalTopics: ch.topics.length,
-          completedTopics: ch.topics.filter(t =>
-            progress.some(p => p.topicId === t.id && p.completed)
-          ).length,
+          totalTopics: (ch.topics || []).length,
+          completedTopics: (ch.topics || []).filter((t: any) => progressSet.has(t.id)).length,
         })),
       };
     });
 
-    // === PARALLEL TASK ASSIGNMENT ALGORITHM ===
+    // ─── STEP 6: Build today's tasks ──────────────────────────────────
     const pacingGoal = student?.pacingGoal || '5M';
     const pacingMonths: Record<string, number> = { '3M': 3, '5M': 5, '6M': 6 };
     const months = pacingMonths[pacingGoal] || 5;
     const totalDaysInPlan = months * 30;
 
-    const allTopics = eligibleSubjects.flatMap(s => s.chapters.flatMap(ch => ch.topics));
-    const totalTopicsCount = allTopics.length;
-    const totalCompleted = progress.filter(p => p.completed).length;
+    const allTopicsFlat = eligibleSubjects.flatMap((s: any) => s.chapters.flatMap((ch: any) => ch.topics || []));
+    const totalTopicsCount = allTopicsFlat.length;
+    const totalCompleted = progress.filter((p: any) => p.completed).length;
     const totalRemaining = totalTopicsCount - totalCompleted;
 
     const currentDay = student?.currentDay || 1;
@@ -140,7 +214,6 @@ export async function GET(request: Request) {
     const topicsPerDay = totalRemaining > 0 ? Math.ceil(totalRemaining / daysLeft) : 0;
 
     // Build queues per subject
-    const isFreeUser = student?.status === 'free';
     const subjectQueues: Array<{
       subjectName: string;
       subjectColor: string;
@@ -161,25 +234,22 @@ export async function GET(request: Request) {
     }> = [];
 
     for (const subject of eligibleSubjects) {
-      // Free users only get tasks from unlocked subjects
       if (isFreeUser && subject.name !== 'Physics') continue;
 
-      const allSubjectTopics = subject.chapters.flatMap(ch => ch.topics);
-      const completedCount = allSubjectTopics.filter(t =>
-        progress.some(p => p.topicId === t.id && p.completed)
-      ).length;
+      const allSubjectTopics = subject.chapters.flatMap((ch: any) => ch.topics || []);
+      const completedCount = allSubjectTopics.filter((t: any) => progressSet.has(t.id)).length;
 
       const remaining = allSubjectTopics
-        .filter(t => !progress.some(p => p.topicId === t.id && p.completed))
-        .filter(t => isFreeUser ? t.isFree : true) // Free users only see free topics
-        .sort((a, b) => {
-          const chA = subject.chapters.find(ch => ch.id === a.chapterId);
-          const chB = subject.chapters.find(ch => ch.id === b.chapterId);
+        .filter((t: any) => !progressSet.has(t.id))
+        .filter((t: any) => isFreeUser ? t.isFree : true)
+        .sort((a: any, b: any) => {
+          const chA = subject.chapters.find((ch: any) => ch.id === a.chapterId);
+          const chB = subject.chapters.find((ch: any) => ch.id === b.chapterId);
           if (chA && chB && chA.number !== chB.number) return chA.number - chB.number;
           return a.number - b.number;
         })
-        .map(t => {
-          const chapter = subject.chapters.find(ch => ch.id === t.chapterId);
+        .map((t: any) => {
+          const chapter = subject.chapters.find((ch: any) => ch.id === t.chapterId);
           return {
             topicId: t.id,
             topicName: t.name,
@@ -207,7 +277,6 @@ export async function GET(request: Request) {
 
     // Calculate proportional allocation
     const totalRemainingTopics = subjectQueues.reduce((sum, q) => sum + q.remaining.length, 0);
-
     const subjectTaskAllocation = subjectQueues.map(q => {
       const share = totalRemainingTopics > 0 ? q.remaining.length / totalRemainingTopics : 0;
       const allocated = q.remaining.length > 0 ? Math.max(1, Math.round(topicsPerDay * share)) : 0;
@@ -258,7 +327,7 @@ export async function GET(request: Request) {
             subjectColor: sq.subjectColor,
             chapterName: topic.chapterName,
             completed: false,
-            videoLink: toValidUrl(isFreeUser ? '' : topic.videoLink), // Free users don't see videos
+            videoLink: toValidUrl(isFreeUser ? '' : topic.videoLink),
             pdfLink: toValidUrl(topic.pdfLink),
             priority,
             subjectIcon: sq.subjectIcon,
@@ -282,10 +351,11 @@ export async function GET(request: Request) {
     ];
 
     // Focus score
-    const todayDone = finalTodayTasks.filter(t =>
-      progress.some(p => p.topicId === t.topicId && p.completed)
-    ).length;
-    const focusScore = finalTodayTasks.length > 0 ? Math.round((todayDone / finalTodayTasks.length) * 100) : 0;
+    const focusScore = finalTodayTasks.length > 0
+      ? Math.round((finalTodayTasks.filter(t =>
+          progressSet.has(t.topicId)
+        ).length / finalTodayTasks.length) * 100)
+      : 0;
 
     // Streak
     const streak = calculateStreak(progress);
@@ -322,8 +392,8 @@ export async function GET(request: Request) {
     console.error('Error fetching data:', error);
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined;
-    return NextResponse.json({ 
-      error: 'Failed to fetch data', 
+    return NextResponse.json({
+      error: 'Failed to fetch data',
       detail: errMsg,
       stack: errStack,
     }, { status: 500 });
@@ -336,20 +406,20 @@ function toValidUrl(value: string): string {
   return '';
 }
 
-function completedCountForMonth(progress: { completed: boolean; dateCompleted: Date | null }[], month: number): number {
-  return progress.filter(p => {
+function completedCountForMonth(progress: any[], month: number): number {
+  return progress.filter((p: any) => {
     if (!p.completed || !p.dateCompleted) return false;
     const d = new Date(p.dateCompleted);
     return d.getMonth() === month - 1;
   }).length;
 }
 
-function calculateStreak(progress: { completed: boolean; dateCompleted: Date | null }[]): number {
+function calculateStreak(progress: any[]): number {
   const completedDates = progress
-    .filter(p => p.completed && p.dateCompleted)
-    .map(p => new Date(p.dateCompleted!).toDateString())
-    .filter((v, i, a) => a.indexOf(v) === i)
-    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    .filter((p: any) => p.completed && p.dateCompleted)
+    .map((p: any) => new Date(p.dateCompleted).toDateString())
+    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+    .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
 
   if (completedDates.length === 0) return 0;
 

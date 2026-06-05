@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { writeProgressToSheet } from '@/lib/sheet-sync';
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +30,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Update student's topicsDone count
+    // 2. Update student's topicsDone count (use a simple count query)
     const totalCompleted = await db.progress.count({
       where: {
         studentPhone,
@@ -51,26 +50,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Write back to Google Sheet (async, non-blocking)
-    // Get the topic's subject and chapter info for the sheet reference
-    const topic = await db.topic.findUnique({
-      where: { id: topicId },
-      include: { chapter: { include: { subject: true } } },
-    });
-
-    if (topic) {
-      // Create a sheet-compatible topic ID (Subject_Chapter_Topic format)
-      const sheetTopicId = `${topic.chapter.subject.name}_${topic.chapter.number}_${topic.number}`;
-      
-      // Fire-and-forget write to Google Sheet
-      writeProgressToSheet(studentPhone, sheetTopicId, completed).catch(err => {
-        console.warn('Sheet write-back failed (non-critical):', err.message);
-      });
-    }
-
     return NextResponse.json({ success: true, progress });
   } catch (error) {
     console.error('Error updating progress:', error);
-    return NextResponse.json({ error: 'Failed to update progress' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Failed to update progress',
+      detail: error instanceof Error ? error.message : String(error),
+    }, { status: 500 });
   }
 }
