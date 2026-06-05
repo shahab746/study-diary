@@ -1,12 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-
-// Force dynamic rendering — this app is authenticated and can't be statically generated
-export const dynamic = 'force-dynamic';
 
 const inter = Inter({
   variable: "--font-inter",
@@ -30,12 +26,12 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#0B1020',
+  themeColor: '#000000',
 };
 
 export const metadata: Metadata = {
-  title: "Lecture Diary — Your Study Companion",
-  description: "A premium AI-powered learning platform. Track progress, manage pacing, and complete your curriculum with elegance.",
+  title: "Student's Diary — Lecture Tracker",
+  description: "Track lectures, manage study schedules, and crush your curriculum with elegance.",
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
@@ -63,9 +59,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          {children}
           <Toaster />
         </ThemeProvider>
       </body>
