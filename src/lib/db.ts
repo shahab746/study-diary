@@ -1,11 +1,8 @@
-// CRITICAL: Set DATABASE_URL before importing Prisma.
-// When using the Turso driver adapter on Vercel, DATABASE_URL is not used
-// for actual queries (the adapter handles that), but Prisma's generated
-// client still validates it at import time. If it's undefined, Prisma throws:
-// "URL_INVALID: The URL 'undefined' is not in a valid format"
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'file:./dummy.db';
-}
+// CRITICAL: Import prisma-init before any Prisma imports!
+// This sets DATABASE_URL to a safe default if it's undefined.
+// Prisma's generated client validates DATABASE_URL at import time
+// and crashes with "URL_INVALID: The URL 'undefined' is not valid" if missing.
+import './prisma-init';
 
 import { PrismaClient } from '@prisma/client'
 import { PrismaLibSQL } from '@prisma/adapter-libsql'
