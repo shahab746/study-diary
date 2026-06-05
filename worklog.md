@@ -44,3 +44,57 @@ Stage Summary:
 - Subject details now visible on both local and Vercel
 - App performance significantly improved by eliminating sequential query overhead
 - Vercel URL: https://lecture-diary-s24q.vercel.app
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Make Lecture Diary app mobile-friendly
+
+Work Log:
+- Read and analyzed all key UI files: page.tsx (1364 lines), globals.css, layout.tsx, store.ts, LoginPage.tsx, Sidebar.tsx, Header.tsx
+- Identified mobile-unfriendly patterns: cluttered topbar, oversized elements, missing touch targets, non-scrollable filter bars, desktop-only navigation
+- Comprehensive CSS overhaul in globals.css:
+  - Added detailed @media (max-width: 720px) responsive rules for every component
+  - Added @media (max-width: 380px) for extra-small phones
+  - Improved mobile bottom nav (floating pill design with gradient active state)
+  - Made stat cards, panels, lecture items, subject cards, insights, calendar all compact on mobile
+  - Filter bar now horizontally scrollable on mobile (no wrapping)
+  - Search keyboard shortcut badge hidden on mobile
+  - Login card adapts padding on mobile
+  - Added `.desktop-only` utility class
+  - Added `100dvh` for proper mobile viewport height
+  - Added touch-friendly improvements (tap highlight, overscroll, smooth scroll)
+- Updated Topbar component:
+  - Search placeholder shortened for mobile
+  - Theme toggle and notifications hidden on mobile (desktop-only)
+  - "New Session" button shows only icon on mobile (text hidden)
+- Updated MobileBottomNav:
+  - Changed icons (Home icon instead of LayoutDashboard)
+  - Added Search nav item replacing Calendar
+  - Added ARIA labels, keyboard navigation, role attributes
+  - Improved active state styling with gradient
+  - Added tap feedback (scale animation)
+- Updated SubjectDetailView:
+  - Smaller subject icon for mobile
+  - Back button shows only icon on mobile (text hidden)
+  - Chapter heading text smaller
+  - Progress bar track hidden on mobile (only percentage shown)
+  - Lecture play buttons have minimum touch target size
+- Updated DashboardView:
+  - "Export Week" button hidden on mobile
+- Updated layout.tsx:
+  - Added proper Viewport export for mobile (device-width, no zoom, cover)
+  - Added PWA manifest and Apple Web App meta
+  - Added theme-color for mobile browsers
+- Created public/manifest.json for PWA-like behavior
+- Tested across iPhone 16, iPhone SE (375px), iPad, and desktop viewports
+- All lint checks pass
+
+Stage Summary:
+- App is now fully mobile-responsive across all breakpoints
+- Bottom nav provides mobile navigation with 5 tabs: Home, Lectures, Subjects, Insights, Search
+- Touch targets are at least 38px for interactive elements
+- Filter bars scroll horizontally on mobile
+- Compact layout with reduced padding, font sizes on small screens
+- PWA manifest enables "Add to Home Screen" on mobile
+- Desktop experience is unchanged

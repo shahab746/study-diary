@@ -254,7 +254,7 @@ function Topbar({ onRecord }: { onRecord: () => void }) {
       <div className="search-box">
         <Search width={16} height={16} style={{ color: 'var(--text-muted)' }} />
         <input
-          placeholder="Search lectures, notes, topics..."
+          placeholder="Search..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           onKeyDown={e => {
@@ -266,12 +266,12 @@ function Topbar({ onRecord }: { onRecord: () => void }) {
         <span className="kbd">⌘K</span>
       </div>
       {mounted && (
-        <button className="icon-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle theme">
+        <button className="icon-btn desktop-only" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle theme">
           {theme === 'dark' ? <Sun width={16} height={16} /> : <Moon width={16} height={16} />}
         </button>
       )}
-      <button className="icon-btn" title="Notifications"><Bell width={16} height={16} /></button>
-      <button className="btn primary" onClick={onRecord}><Plus width={15} height={15} />New Session</button>
+      <button className="icon-btn desktop-only" title="Notifications"><Bell width={16} height={16} /></button>
+      <button className="btn primary" onClick={onRecord}><Plus width={15} height={15} /><span className="desktop-only">New Session</span></button>
     </div>
   );
 }
@@ -325,7 +325,7 @@ function DashboardView() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn ghost"><Download width={15} height={15} />Export Week</button>
+          <button className="btn ghost desktop-only"><Download width={15} height={15} />Export Week</button>
         </div>
       </div>
 
@@ -1131,16 +1131,16 @@ function SubjectDetailView() {
             <span className="sep">/</span>
             <span className="cur">{subjectDetail.name}</span>
           </div>
-          <h2 className="heading" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="subject-icon" style={{ background: color, width: 44, height: 44, borderRadius: 12 }}>
+          <h2 className="heading" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="subject-icon" style={{ background: color, width: 36, height: 36, borderRadius: 10, flexShrink: 0 }}>
               {getSubjectIcon(subjectDetail.name)}
             </div>
-            {subjectDetail.name}
+            <span style={{ fontSize: 'inherit' }}>{subjectDetail.name}</span>
           </h2>
           <p>{subjectDetail.chapterCount} chapters · {subjectDetail.totalTopics} topics · <span className="gradient-text">{totalProgress}%</span> complete</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn ghost" onClick={closeSubjectDetail}><ChevronLeft width={15} height={15} />Back</button>
+          <button className="btn ghost" onClick={closeSubjectDetail}><ChevronLeft width={15} height={15} /><span className="desktop-only">Back</span></button>
         </div>
       </div>
 
@@ -1157,14 +1157,14 @@ function SubjectDetailView() {
 
       {/* Chapters */}
       {subjectDetail.chapters.map(ch => (
-        <div key={ch.id} className="panel glass" style={{ marginBottom: 16 }}>
+        <div key={ch.id} className="panel glass" style={{ marginBottom: 12 }}>
           <div className="panel-head">
-            <div>
-              <h3 className="heading" style={{ fontSize: 16 }}>Ch {ch.number}: {ch.name}</h3>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 className="heading" style={{ fontSize: 15 }}>Ch {ch.number}: {ch.name}</h3>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{ch.completedTopics}/{ch.totalTopics} completed</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div className="progress-bar-track" style={{ width: 80, height: 5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <div className="progress-bar-track desktop-only" style={{ width: 80, height: 5 }}>
                 <div className="progress-bar-fill" style={{ width: `${ch.totalTopics > 0 ? (ch.completedTopics / ch.totalTopics) * 100 : 0}%`, background: color }}></div>
               </div>
               <span className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ch.totalTopics > 0 ? Math.round((ch.completedTopics / ch.totalTopics) * 100) : 0}%</span>
@@ -1185,6 +1185,7 @@ function SubjectDetailView() {
                 <div className="lecture-play" style={{
                   background: t.completed ? 'rgba(16,185,129,.12)' : 'var(--accent-soft)',
                   color: t.completed ? '#10B981' : '#7C3AED',
+                  minWidth: 38, minHeight: 38,
                 }}>
                   {t.completed ? <CheckCircle2 width={16} height={16} /> : <Play width={16} height={16} fill="currentColor" />}
                 </div>
@@ -1231,20 +1232,24 @@ function MobileBottomNav() {
   const { sidebarView, setSidebarView } = useStudyOS();
 
   const items: { id: ViewId; icon: React.ReactNode; label: string }[] = [
-    { id: 'dashboard', icon: <LayoutDashboard width={18} height={18} />, label: 'Dashboard' },
-    { id: 'lectures', icon: <BookOpen width={18} height={18} />, label: 'Lectures' },
-    { id: 'calendar', icon: <CalendarDays width={18} height={18} />, label: 'Calendar' },
-    { id: 'subjects', icon: <Library width={18} height={18} />, label: 'Subjects' },
-    { id: 'insights', icon: <Sparkles width={18} height={18} />, label: 'Insights' },
+    { id: 'dashboard', icon: <HomeIcon width={20} height={20} />, label: 'Home' },
+    { id: 'lectures', icon: <BookOpen width={20} height={20} />, label: 'Lectures' },
+    { id: 'subjects', icon: <Library width={20} height={20} />, label: 'Subjects' },
+    { id: 'insights', icon: <Sparkles width={20} height={20} />, label: 'Insights' },
+    { id: 'search', icon: <Search width={20} height={20} />, label: 'Search' },
   ];
 
   return (
-    <nav className="mobile-nav">
+    <nav className="mobile-nav" role="navigation" aria-label="Main navigation">
       {items.map(item => (
         <div
           key={item.id}
           className={`mobile-nav-item ${sidebarView === item.id ? 'active' : ''}`}
           onClick={() => setSidebarView(item.id)}
+          role="button"
+          tabIndex={0}
+          aria-label={item.label}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSidebarView(item.id); } }}
         >
           {item.icon}
           {item.label}

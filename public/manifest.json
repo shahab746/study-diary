@@ -1,0 +1,16 @@
+{
+  "name": "Lecture Diary",
+  "short_name": "LectureDiary",
+  "description": "Your Study Companion - Track, Pace, Complete",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B1020",
+  "theme_color": "#7C3AED",
+  "icons": [
+    {
+      "src": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
