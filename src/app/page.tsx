@@ -736,23 +736,30 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                     <span style={{ color: '#666', marginRight: 8 }}>{topic.number}.</span>
                     {topic.name}
                   </div>
-                  {topic.dayNumber > 0 && (
-                    <div style={{ marginTop: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {topic.dayNumber > 0 && (
                       <span className="difficulty-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>
                         Day {topic.dayNumber}
                       </span>
-                    </div>
-                  )}
+                    )}
+                    {topic.hasPdf && (
+                      <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
+                        <span className="difficulty-tag" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', cursor: 'pointer' }}>
+                          Notes
+                        </span>
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <div className="lecture-actions">
-                  {topic.hasPdf && (
-                    <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                  {topic.hasVideo && (
+                    <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
                       <button className="watch-btn">
-                        <FileText width={12} height={12} /> Notes
+                        <Play width={12} height={12} /> Watch
                       </button>
                     </a>
                   )}
-                  {!topic.hasPdf && !topic.hasVideo && topic.isFree === false && (
+                  {!topic.hasVideo && !topic.hasPdf && topic.isFree === false && (
                     <span style={{ fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Lock width={12} height={12} /> Premium
                     </span>
