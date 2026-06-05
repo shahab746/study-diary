@@ -73,9 +73,10 @@ export const authOptions: NextAuthOptions = {
           if (error instanceof Error && error.message.includes('disabled')) {
             throw error;
           }
-          // Unexpected errors
+          // Unexpected errors — include the actual error message for debugging
           console.error('🔐 Auth: Unexpected error during authorization:', error);
-          throw new Error('Unable to connect. Please try again in a moment.');
+          const errMsg = error instanceof Error ? error.message : String(error);
+          throw new Error(`Connection error: ${errMsg}`);
         }
       },
     }),

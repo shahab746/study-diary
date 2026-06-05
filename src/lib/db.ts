@@ -19,22 +19,40 @@ let _prismaClient: PrismaClient | undefined;
 function createPrismaClient(): PrismaClient {
   const libsqlUrl = process.env.LIBSQL_URL;
   const libsqlAuthToken = process.env.LIBSQL_AUTH_TOKEN;
+  const isVercel = !!process.env.VERCEL;
 
-  console.log(`📦 DB: Creating PrismaClient (LIBSQL_URL=${libsqlUrl ? 'set' : 'not set'}, AUTH_TOKEN=${libsqlAuthToken ? 'set' : 'not set'})`);
+  console.log(`📦 DB: Creating PrismaClient (LIBSQL_URL=${libsqlUrl ? 'set' : 'not set'}, AUTH_TOKEN=${libsqlAuthToken ? 'set' : 'not set'}, VERCEL=${isVercel})`);
 
   if (libsqlUrl) {
     try {
       // Turso / libSQL remote database (for Vercel deployment)
+      console.log(`📦 DB: Attempting LibSQL connection to ${libsqlUrl}`);
+
       const libsql = createClient({
         url: libsqlUrl,
-        authToken: libsqlAuthToken,
+        authToken: libsqlAuthToken || undefined,
       });
       const adapter = new PrismaLibSQL(libsql);
+
+      // When using driver adapters, DATABASE_URL is not used for actual queries.
+      // But Prisma still requires it for schema resolution. On Vercel, a local
+      // file path won't work, so we provide a dummy value.
+      if (!process.env.DATABASE_URL) {
+        process.env.DATABASE_URL = 'file:./dummy.db';
+      }
+
       const client = new PrismaClient({ adapter } as any);
       console.log('📦 DB: PrismaClient created with LibSQL adapter (Turso)');
       return client;
     } catch (err) {
-      console.error('📦 DB: Failed to create LibSQL adapter, falling back to SQLite:', err);
+      console.error('📦 DB: Failed to create LibSQL adapter:', err);
+      if (isVercel) {
+        // On Vercel, we can't fall back to local SQLite
+        throw new Error(
+          `Failed to connect to Turso database: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      console.log('📦 DB: Falling back to local SQLite');
     }
   }
 

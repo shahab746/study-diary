@@ -133,8 +133,14 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('🔐 Login API error:', error);
     const message = error instanceof Error ? error.message : String(error);
+    const errorType = error instanceof Error ? error.constructor.name : 'Unknown';
+    // Return detailed error info for debugging (remove debug info in production later)
     return NextResponse.json(
-      { success: false, error: 'Unable to connect. Please try again in a moment.', debug: message },
+      {
+        success: false,
+        error: `Database connection error: ${message}`,
+        debug: { message, errorType, stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined },
+      },
       { status: 500 }
     );
   }
