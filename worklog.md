@@ -1,100 +1,37 @@
 ---
 Task ID: 1
-Agent: Main
-Task: Fix Vercel build error (TypeError: Invalid URL during prerendering of /_not-found)
-
-Work Log:
-- Diagnosed root cause: next-auth SessionProvider tries to construct URL from NEXTAUTH_URL during SSG, but env var is missing during Vercel build
-- Created src/app/not-found.tsx (self-contained 404 page that bypasses root layout providers)
-- Fixed AuthProvider to skip SessionProvider during SSR/build (prevents Invalid URL error)
-- Made PrismaClient lazy via Proxy (only created on first access, not at import time)
-- Added Turso/libSQL adapter support for Vercel (remote SQLite-compatible database)
-- Added NEXTAUTH_SECRET fallback for build time
-- Added postinstall script for prisma generate
-- Added .env.example with documentation
-- Installed @prisma/adapter-libsql and @libsql/client packages
-- Updated prisma/schema.prisma to support driver adapters
-- Pushed all changes to GitHub (commit f4f5315)
-
-Stage Summary:
-- Build error fix pushed to shahab746/lecture_diary repo
-- User needs to: (1) set up Turso database, (2) configure env vars on Vercel, (3) redeploy
-- GitHub PAT was shared publicly - user should revoke it
----
-Task ID: 1
-Agent: main
-Task: Fix subjects not visible in app and optimize slow performance
-
-Work Log:
-- Read and analyzed db.ts, data API, subject detail API, store, and seed endpoint
-- Identified root cause: N+1 query pattern on Turso (500+ sequential HTTP round-trips per page load)
-- Rewrote /api/data/route.ts to use batch SQL queries (5 parallel queries instead of 500+ sequential)
-- Rewrote /api/subject/[subjectId]/route.ts with batch SQL and JOIN queries
-- Fixed seed endpoint to use parameterized queries instead of string concatenation (more reliable)
-- Added reset parameter to seed endpoint for clean re-seeding
-- Removed fire-and-forget sync calls from store that added latency on every page load
-- Verified app works locally with Agent Browser (login, dashboard, subjects, subject detail)
-- Pushed changes to GitHub (Vercel auto-deploys)
-- Reset and re-seeded Turso database: 9 subjects, 86 chapters, 1029 topics, 0 errors
-- Verified Vercel deployment works end-to-end with Agent Browser
-
-Stage Summary:
-- Root cause fixed: N+1 queries replaced with batch SQL (5 queries vs 500+)
-- Seed completed: 1029 topics (was 37), 86 chapters (was 1), 0 errors (was 9)
-- Subject details now visible on both local and Vercel
-- App performance significantly improved by eliminating sequential query overhead
-- Vercel URL: https://lecture-diary-s24q.vercel.app
-
----
-Task ID: 1
 Agent: Main Agent
-Task: Make Lecture Diary app mobile-friendly
+Task: Replace mock data with real sheets data respecting user auth
 
 Work Log:
-- Read and analyzed all key UI files: page.tsx (1364 lines), globals.css, layout.tsx, store.ts, LoginPage.tsx, Sidebar.tsx, Header.tsx
-- Identified mobile-unfriendly patterns: cluttered topbar, oversized elements, missing touch targets, non-scrollable filter bars, desktop-only navigation
-- Comprehensive CSS overhaul in globals.css:
-  - Added detailed @media (max-width: 720px) responsive rules for every component
-  - Added @media (max-width: 380px) for extra-small phones
-  - Improved mobile bottom nav (floating pill design with gradient active state)
-  - Made stat cards, panels, lecture items, subject cards, insights, calendar all compact on mobile
-  - Filter bar now horizontally scrollable on mobile (no wrapping)
-  - Search keyboard shortcut badge hidden on mobile
-  - Login card adapts padding on mobile
-  - Added `.desktop-only` utility class
-  - Added `100dvh` for proper mobile viewport height
-  - Added touch-friendly improvements (tap highlight, overscroll, smooth scroll)
-- Updated Topbar component:
-  - Search placeholder shortened for mobile
-  - Theme toggle and notifications hidden on mobile (desktop-only)
-  - "New Session" button shows only icon on mobile (text hidden)
-- Updated MobileBottomNav:
-  - Changed icons (Home icon instead of LayoutDashboard)
-  - Added Search nav item replacing Calendar
-  - Added ARIA labels, keyboard navigation, role attributes
-  - Improved active state styling with gradient
-  - Added tap feedback (scale animation)
-- Updated SubjectDetailView:
-  - Smaller subject icon for mobile
-  - Back button shows only icon on mobile (text hidden)
-  - Chapter heading text smaller
-  - Progress bar track hidden on mobile (only percentage shown)
-  - Lecture play buttons have minimum touch target size
-- Updated DashboardView:
-  - "Export Week" button hidden on mobile
-- Updated layout.tsx:
-  - Added proper Viewport export for mobile (device-width, no zoom, cover)
-  - Added PWA manifest and Apple Web App meta
-  - Added theme-color for mobile browsers
-- Created public/manifest.json for PWA-like behavior
-- Tested across iPhone 16, iPhone SE (375px), iPad, and desktop viewports
-- All lint checks pass
+- Read and analyzed all project files: page.tsx, store.ts, sheet-sync.ts, API routes, auth.ts, layout.tsx, LoginPage.tsx
+- Identified that page.tsx had hardcoded mock data (COURSES, INITIAL_TASKS, SCHEDULE_WEEKS, CALCULUS_LECTURES) that needed replacement
+- Mapped mock data to real store/API data:
+  - COURSES → store.subjects (SubjectProgress from /api/data)
+  - INITIAL_TASKS → store.todayTasks (TodayTask from /api/data)
+  - SCHEDULE_WEEKS → computed from store.student pacing data
+  - CALCULUS_LECTURES → store.subjectDetail (from /api/subject/[id])
+  - Stats → store.focusScore, store.streak, store.programWeek, etc.
+- Rewrote entire page.tsx (~1050 lines) to use useStudyOS() Zustand store
+- Added useSession() from next-auth/react for auth gating
+- Added LoginPage component for unauthenticated users
+- Added sign out button in sidebar
+- Added loading skeleton for dashboard while data loads
+- Made all task toggling use store.toggleTaskComplete() which calls /api/progress
+- Made subject detail use store.openSubjectDetail() which calls /api/subject/[id]
+- Computed schedule weeks from real student pacing data (startDate, totalDays, currentDay)
+- Fixed React hooks rules violations (useCallback before conditional returns)
+- Fixed setState-in-effect lint error (focus timer)
+- Added AuthProvider (SessionProvider) to root layout.tsx
+- Added null-safe handling for useSession() during SSR
+- Build passes clean, lint passes clean
+- Dev server running on port 3000, returns 200
+- Browser verified: login page renders correctly for unauthenticated users
 
 Stage Summary:
-- App is now fully mobile-responsive across all breakpoints
-- Bottom nav provides mobile navigation with 5 tabs: Home, Lectures, Subjects, Insights, Search
-- Touch targets are at least 38px for interactive elements
-- Filter bars scroll horizontally on mobile
-- Compact layout with reduced padding, font sizes on small screens
-- PWA manifest enables "Add to Home Screen" on mobile
-- Desktop experience is unchanged
+- All mock data replaced with real data from Zustand store + API
+- Auth gating works: unauthenticated → login page, authenticated → dashboard with real data
+- Subject detail view fetches real chapters/topics from API
+- Task completion persists to database via /api/progress
+- Schedule computed from real pacing data
+- Sign out functionality added

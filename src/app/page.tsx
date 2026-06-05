@@ -1,146 +1,39 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
+import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
+import { LoginPage } from '@/components/auth/LoginPage';
 import {
   Home as HomeIcon, ListTodo, BookOpen, CalendarDays, Timer, Download, Moon, Sun,
   Search, Plus, Star, Clock, Play, MoreHorizontal, X, ChevronLeft,
-  Check, Flame, RotateCcw, Sigma, Cpu, Zap, BookOpenText, ArrowLeft,
-  FileText, Menu
+  Check, Flame, RotateCcw, BookOpenText, ArrowLeft,
+  FileText, Menu, LogOut, Sigma, Cpu, Zap, Beaker, Atom, Pi, Landmark,
+  ExternalLink, FileText as PdfIcon, Lock
 } from 'lucide-react';
+
+// ============================================
+// ICON MAP
+// ============================================
+const ICON_MAP: Record<string, React.ReactNode> = {
+  sigma: <Sigma width={20} height={20} />,
+  cpu: <Cpu width={20} height={20} />,
+  zap: <Zap width={20} height={20} />,
+  book: <BookOpen width={20} height={20} />,
+  beaker: <Beaker width={20} height={20} />,
+  atom: <Atom width={20} height={20} />,
+  pi: <Pi width={20} height={20} />,
+  landmark: <Landmark width={20} height={20} />,
+};
+function getIcon(iconName: string): React.ReactNode {
+  return ICON_MAP[iconName?.toLowerCase()] || <BookOpen width={20} height={20} />;
+}
 
 // ============================================
 // TYPES
 // ============================================
 type ViewId = 'today' | 'tasks' | 'courses' | 'schedule' | 'focus-timer' | 'export';
-
-interface Course {
-  id: string;
-  name: string;
-  instructor: string;
-  color: string;
-  totalLectures: number;
-  completedLectures: number;
-  semester: number;
-  icon: React.ReactNode;
-}
-
-interface Task {
-  id: string;
-  title: string;
-  courseName: string;
-  courseId: string;
-  lectureNum: number;
-  priority: 'high' | 'medium' | 'low';
-  duration: number;
-  completed: boolean;
-  color: string;
-  instructor: string;
-}
-
-interface WeekSchedule {
-  id: number;
-  weekNum: number;
-  dateRange: string;
-  courses: { name: string; lectures: string; color: string }[];
-  completed: boolean;
-}
-
-interface Lecture {
-  id: string;
-  number: number;
-  title: string;
-  difficulty: 'easy' | 'medium' | 'hard' | null;
-  completed: boolean;
-  notes: string;
-}
-
-// ============================================
-// MOCK DATA
-// ============================================
-const COURSES: Course[] = [
-  { id: 'calc1', name: 'Calculus 1', instructor: 'Prof. Leonard', color: '#8B5CF6', totalLectures: 36, completedLectures: 0, semester: 1, icon: <Sigma width={20} height={20} /> },
-  { id: 'prog1', name: 'Programming 1', instructor: 'MIT 6.0001', color: '#3B82F6', totalLectures: 22, completedLectures: 0, semester: 1, icon: <Cpu width={20} height={20} /> },
-  { id: 'circuits', name: 'Circuits', instructor: 'MIT 6.002', color: '#F59E0B', totalLectures: 30, completedLectures: 0, semester: 1, icon: <Zap width={20} height={20} /> },
-  { id: 'nand2tetris', name: 'Nand2Tetris', instructor: 'N2T', color: '#EF4444', totalLectures: 12, completedLectures: 0, semester: 1, icon: <Cpu width={20} height={20} /> },
-  { id: 'linear', name: 'Linear Algebra', instructor: 'Prof. Leonard', color: '#10B981', totalLectures: 34, completedLectures: 0, semester: 2, icon: <Sigma width={20} height={20} /> },
-  { id: 'prog2', name: 'Programming 2', instructor: 'MIT 6.0002', color: '#3B82F6', totalLectures: 20, completedLectures: 0, semester: 2, icon: <BookOpen width={20} height={20} /> },
-  { id: 'signals', name: 'Signals Intro', instructor: 'MIT 6.003', color: '#EC4899', totalLectures: 20, completedLectures: 0, semester: 2, icon: <Zap width={20} height={20} /> },
-];
-
-const INITIAL_TASKS: Task[] = [
-  { id: 't1', title: 'Lines, Angle of Inclination & Distance Formula', courseName: 'Calculus 1', courseId: 'calc1', lectureNum: 1, priority: 'high', duration: 65, completed: false, color: '#8B5CF6', instructor: 'Prof. Leonard' },
-  { id: 't2', title: 'What is Computation?', courseName: 'Programming 1', courseId: 'prog1', lectureNum: 1, priority: 'medium', duration: 65, completed: false, color: '#3B82F6', instructor: 'MIT 6.0001' },
-  { id: 't3', title: 'Introduction and Lumped Abstraction', courseName: 'Circuits', courseId: 'circuits', lectureNum: 1, priority: 'low', duration: 65, completed: false, color: '#F59E0B', instructor: 'MIT 6.002' },
-  { id: 't4', title: 'Boolean Logic', courseName: 'Nand2Tetris', courseId: 'nand2tetris', lectureNum: 1, priority: 'low', duration: 65, completed: false, color: '#EF4444', instructor: 'N2T' },
-];
-
-const SCHEDULE_WEEKS: WeekSchedule[] = [
-  { id: 1, weekNum: 1, dateRange: 'May 5 - May 11', courses: [
-    { name: 'Calculus 1', lectures: 'L1-3', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L1-2', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L1-3', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L1-1', color: '#EF4444' },
-  ], completed: false },
-  { id: 2, weekNum: 2, dateRange: 'May 12 - May 18', courses: [
-    { name: 'Calculus 1', lectures: 'L4-7', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L3-4', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L4-6', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L2-2', color: '#EF4444' },
-  ], completed: false },
-  { id: 3, weekNum: 3, dateRange: 'May 19 - May 25', courses: [
-    { name: 'Calculus 1', lectures: 'L8-11', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L5-6', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L7-9', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L3-3', color: '#EF4444' },
-  ], completed: false },
-  { id: 4, weekNum: 4, dateRange: 'May 26 - Jun 1', courses: [
-    { name: 'Calculus 1', lectures: 'L12-15', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L7-8', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L10-12', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L4-4', color: '#EF4444' },
-  ], completed: false },
-  { id: 5, weekNum: 5, dateRange: 'Jun 2 - Jun 8', courses: [
-    { name: 'Calculus 1', lectures: 'L16-19', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L9-10', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L13-15', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L5-5', color: '#EF4444' },
-  ], completed: false },
-  { id: 6, weekNum: 6, dateRange: 'Jun 9 - Jun 15', courses: [
-    { name: 'Calculus 1', lectures: 'L20-23', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L11-12', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L16-18', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L6-6', color: '#EF4444' },
-  ], completed: false },
-  { id: 7, weekNum: 7, dateRange: 'Jun 16 - Jun 22', courses: [
-    { name: 'Calculus 1', lectures: 'L24-27', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L13-14', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L19-21', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L7-7', color: '#EF4444' },
-  ], completed: false },
-  { id: 8, weekNum: 8, dateRange: 'Jun 23 - Jun 29', courses: [
-    { name: 'Calculus 1', lectures: 'L28-31', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L15-16', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L22-24', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L8-8', color: '#EF4444' },
-  ], completed: false },
-  { id: 9, weekNum: 9, dateRange: 'Jun 30 - Jul 6', courses: [
-    { name: 'Calculus 1', lectures: 'L32-36', color: '#8B5CF6' },
-    { name: 'Programming 1', lectures: 'L17-22', color: '#3B82F6' },
-    { name: 'Circuits', lectures: 'L25-30', color: '#F59E0B' },
-    { name: 'Nand2Tetris', lectures: 'L9-12', color: '#EF4444' },
-  ], completed: false },
-];
-
-const CALCULUS_LECTURES: Lecture[] = [
-  { id: 'cl1', number: 1, title: 'Lines, Angle of Inclination & Distance Formula', difficulty: 'easy', completed: false, notes: '' },
-  { id: 'cl2', number: 2, title: 'Functions, Domain & Range', difficulty: 'easy', completed: false, notes: '' },
-  { id: 'cl3', number: 3, title: 'Trigonometric Functions Review', difficulty: 'medium', completed: false, notes: '' },
-  { id: 'cl4', number: 4, title: 'Introduction to Limits', difficulty: 'medium', completed: false, notes: '' },
-  { id: 'cl5', number: 5, title: 'Properties of Limits & Limit Laws', difficulty: 'hard', completed: false, notes: '' },
-  { id: 'cl6', number: 6, title: 'Continuity & One-Sided Limits', difficulty: 'hard', completed: false, notes: '' },
-  { id: 'cl7', number: 7, title: 'Limits at Infinity & Infinite Limits', difficulty: 'hard', completed: false, notes: '' },
-];
 
 // ============================================
 // HELPERS
@@ -171,10 +64,12 @@ function formatTimer(totalSeconds: number): string {
 // ============================================
 // SIDEBAR COMPONENT
 // ============================================
-function Sidebar({ currentView, setCurrentView, onClose }: {
+function Sidebar({ currentView, setCurrentView, onClose, studentName, totalLecs }: {
   currentView: ViewId;
   setCurrentView: (v: ViewId) => void;
   onClose?: () => void;
+  studentName: string;
+  totalLecs: number;
 }) {
   const { theme, setTheme } = useTheme();
 
@@ -201,7 +96,7 @@ function Sidebar({ currentView, setCurrentView, onClose }: {
         <BookOpenText width={22} height={22} style={{ color: '#FF3B30' }} />
         <div>
           <h1 className="heading">Student&apos;s Diary</h1>
-          <span>Shahab · 176 Lec</span>
+          <span>{studentName || 'Student'} · {totalLecs} Topics</span>
         </div>
       </div>
 
@@ -240,6 +135,14 @@ function Sidebar({ currentView, setCurrentView, onClose }: {
           {theme === 'dark' ? <Sun width={18} height={18} /> : <Moon width={18} height={18} />}
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </div>
+        <div
+          className="sidebar-nav-item"
+          onClick={() => signOut({ callbackUrl: '/' })}
+          style={{ color: '#FF6B60' }}
+        >
+          <LogOut width={18} height={18} />
+          Sign out
+        </div>
       </div>
     </aside>
   );
@@ -277,31 +180,67 @@ function MobileNav({ currentView, setCurrentView }: {
 }
 
 // ============================================
+// LOADING SKELETON
+// ============================================
+function LoadingSkeleton() {
+  return (
+    <div className="view active">
+      <div className="hero-card" style={{ opacity: 0.5 }}>
+        <div style={{ height: 14, width: 120, background: '#2a2a2a', borderRadius: 6, marginBottom: 12 }} />
+        <div style={{ height: 28, width: 260, background: '#2a2a2a', borderRadius: 6, marginBottom: 12 }} />
+        <div style={{ height: 16, width: 400, background: '#2a2a2a', borderRadius: 6 }} />
+      </div>
+      <div className="stats-grid">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="stat-card" style={{ opacity: 0.5 }}>
+            <div style={{ height: 32, width: 60, background: '#2a2a2a', borderRadius: 6, margin: '0 auto' }} />
+          </div>
+        ))}
+      </div>
+      <div className="mission-section" style={{ opacity: 0.5 }}>
+        <div style={{ height: 16, width: 160, background: '#2a2a2a', borderRadius: 6, marginBottom: 20 }} />
+        {[1, 2, 3].map(i => (
+          <div key={i} style={{ height: 40, background: '#2a2a2a', borderRadius: 6, marginBottom: 8 }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // TODAY VIEW
 // ============================================
 function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocusTimer: () => void }) {
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
-
-  const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
+  const store = useStudyOS();
+  const tasks = store.todayTasks;
+  const student = store.student;
+  const toggleTask = store.toggleTaskComplete;
 
   const completedCount = tasks.filter(t => t.completed).length;
-  const focusScore = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+  const focusScore = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : store.focusScore;
+
+  const nextTask = tasks.find(t => !t.completed);
 
   return (
     <div className="view active">
       {/* Hero Card */}
       <div className="hero-card">
         <div className="hero-date">{getDateLine()}</div>
-        <div className="hero-greeting">{getGreeting()}, Shahab.</div>
+        <div className="hero-greeting">{getGreeting()}, {student?.name || 'Student'}.</div>
         <div className="hero-message">
-          Your next move is Lines, Angle of Inclination &amp; Distance Formula in Calculus 1.
+          {nextTask
+            ? `Your next move is ${nextTask.topicName} in ${nextTask.subjectName}.`
+            : tasks.length > 0
+              ? 'All today\'s tasks are done! Great work.'
+              : 'No tasks scheduled for today. Enjoy your break!'
+          }
         </div>
         <div className="hero-actions">
-          <button className="btn btn-accent" onClick={onNewTask}>
-            <Star width={15} height={15} /> Start next best task
-          </button>
+          {nextTask && (
+            <button className="btn btn-accent" onClick={onNewTask}>
+              <Star width={15} height={15} /> Start next best task
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={onFocusTimer}>
             <Clock width={15} height={15} /> Focus 25m
           </button>
@@ -319,19 +258,19 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
           <div className="stat-sub">today&apos;s tasks done</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Study Time</div>
-          <div className="stat-value">0h</div>
-          <div className="stat-sub">logged today</div>
+          <div className="stat-label">Topics Done</div>
+          <div className="stat-value">{store.totalCompleted}</div>
+          <div className="stat-sub">of {store.totalTopics} total</div>
         </div>
         <div className="stat-card">
           <div className="stat-label"><Flame width={13} height={13} />Streak</div>
-          <div className="stat-value">0</div>
+          <div className="stat-value">{store.streak}</div>
           <div className="stat-sub">days in a row</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Program Week</div>
-          <div className="stat-value">W20</div>
-          <div className="stat-sub">0 weeks left</div>
+          <div className="stat-value">W{store.programWeek}</div>
+          <div className="stat-sub">{store.weeksLeft} weeks left</div>
         </div>
       </div>
 
@@ -340,29 +279,34 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
         <div className="mission-header">
           <div>
             <div className="mission-title">Today&apos;s mission</div>
-            <div className="mission-hint">Swipe right to complete · left to postpone</div>
+            <div className="mission-hint">{completedCount} of {tasks.length} topics done · {store.topicsPerDay} topics/day pace</div>
           </div>
         </div>
         <div style={{ marginTop: 14 }}>
           {tasks.map(task => (
-            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+            <div key={task.topicId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
               <div
                 className={`task-checkbox ${task.completed ? 'checked' : ''}`}
-                onClick={() => toggleTask(task.id)}
+                onClick={() => toggleTask(task.topicId)}
               >
                 {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: task.completed ? '#666' : '#fff', textDecoration: task.completed ? 'line-through' : 'none' }}>
-                  {task.title}
+                  {task.topicName}
                 </div>
-                <div style={{ fontSize: 12, color: '#888' }}>{task.courseName} · Lecture {task.lectureNum}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>{task.subjectName} · {task.chapterName}</div>
               </div>
-              <span className="task-course-badge" style={{ background: `${task.color}22`, color: task.color }}>
-                {task.instructor} · L{task.lectureNum}
+              <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor, flexShrink: 0 }}>
+                {task.subjectName} · D{task.dayNumber}
               </span>
             </div>
           ))}
+          {tasks.length === 0 && (
+            <div style={{ textAlign: 'center', color: '#666', padding: 20 }}>
+              No tasks for today. Check your pacing goal or enjoy the day off!
+            </div>
+          )}
           <button className="mission-add" style={{ marginTop: 14 }} onClick={onNewTask}>
             <Plus width={14} height={14} /> Add mission
           </button>
@@ -376,12 +320,10 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
 // TASKS VIEW
 // ============================================
 function TasksView({ onNewTask }: { onNewTask: () => void }) {
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
+  const store = useStudyOS();
+  const tasks = store.todayTasks;
+  const toggleTask = store.toggleTaskComplete;
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('today');
-
-  const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
 
   const filteredTasks = activeTab === 'today'
     ? tasks
@@ -418,10 +360,10 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
 
       {/* Task Cards */}
       {filteredTasks.map(task => (
-        <div key={task.id} className="task-card">
+        <div key={task.topicId} className="task-card">
           <div
             className={`task-checkbox ${task.completed ? 'checked' : ''}`}
-            onClick={() => toggleTask(task.id)}
+            onClick={() => toggleTask(task.topicId)}
           >
             {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
           </div>
@@ -434,12 +376,12 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
               <FileText width={14} height={14} style={{ color: '#666' }} />
             </div>
             <div className="task-title" style={{ textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? '#666' : '#fff' }}>
-              {task.title}
+              {task.topicName}
             </div>
             <div className="task-meta">
-              <span>{task.courseName} · Lecture {task.lectureNum}</span>
-              <span className="task-course-badge" style={{ background: `${task.color}22`, color: task.color }}>
-                {task.instructor} · Lecture {task.lectureNum}
+              <span>{task.subjectName} · {task.chapterName}</span>
+              <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor }}>
+                {task.subjectName} · D{task.dayNumber}
               </span>
             </div>
           </div>
@@ -447,8 +389,21 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
             <Clock width={14} height={14} />
             {task.duration}m
           </div>
-          <div className="task-menu">
-            <MoreHorizontal width={18} height={18} />
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {task.videoLink && (
+              <a href={task.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                <button className="watch-btn" style={{ padding: '4px 10px' }}>
+                  <Play width={11} height={11} /> Video
+                </button>
+              </a>
+            )}
+            {task.pdfLink && (
+              <a href={task.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                <button className="btn btn-ghost btn-sm" style={{ padding: '4px 10px', fontSize: 11 }}>
+                  <PdfIcon width={11} height={11} /> PDF
+                </button>
+              </a>
+            )}
           </div>
         </div>
       ))}
@@ -465,55 +420,53 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
 // ============================================
 // COURSES VIEW
 // ============================================
-function CoursesView({ onCourseClick }: { onCourseClick: (courseId: string) => void }) {
-  const totalLectures = COURSES.reduce((sum, c) => sum + c.totalLectures, 0);
-  const completedLectures = COURSES.reduce((sum, c) => sum + c.completedLectures, 0);
-  const totalPct = totalLectures > 0 ? Math.round((completedLectures / totalLectures) * 100) : 0;
+function CoursesView({ onCourseClick }: { onCourseClick: (subjectId: string) => void }) {
+  const store = useStudyOS();
+  const subjects = store.subjects;
 
-  const sem1 = COURSES.filter(c => c.semester === 1);
-  const sem2 = COURSES.filter(c => c.semester === 2);
-
-  const renderCourseCard = (course: Course) => {
-    const pct = course.totalLectures > 0 ? Math.round((course.completedLectures / course.totalLectures) * 100) : 0;
-    return (
-      <div key={course.id} className="course-card" onClick={() => onCourseClick(course.id)}>
-        <div className="course-icon" style={{ background: course.color }}>
-          {course.icon}
-        </div>
-        <div className="course-name">{course.name}</div>
-        <div className="course-instructor">{course.instructor}</div>
-        <div className="course-progress-row">
-          <div className="course-progress-pct" style={{ color: course.color }}>{pct}%</div>
-          <div className="course-lecture-count">{course.completedLectures}/{course.totalLectures}</div>
-        </div>
-        <div className="course-progress-bar">
-          <div className="course-progress-fill" style={{ width: `${pct}%`, background: course.color }} />
-        </div>
-      </div>
-    );
-  };
+  const totalTopics = subjects.reduce((sum, s) => sum + s.totalTopics, 0);
+  const completedTopics = subjects.reduce((sum, s) => sum + s.completedTopics, 0);
+  const totalPct = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
 
   return (
     <div className="view active">
       <div className="courses-header">
-        <h2 className="heading" style={{ fontSize: 28, color: '#fff' }}>Courses</h2>
+        <h2 className="heading" style={{ fontSize: 28, color: '#fff' }}>Subjects</h2>
       </div>
       <div className="courses-subtitle">
-        {completedLectures} of {totalLectures} lectures · {totalPct}% complete
+        {completedTopics} of {totalTopics} topics · {totalPct}% complete
       </div>
       <div className="courses-progress-bar">
         <div className="courses-progress-fill" style={{ width: `${totalPct}%` }} />
       </div>
 
-      <div className="semester-label">Semester 1</div>
       <div className="courses-grid">
-        {sem1.map(renderCourseCard)}
+        {subjects.map(subject => {
+          const pct = subject.progressPct;
+          return (
+            <div key={subject.subjectId} className="course-card" onClick={() => onCourseClick(subject.subjectId)}>
+              <div className="course-icon" style={{ background: subject.color }}>
+                {getIcon(subject.icon)}
+              </div>
+              <div className="course-name">{subject.subjectName}</div>
+              <div className="course-instructor">{subject.chapterCount} chapters{subject.isLocked ? ' · Locked' : ''}</div>
+              <div className="course-progress-row">
+                <div className="course-progress-pct" style={{ color: subject.color }}>{pct}%</div>
+                <div className="course-lecture-count">{subject.completedTopics}/{subject.totalTopics}</div>
+              </div>
+              <div className="course-progress-bar">
+                <div className="course-progress-fill" style={{ width: `${pct}%`, background: subject.color }} />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="semester-label">Semester 2</div>
-      <div className="courses-grid">
-        {sem2.map(renderCourseCard)}
-      </div>
+      {subjects.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#666', padding: 40 }}>
+          No subjects available for your grade and field.
+        </div>
+      )}
     </div>
   );
 }
@@ -522,33 +475,69 @@ function CoursesView({ onCourseClick }: { onCourseClick: (courseId: string) => v
 // SCHEDULE VIEW
 // ============================================
 function ScheduleView() {
-  const [weeks, setWeeks] = useState(SCHEDULE_WEEKS);
+  const store = useStudyOS();
+  const student = store.student;
+  const subjects = store.subjects;
 
-  const toggleWeek = (id: number) => {
-    setWeeks(prev => prev.map(w => w.id === id ? { ...w, completed: !w.completed } : w));
-  };
+  // Build schedule weeks from real data
+  const currentDay = student?.currentDay || 1;
+  const totalDays = student?.totalDays || 150;
+  const startDate = student?.startDate ? new Date(student.startDate) : new Date();
+
+  const totalWeeks = Math.ceil(totalDays / 7);
+  const currentWeekNum = Math.ceil(currentDay / 7);
+
+  // Generate week data
+  const weeks = Array.from({ length: Math.min(totalWeeks, 20) }, (_, i) => {
+    const weekNum = i + 1;
+    const weekStart = new Date(startDate);
+    weekStart.setDate(weekStart.getDate() + i * 7);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    const dateRange = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    const isCompleted = weekNum < currentWeekNum;
+    const isCurrent = weekNum === currentWeekNum;
+
+    return {
+      weekNum,
+      dateRange,
+      isCompleted,
+      isCurrent,
+      subjects: subjects.map(s => ({
+        name: s.subjectName,
+        color: s.color,
+        topicsPerWeek: s.totalTopics > 0 ? Math.max(1, Math.round(s.totalTopics / totalWeeks)) : 0,
+      })),
+    };
+  });
 
   return (
     <div className="view active">
-      <h2 className="heading" style={{ fontSize: 28, color: '#fff', marginBottom: 24 }}>Schedule</h2>
+      <h2 className="heading" style={{ fontSize: 28, color: '#fff', marginBottom: 4 }}>Schedule</h2>
+      <p style={{ fontSize: 14, color: '#888', marginBottom: 24 }}>
+        Day {currentDay} of {totalDays} · Week {currentWeekNum} of {totalWeeks}
+      </p>
 
       <div className="schedule-grid">
         {weeks.map(week => (
-          <div key={week.id} className="schedule-card">
-            <div className="schedule-week-title">Week {week.weekNum}</div>
+          <div key={week.weekNum} className="schedule-card" style={week.isCurrent ? { borderColor: '#FF3B30', borderWidth: 2 } : {}}>
+            <div className="schedule-week-title">
+              Week {week.weekNum}
+              {week.isCurrent && <span style={{ fontSize: 10, color: '#FF3B30', marginLeft: 8, fontWeight: 700 }}>CURRENT</span>}
+            </div>
             <div className="schedule-date-range">{week.dateRange}</div>
-            {week.courses.map((course, i) => (
+            {week.subjects.filter(s => s.topicsPerWeek > 0).map((subject, i) => (
               <div key={i} className="schedule-course-item">
-                <div className="schedule-course-dot" style={{ background: course.color }} />
-                {course.name} <span className="schedule-course-lectures">· {course.lectures}</span>
+                <div className="schedule-course-dot" style={{ background: subject.color }} />
+                {subject.name} <span className="schedule-course-lectures">· ~{subject.topicsPerWeek} topics</span>
               </div>
             ))}
-            <div className="schedule-mark-complete" onClick={() => toggleWeek(week.id)}>
-              <div className={`schedule-checkbox ${week.completed ? 'checked' : ''}`}>
-                {week.completed && <Check width={12} height={12} style={{ color: '#fff' }} />}
+            {week.isCompleted && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, color: '#10B981', fontSize: 12, fontWeight: 600 }}>
+                <Check width={14} height={14} /> Completed
               </div>
-              {week.completed ? 'Completed' : 'Mark complete'}
-            </div>
+            )}
           </div>
         ))}
       </div>
@@ -574,16 +563,18 @@ function FocusTimerView() {
 
   useEffect(() => {
     if (!isRunning) return;
-    if (secondsLeft <= 0) {
-      setIsRunning(false);
-      setSessionsCompleted(prev => prev + 1);
-      return;
-    }
     const interval = setInterval(() => {
-      setSecondsLeft(prev => prev - 1);
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          setIsRunning(false);
+          setSessionsCompleted(p => p + 1);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning, secondsLeft]);
+  }, [isRunning]);
 
   const switchMode = (m: 'focus' | 'short' | 'long') => {
     setMode(m);
@@ -662,26 +653,27 @@ function FocusTimerView() {
 // EXPORT VIEW
 // ============================================
 function ExportView() {
+  const store = useStudyOS();
   return (
     <div className="view active">
       <h2 className="heading" style={{ fontSize: 28, color: '#fff', marginBottom: 12 }}>Export Notes</h2>
       <p style={{ color: '#888', marginBottom: 24 }}>Export your lecture notes and study progress.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-        <div className="stat-card" style={{ cursor: 'pointer' }}>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => window.open('/api/download?format=md', '_blank')}>
           <div className="stat-label"><FileText width={13} height={13} />Markdown</div>
           <div className="stat-value" style={{ fontSize: 18 }}>All notes</div>
-          <div className="stat-sub">Export as .md file</div>
+          <div className="stat-sub">{store.totalCompleted} completed topics</div>
         </div>
-        <div className="stat-card" style={{ cursor: 'pointer' }}>
-          <div className="stat-label"><Download width={13} height={13} />PDF</div>
-          <div className="stat-value" style={{ fontSize: 18 }}>Progress report</div>
-          <div className="stat-sub">Export as .pdf file</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'pointer' }}>
-          <div className="stat-label"><BookOpenText width={13} height={13} />CSV</div>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => window.open('/api/download?format=csv', '_blank')}>
+          <div className="stat-label"><Download width={13} height={13} />CSV</div>
           <div className="stat-value" style={{ fontSize: 18 }}>Lecture data</div>
           <div className="stat-sub">Export as .csv file</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'pointer' }}>
+          <div className="stat-label"><BookOpenText width={13} height={13} />Progress</div>
+          <div className="stat-value" style={{ fontSize: 18 }}>Summary report</div>
+          <div className="stat-sub">{Math.round(store.totalTopics > 0 ? (store.totalCompleted / store.totalTopics) * 100 : 0)}% complete</div>
         </div>
       </div>
     </div>
@@ -689,18 +681,21 @@ function ExportView() {
 }
 
 // ============================================
-// COURSE DETAIL VIEW
+// SUBJECT DETAIL VIEW
 // ============================================
-function CourseDetailView({ courseId, onBack }: { courseId: string; onBack: () => void }) {
-  const course = COURSES.find(c => c.id === courseId) || COURSES[0];
-  const [lectures, setLectures] = useState<Lecture[]>(
-    courseId === 'calc1' ? CALCULUS_LECTURES : CALCULUS_LECTURES.map(l => ({
-      ...l,
-      id: `${courseId}-${l.number}`,
-      title: `Lecture ${l.number}`,
-      difficulty: l.number <= 2 ? 'easy' : l.number <= 5 ? 'medium' : 'hard' as const,
-    }))
-  );
+function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: () => void }) {
+  const store = useStudyOS();
+  const subject = store.subjects.find(s => s.subjectId === subjectId);
+  const detail = store.subjectDetail;
+  const loading = store.subjectDetailLoading;
+
+  // Fetch detail on mount
+  useEffect(() => {
+    if (subjectId) {
+      store.openSubjectDetail(subjectId);
+    }
+  }, [subjectId, store]);
+
   const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
 
   // Mini timer state
@@ -721,34 +716,43 @@ function CourseDetailView({ courseId, onBack }: { courseId: string; onBack: () =
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
-  const toggleLecture = (id: string) => {
-    setLectures(prev => prev.map(l => l.id === id ? { ...l, completed: !l.completed } : l));
-  };
+  if (loading || !detail) {
+    return (
+      <div className="view active">
+        <button className="back-btn" onClick={onBack}>
+          <ArrowLeft width={16} height={16} /> Back to subjects
+        </button>
+        <div style={{ textAlign: 'center', padding: 60, color: '#888' }}>
+          Loading subject details...
+        </div>
+      </div>
+    );
+  }
 
-  const updateNotes = (id: string, notes: string) => {
-    setLectures(prev => prev.map(l => l.id === id ? { ...l, notes } : l));
-  };
+  const allTopics = detail.chapters.flatMap(ch => ch.topics);
+  const completedCount = allTopics.filter(t => t.completed).length;
+  const remainingHours = Math.round((allTopics.length - completedCount) * 1.1);
 
-  const filteredLectures = filter === 'all'
-    ? lectures
-    : filter === 'todo'
-      ? lectures.filter(l => !l.completed)
-      : lectures.filter(l => l.completed);
+  const filteredChapters = detail.chapters.map(ch => ({
+    ...ch,
+    topics: filter === 'all' ? ch.topics
+      : filter === 'todo' ? ch.topics.filter(t => !t.completed)
+        : ch.topics.filter(t => t.completed),
+  })).filter(ch => ch.topics.length > 0);
 
-  const completedCount = lectures.filter(l => l.completed).length;
-  const remainingHours = Math.round((lectures.length - completedCount) * 1.1);
+  const pct = detail.totalTopics > 0 ? Math.round((detail.completedTopics / detail.totalTopics) * 100) : 0;
 
   return (
     <div className="view active">
       <button className="back-btn" onClick={onBack}>
-        <ArrowLeft width={16} height={16} /> Back to courses
+        <ArrowLeft width={16} height={16} /> Back to subjects
       </button>
 
       <div className="course-detail-header">
         <div>
-          <div className="course-detail-title">{course.name} — {course.instructor}</div>
+          <div className="course-detail-title">{detail.name}</div>
           <div className="course-detail-subtitle">
-            Calculus · ~{remainingHours}h remaining
+            {pct}% complete · {detail.completedTopics}/{detail.totalTopics} topics · ~{remainingHours}h remaining
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -786,47 +790,72 @@ function CourseDetailView({ courseId, onBack }: { courseId: string; onBack: () =
       </div>
 
       <div style={{ background: 'var(--surface-solid)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
-        {filteredLectures.map(lecture => (
-          <div key={lecture.id} className="lecture-item">
-            <div
-              className={`lecture-checkbox ${lecture.completed ? 'checked' : ''}`}
-              onClick={() => toggleLecture(lecture.id)}
-            >
-              {lecture.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
+        {filteredChapters.map(chapter => (
+          <div key={chapter.id}>
+            <div style={{ padding: '12px 16px', background: '#1a1a1a', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#ccc' }}>
+                Ch {chapter.number}: {chapter.name}
+              </span>
+              <span style={{ fontSize: 11, color: '#888' }}>
+                {chapter.completedTopics}/{chapter.totalTopics}
+              </span>
             </div>
-            <div className="lecture-info">
-              <div className="lecture-name">
-                <span style={{ color: '#666', marginRight: 8 }}>{lecture.number}.</span>
-                {lecture.title}
+            {chapter.topics.map(topic => (
+              <div key={topic.id} className="lecture-item">
+                <div
+                  className={`lecture-checkbox ${topic.completed ? 'checked' : ''}`}
+                  onClick={() => store.toggleSubjectDetailTopic(topic.id)}
+                >
+                  {topic.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
+                </div>
+                <div className="lecture-info">
+                  <div className="lecture-name">
+                    <span style={{ color: '#666', marginRight: 8 }}>{topic.number}.</span>
+                    {topic.name}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {topic.dayNumber > 0 && (
+                      <span className="difficulty-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>
+                        Day {topic.dayNumber}
+                      </span>
+                    )}
+                    {topic.hasVideo && (
+                      <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
+                        <span className="difficulty-tag" style={{ background: 'rgba(255,59,48,0.15)', color: '#FF3B30', cursor: 'pointer' }}>
+                          Video
+                        </span>
+                      </a>
+                    )}
+                    {topic.hasPdf && (
+                      <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
+                        <span className="difficulty-tag" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', cursor: 'pointer' }}>
+                          PDF
+                        </span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <div className="lecture-actions">
+                  {topic.hasVideo && (
+                    <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                      <button className="watch-btn">
+                        <Play width={12} height={12} /> Watch
+                      </button>
+                    </a>
+                  )}
+                  {!topic.hasVideo && !topic.hasPdf && !topic.isFree !== undefined && !topic.isFree && (
+                    <span style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Lock width={12} height={12} /> Premium
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="difficulty-tags">
-                {lecture.difficulty === 'easy' && (
-                  <span className="difficulty-tag difficulty-easy">Easy</span>
-                )}
-                {lecture.difficulty === 'medium' && (
-                  <span className="difficulty-tag difficulty-medium">Medium</span>
-                )}
-                {lecture.difficulty === 'hard' && (
-                  <span className="difficulty-tag difficulty-hard">Hard</span>
-                )}
-              </div>
-              <input
-                className="lecture-notes-input"
-                placeholder="Key insight or question..."
-                value={lecture.notes}
-                onChange={e => updateNotes(lecture.id, e.target.value)}
-              />
-            </div>
-            <div className="lecture-actions">
-              <button className="watch-btn">
-                <Play width={12} height={12} /> Watch
-              </button>
-            </div>
+            ))}
           </div>
         ))}
-        {filteredLectures.length === 0 && (
+        {filteredChapters.length === 0 && (
           <div style={{ padding: 32, textAlign: 'center', color: '#666' }}>
-            No lectures in this category.
+            No topics in this category.
           </div>
         )}
       </div>
@@ -838,6 +867,7 @@ function CourseDetailView({ courseId, onBack }: { courseId: string; onBack: () =
 // QUICK ADD TASK MODAL
 // ============================================
 function QuickAddModal({ onClose }: { onClose: () => void }) {
+  const store = useStudyOS();
   const [taskName, setTaskName] = useState('');
   const [when, setWhen] = useState<'today' | 'tomorrow'>('today');
   const [estimate, setEstimate] = useState(30);
@@ -917,15 +947,15 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="modal-section">
-          <div className="modal-section-label">Course (Optional)</div>
+          <div className="modal-section-label">Subject (Optional)</div>
           <select
             className="modal-select"
             value={course}
             onChange={e => setCourse(e.target.value)}
           >
             <option value="">— None —</option>
-            {COURSES.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {store.subjects.map(s => (
+              <option key={s.subjectId} value={s.subjectId}>{s.subjectName}</option>
             ))}
           </select>
         </div>
@@ -969,26 +999,67 @@ function Topbar({ onNewTask, onHamburger }: { onNewTask: () => void; onHamburger
 // MAIN HOME COMPONENT
 // ============================================
 export default function Home() {
+  const sessionResult = useSession();
+  const status = sessionResult?.status ?? 'loading';
+  const session = sessionResult?.data ?? null;
+  const store = useStudyOS();
   const [currentView, setCurrentView] = useState<ViewId>('today');
   const [showModal, setShowModal] = useState(false);
-  const [courseDetailId, setCourseDetailId] = useState<string | null>(null);
+  const [subjectDetailId, setSubjectDetailId] = useState<string | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
 
+  // All hooks must be called before any conditional returns
   const handleNewTask = useCallback(() => setShowModal(true), []);
   const handleFocusTimer = useCallback(() => setCurrentView('focus-timer'), []);
 
-  const handleCourseClick = useCallback((courseId: string) => {
-    setCourseDetailId(courseId);
+  const handleCourseClick = useCallback((subjectId: string) => {
+    setSubjectDetailId(subjectId);
   }, []);
 
   const handleBackFromCourse = useCallback(() => {
-    setCourseDetailId(null);
-  }, []);
+    store.closeSubjectDetail();
+    setSubjectDetailId(null);
+  }, [store]);
+
+  // Fetch data when session is available
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user && !initialFetchDone) {
+      const phone = (session.user as Record<string, unknown>).phone as string;
+      if (phone) {
+        store.fetchData(phone).then(() => setInitialFetchDone(true));
+      }
+    }
+  }, [status, session, initialFetchDone, store]);
+
+  // Show login page if not authenticated
+  if (status === 'unauthenticated') {
+    return <LoginPage />;
+  }
+
+  // Loading while checking auth
+  if (status === 'loading') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#000' }}>
+        <div style={{ textAlign: 'center', color: '#888' }}>
+          <BookOpenText width={32} height={32} style={{ color: '#FF3B30', margin: '0 auto 12px' }} />
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const studentName = store.student?.name || (session?.user?.name as string) || 'Student';
+  const totalLecs = store.totalTopics;
 
   const renderContent = () => {
-    // If a course detail is open, show it
-    if (courseDetailId) {
-      return <CourseDetailView courseId={courseDetailId} onBack={handleBackFromCourse} />;
+    if (store.isLoading) {
+      return <LoadingSkeleton />;
+    }
+
+    // If a subject detail is open, show it
+    if (subjectDetailId) {
+      return <SubjectDetailView subjectId={subjectDetailId} onBack={handleBackFromCourse} />;
     }
 
     switch (currentView) {
@@ -1012,7 +1083,12 @@ export default function Home() {
   return (
     <div className="app-shell">
       {/* Desktop Sidebar */}
-      <Sidebar currentView={currentView} setCurrentView={setCurrentView} />
+      <Sidebar
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        studentName={studentName}
+        totalLecs={totalLecs}
+      />
 
       {/* Mobile Sidebar Overlay */}
       <div
@@ -1022,8 +1098,10 @@ export default function Home() {
       <div className={`mobile-sidebar-drawer ${mobileDrawerOpen ? 'open' : ''}`}>
         <Sidebar
           currentView={currentView}
-          setCurrentView={(v) => { setCurrentView(v); setMobileDrawerOpen(false); setCourseDetailId(null); }}
+          setCurrentView={(v) => { setCurrentView(v); setMobileDrawerOpen(false); setSubjectDetailId(null); }}
           onClose={() => setMobileDrawerOpen(false)}
+          studentName={studentName}
+          totalLecs={totalLecs}
         />
       </div>
 
@@ -1041,7 +1119,7 @@ export default function Home() {
       {/* Mobile Bottom Nav */}
       <MobileNav
         currentView={currentView}
-        setCurrentView={(v) => { setCurrentView(v); setCourseDetailId(null); }}
+        setCurrentView={(v) => { setCurrentView(v); setSubjectDetailId(null); }}
       />
 
       {/* Quick Add Modal */}
