@@ -938,7 +938,14 @@ export default function Home() {
 
   // All hooks must be called before any conditional returns
   const handleNewTask = useCallback(() => setShowModal(true), []);
-  const handleFocusTimer = useCallback(() => setCurrentView('focus-timer'), []);
+
+  // Combined view change handler — always clears subject detail so tabs work
+  const handleViewChange = useCallback((v: ViewId) => {
+    setCurrentView(v);
+    setSubjectDetailId(null);
+  }, []);
+
+  const handleFocusTimer = useCallback(() => handleViewChange('focus-timer'), [handleViewChange]);
 
   const handleCourseClick = useCallback((subjectId: string) => {
     setSubjectDetailId(subjectId);
@@ -1012,7 +1019,7 @@ export default function Home() {
       {/* Desktop Sidebar */}
       <Sidebar
         currentView={currentView}
-        setCurrentView={setCurrentView}
+        setCurrentView={handleViewChange}
         studentName={studentName}
         totalLecs={totalLecs}
       />
@@ -1025,7 +1032,7 @@ export default function Home() {
       <div className={`mobile-sidebar-drawer ${mobileDrawerOpen ? 'open' : ''}`}>
         <Sidebar
           currentView={currentView}
-          setCurrentView={(v) => { setCurrentView(v); setMobileDrawerOpen(false); setSubjectDetailId(null); }}
+          setCurrentView={(v) => { handleViewChange(v); setMobileDrawerOpen(false); }}
           onClose={() => setMobileDrawerOpen(false)}
           studentName={studentName}
           totalLecs={totalLecs}
@@ -1046,7 +1053,7 @@ export default function Home() {
       {/* Mobile Bottom Nav */}
       <MobileNav
         currentView={currentView}
-        setCurrentView={(v) => { setCurrentView(v); setSubjectDetailId(null); }}
+        setCurrentView={handleViewChange}
       />
 
       {/* Quick Add Modal */}
