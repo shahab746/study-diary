@@ -1,23 +1,30 @@
+# Study Diary - Work Log
+
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Fix app preview - user reported "can't preview anything"
+Task: Generate APK for Study Diary PWA using Bubblewrap
 
 Work Log:
-- Investigated the issue: the Next.js dev server was not running
-- The `bun run dev` script runs `next start` (production mode), not `next dev`
-- The production build existed but the server had crashed/stopped
-- Rebuilt the app with `bun run build` - succeeded cleanly
-- Started the dev server using `node node_modules/next/dist/bin/next dev -p 3000 -H 0.0.0.0`
-- Lint check passed with no errors
-- Verified the app responds with HTTP 200 via curl
-- Used agent-browser to open the page - login page renders correctly
-- Screenshot confirmed: login form with phone/PIN fields visible
-- App is fully functional at the login stage
+- Replaced PWA icons with user's uploaded icon (1780735268.png - 1664x928)
+- Generated all required icon sizes using Sharp (32x32, 192x192, 512x512, 1024x1024)
+- Updated manifest.json with categories, screenshots, scope, dir, lang fields
+- Attempted PWABuilder.com but it was stuck in loading state
+- Installed Bubblewrap CLI and Android SDK
+- Created custom Node.js script to bypass Bubblewrap's interactive prompts
+- Patched Bubblewrap's ImageHelper to use local icon files (since Vercel doesn't have updated icons)
+- Downloaded and installed JDK 17 (system only had JRE 21)
+- Successfully built TWA Android project with Gradle
+- Signed APK with custom keystore
+- Created Digital Asset Links file (.well-known/assetlinks.json) for TWA verification
+- Copied final APK to /home/z/StudyDiary.apk (2.3MB)
 
 Stage Summary:
-- Root cause: dev server was not running (had crashed)
-- Fix: Restarted the Next.js dev server
-- The code (page.tsx, store.ts, auth.ts, globals.css) was all intact and complete
-- No code changes were needed - the issue was purely that the server wasn't running
-- The login page renders correctly with phone and PIN input fields
+- APK generated: /home/z/StudyDiary.apk (signed, 2.3MB)
+- Package name: com.studydiary.app
+- Keystore: /home/z/studydiary-twa/android-keystore
+- Keystore password: studydiary123
+- Key alias: studydiary
+- SHA-256 fingerprint: D3:57:88:20:5C:B5:C0:16:84:C9:B5:DA:55:C9:7A:20:06:D8:DA:3C:2F:9A:55:A7:FA:23:DC:2E:B6:A7:3E:3B
+- Digital Asset Links file created at public/.well-known/assetlinks.json
+- TWA project source: /home/z/studydiary-twa/

@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.studydiary.app",
+    "sha256_cert_fingerprints": ["D3:57:88:20:5C:B5:C0:16:84:C9:B5:DA:55:C9:7A:20:06:D8:DA:3C:2F:9A:55:A7:FA:23:DC:2E:B6:A7:3E:3B"]
+  }
+}]
