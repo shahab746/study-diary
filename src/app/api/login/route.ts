@@ -33,7 +33,14 @@ export async function POST(request: Request) {
     console.log(`🔐 Login API: Looking up phone="${cleanPhone}"`);
 
     // Step 1: Check local database first (fast — no network calls)
-    let student = await db.student.findUnique({ where: { phone: cleanPhone } });
+    let student = null;
+    let dbAvailable = true;
+    try {
+      student = await db.student.findUnique({ where: { phone: cleanPhone } });
+    } catch (dbError) {
+      console.warn('🔐 Login API: DB lookup failed, will use Google Sheets fallback:', dbError instanceof Error ? dbError.message : String(dbError));
+      dbAvailable = false;
+    }
 
     // Step 2: If not in local DB, try Google Sheet
     let sheetErrorDetail: string | null = null;
@@ -86,7 +93,24 @@ export async function POST(request: Request) {
           }
 
           // Re-fetch from local DB to get the student record
-          student = await db.student.findUnique({ where: { phone: cleanPhone } });
+          try {
+            student = await db.student.findUnique({ where: { phone: cleanPhone } });
+          } catch (reFetchErr) {
+            console.warn('🔐 Login API: DB re-fetch failed after upsert:', reFetchErr instanceof Error ? reFetchErr.message : String(reFetchErr));
+          }
+          // If DB re-fetch also failed (or returned null), use sheet data directly
+          if (!student) {
+            student = {
+              name: sheetUser.name,
+              phone: sheetUser.phone,
+              grade: sheetUser.grade,
+              board: sheetUser.board,
+              field: sheetUser.field,
+              status: sheetUser.status,
+              pin: sheetUser.pin,
+              academicGroup: sheetUser.academicGroup,
+            };
+          }
         }
       } catch (sheetError) {
         console.error('🔐 Login API: Google Sheet lookup failed:', sheetError);
