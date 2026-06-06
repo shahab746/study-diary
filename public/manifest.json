@@ -3,8 +3,12 @@
   "short_name": "StudyDiary",
   "description": "Your Study Companion - Track, Pace, Complete",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone"],
   "orientation": "portrait",
+  "dir": "ltr",
+  "lang": "en",
   "background_color": "#121212",
   "theme_color": "#FF3B30",
   "icons": [
