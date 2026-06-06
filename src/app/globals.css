@@ -668,8 +668,8 @@
    ============================================ */
 .task-card {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  flex-direction: column;
+  gap: 12px;
   background: linear-gradient(180deg, rgba(30,30,30,0.9) 0%, rgba(26,26,26,0.95) 100%);
   border: 1px solid var(--border);
   border-left: 3px solid var(--priority-medium);
@@ -679,6 +679,17 @@
   transition: all .25s cubic-bezier(.4,0,.2,1);
   margin-bottom: 10px;
   position: relative;
+}
+.task-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.task-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 42px;
 }
 .task-card:hover {
   border-color: var(--border-hover);
@@ -699,8 +710,8 @@
 }
 
 .task-checkbox {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 2px solid #444;
   flex-shrink: 0;
@@ -731,7 +742,7 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-top: 6px;
+  margin-top: 7px;
   box-shadow: 0 0 6px currentColor;
 }
 .task-info { flex: 1; min-width: 0; }
@@ -741,6 +752,7 @@
   color: #fff;
   margin-bottom: 4px;
   transition: color .2s ease;
+  word-break: break-word;
 }
 .task-meta {
   font-size: 12px;
@@ -758,7 +770,7 @@
 }
 .task-course-badge {
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   font-weight: 500;
   transition: all .15s ease;
@@ -777,6 +789,11 @@
   padding: 4px;
   flex-shrink: 0;
   transition: color .2s ease;
+}
+@media (max-width: 768px) {
+  .task-card { padding: 14px; }
+  .task-title { font-size: 14px; }
+  .task-card-bottom { padding-left: 0; }
 }
 .task-menu:hover { color: #fff; }
 
@@ -1151,10 +1168,11 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.04);
   transition: all .2s cubic-bezier(.4,0,.2,1);
   position: relative;
+  flex-wrap: wrap;
 }
 .lecture-item::before {
   content: '';
@@ -1174,8 +1192,8 @@
 .lecture-item:last-child { border-bottom: none; }
 
 .lecture-checkbox {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 2px solid #555;
   flex-shrink: 0;
@@ -1184,6 +1202,7 @@
   cursor: pointer;
   transition: all .2s cubic-bezier(.4,0,.2,1);
   margin-top: 2px;
+  -webkit-tap-highlight-color: transparent;
 }
 .lecture-checkbox:hover {
   border-color: #888;
@@ -1234,10 +1253,10 @@
   flex-shrink: 0;
 }
 .watch-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: 8px;
   background: linear-gradient(135deg, #FF3B30, #FF5545);
   color: #fff;
@@ -1249,6 +1268,8 @@
   box-shadow: 0 2px 8px rgba(255,59,48,0.25), 0 1px 2px rgba(0,0,0,0.2);
   position: relative;
   overflow: hidden;
+  min-height: 36px;
+  -webkit-tap-highlight-color: transparent;
 }
 .watch-btn::before {
   content: '';
@@ -1600,7 +1621,8 @@
     white-space: nowrap;
     transition: all .25s cubic-bezier(.4,0,.2,1);
     -webkit-tap-highlight-color: transparent;
-    flex-shrink: 0;
+    flex: 1;
+    justify-content: center;
   }
   .mobile-swipe-item:active {
     transform: scale(0.94);
@@ -1617,6 +1639,18 @@
   .mobile-swipe-item:not(.active):hover {
     background: rgba(255,255,255,0.08);
     color: #ccc;
+  }
+  /* Fix lecture items on mobile */
+  .lecture-item {
+    flex-wrap: wrap;
+  }
+  .lecture-actions {
+    width: 100%;
+    padding-left: 34px;
+    margin-top: 4px;
+  }
+  .hamburger-btn {
+    display: none !important;
   }
   .mobile-more-menu {
     position: absolute;

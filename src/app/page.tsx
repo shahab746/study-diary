@@ -386,49 +386,53 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
       {/* Task Cards */}
       {filteredTasks.map(task => (
         <div key={task.topicId} className="task-card">
-          <div
-            className={`task-checkbox ${task.completed ? 'checked' : ''}`}
-            onClick={() => toggleTask(task.topicId)}
-          >
-            {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
-          </div>
-          <div className="task-priority-dot" style={{ background: PRIORITY_COLORS[task.priority] }} />
-          <div className="task-info">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span className="task-priority-label" style={{ color: PRIORITY_COLORS[task.priority] }}>
-                {PRIORITY_LABELS[task.priority]}
-              </span>
-              <FileText width={14} height={14} style={{ color: '#666' }} />
+          <div className="task-card-top">
+            <div
+              className={`task-checkbox ${task.completed ? 'checked' : ''}`}
+              onClick={() => toggleTask(task.topicId)}
+            >
+              {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
             </div>
-            <div className="task-title" style={{ textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? '#666' : '#fff' }}>
-              {task.topicName}
-            </div>
-            <div className="task-meta">
-              <span>{task.subjectName} · {task.chapterName}</span>
-              <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor }}>
-                {task.subjectName} · D{task.dayNumber}
-              </span>
+            <div className="task-priority-dot" style={{ background: PRIORITY_COLORS[task.priority] }} />
+            <div className="task-info">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span className="task-priority-label" style={{ color: PRIORITY_COLORS[task.priority] }}>
+                  {PRIORITY_LABELS[task.priority]}
+                </span>
+                <FileText width={14} height={14} style={{ color: '#666' }} />
+              </div>
+              <div className="task-title" style={{ textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? '#666' : '#fff' }}>
+                {task.topicName}
+              </div>
+              <div className="task-meta">
+                <span>{task.subjectName} · {task.chapterName}</span>
+                <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor }}>
+                  D{task.dayNumber}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="task-duration">
-            <Clock width={14} height={14} />
-            {task.duration}m
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            {task.videoLink && (
-              <a href={task.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                <button className="watch-btn" style={{ padding: '4px 10px' }}>
-                  <Play width={11} height={11} /> Watch
-                </button>
-              </a>
-            )}
-            {task.pdfLink && (
-              <a href={task.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                <button className="watch-btn" style={{ padding: '4px 10px', background: '#FF3B30' }}>
-                  <FileText width={11} height={11} /> Notes
-                </button>
-              </a>
-            )}
+          <div className="task-card-bottom">
+            <div className="task-duration">
+              <Clock width={14} height={14} />
+              {task.duration}m
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {task.videoLink && (
+                <a href={task.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                  <button className="watch-btn">
+                    <Play width={13} height={13} /> Watch
+                  </button>
+                </a>
+              )}
+              {task.pdfLink && (
+                <a href={task.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                  <button className="watch-btn" style={{ background: '#FF3B30' }}>
+                    <FileText width={13} height={13} /> Notes
+                  </button>
+                </a>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -744,18 +748,18 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                     )}
                   </div>
                 </div>
-                <div className="lecture-actions" style={{ display: 'flex', gap: 6 }}>
+                <div className="lecture-actions" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   {topic.hasVideo && (
                     <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                      <button className="watch-btn">
-                        <Play width={12} height={12} /> Watch
+                      <button className="watch-btn" style={{ padding: '7px 14px' }}>
+                        <Play width={13} height={13} /> Watch
                       </button>
                     </a>
                   )}
                   {topic.hasPdf && (
                     <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                      <button className="watch-btn" style={{ background: '#FF3B30' }}>
-                        <FileText width={12} height={12} /> Notes
+                      <button className="watch-btn" style={{ padding: '7px 14px', background: '#FF3B30' }}>
+                        <FileText width={13} height={13} /> Notes
                       </button>
                     </a>
                   )}
@@ -898,7 +902,7 @@ function Topbar({ onNewTask, onHamburger }: { onNewTask: () => void; onHamburger
       <div className="search-box">
         <Search width={16} height={16} style={{ color: '#666' }} />
         <input
-          placeholder="Search lectures... (⌘K)"
+          placeholder="Search lectures..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
         />
