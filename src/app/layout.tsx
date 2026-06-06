@@ -34,7 +34,8 @@ export const metadata: Metadata = {
   title: "Study Diary — Lecture Tracker",
   description: "Track lectures, manage study schedules, and crush your curriculum with elegance.",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
   },
   manifest: '/manifest.json',
   appleWebApp: {
