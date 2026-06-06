@@ -30,14 +30,76 @@ export const authOptions: NextAuthOptions = {
         console.log(`🔐 Auth: Looking up phone="${cleanPhone}"`);
 
         try {
-          // Only check local database — no Google Sheets fallback in authorize.
-          // The /api/login endpoint handles Google Sheets sync and saves to local DB
-          // BEFORE this authorize function is called. So the user should always be
-          // in the local DB by the time we reach here.
-          const student = await db.student.findUnique({ where: { phone: cleanPhone } });
+          // Check local database first, with Google Sheets fallback if DB is unavailable
+          let student = null;
+          try {
+            student = await db.student.findUnique({ where: { phone: cleanPhone } });
+          } catch (dbErr) {
+            console.warn('🔐 Auth: DB lookup failed, trying Google Sheets fallback:', dbErr instanceof Error ? dbErr.message : String(dbErr));
+          }
+
+          // If DB lookup failed or user not found, try Google Sheets directly
+          if (!student) {
+            try {
+              const { findUserByPhone, invalidateCache } = await import('@/lib/sheet-sync');
+              invalidateCache('sheet_users');
+              const sheetUser = await findUserByPhone(cleanPhone, true);
+              if (sheetUser) {
+                student = {
+                  name: sheetUser.name,
+                  phone: sheetUser.phone,
+                  grade: sheetUser.grade,
+                  board: sheetUser.board,
+                  field: sheetUser.field,
+                  status: sheetUser.status,
+                  pin: sheetUser.pin,
+                  academicGroup: sheetUser.academicGroup,
+                };
+                // Try to save to DB for future fast lookups
+                try {
+                  await db.student.upsert({
+                    where: { phone: sheetUser.phone },
+                    create: {
+                      name: sheetUser.name,
+                      phone: sheetUser.phone,
+                      grade: sheetUser.grade,
+                      board: sheetUser.board,
+                      field: sheetUser.field,
+                      status: sheetUser.status,
+                      startDate: sheetUser.startDate ? new Date(sheetUser.startDate) : new Date(),
+                      targetDate: sheetUser.targetDate ? new Date(sheetUser.targetDate) : new Date(),
+                      currentDay: sheetUser.currentDay,
+                      totalDays: sheetUser.totalDays,
+                      topicsDone: sheetUser.topicsDone,
+                      daysLeft: sheetUser.daysLeft,
+                      pin: sheetUser.pin,
+                      academicGroup: sheetUser.academicGroup,
+                    },
+                    update: {
+                      name: sheetUser.name,
+                      grade: sheetUser.grade,
+                      board: sheetUser.board,
+                      field: sheetUser.field,
+                      status: sheetUser.status,
+                      currentDay: sheetUser.currentDay,
+                      totalDays: sheetUser.totalDays,
+                      topicsDone: sheetUser.topicsDone,
+                      daysLeft: sheetUser.daysLeft,
+                      pin: sheetUser.pin,
+                      academicGroup: sheetUser.academicGroup,
+                    },
+                  });
+                } catch (saveErr) {
+                  console.warn('🔐 Auth: Failed to save user to DB after Google Sheets lookup:', saveErr instanceof Error ? saveErr.message : String(saveErr));
+                }
+              }
+            } catch (sheetErr) {
+              console.warn('🔐 Auth: Google Sheets fallback also failed:', sheetErr instanceof Error ? sheetErr.message : String(sheetErr));
+            }
+          }
 
           if (!student) {
-            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in local DB`);
+            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in local DB or Google Sheets`);
             throw new Error('No account found. Please try again or contact support.');
           }
 
