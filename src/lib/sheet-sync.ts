@@ -34,6 +34,7 @@ export interface SheetUser {
   targetDate: string;
   currentDay: number;
   totalDays: number;
+  pacingGoal: string; // '3M' | '5M' | '6M'
   topicsDone: number;
   daysLeft: number;
   academicGroup: string;
@@ -261,6 +262,7 @@ export async function fetchUsersFromSheet(forceRefresh = false): Promise<SheetUs
         targetDate: String(row[7] || '').trim(),
         currentDay: parseInt(String(row[8] || '1'), 10) || 1,
         totalDays: parseInt(String(row[9] || '438'), 10) || 438,
+        pacingGoal: String(row[10] || '5M').trim(),
         topicsDone: parseInt(String(row[11] || '0'), 10) || 0,
         daysLeft: parseInt(String(row[12] || '423'), 10) || 423,
         academicGroup: String(row[13] || '').trim(),

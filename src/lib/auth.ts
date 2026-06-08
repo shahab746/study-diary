@@ -1,6 +1,6 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { findUserByPhone } from '@/lib/sheet-sync';
+import { findRegisteredUserByPhone } from '@/lib/registered-users';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -27,15 +27,15 @@ export const authOptions: NextAuthOptions = {
         const cleanPhone = credentials.phone.trim();
         const cleanPin = credentials.pin.trim();
 
-        console.log(`🔐 Auth: Looking up phone="${cleanPhone}" in Google Sheets`);
+        console.log(`🔐 Auth: Looking up phone="${cleanPhone}"`);
 
         try {
-          // Look up user directly from Google Sheets
-          const sheetUser = await findUserByPhone(cleanPhone, true);
+          // Look up user — checks Google Sheets first, then registered-users cache
+          const sheetUser = await findRegisteredUserByPhone(cleanPhone, true);
 
           if (!sheetUser) {
-            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in Google Sheets`);
-            throw new Error('No account found. Please try again or contact support.');
+            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}"`);
+            throw new Error('No account found. Please register or try again.');
           }
 
           if (sheetUser.pin !== cleanPin) {
@@ -66,7 +66,8 @@ export const authOptions: NextAuthOptions = {
           if (error instanceof Error && (
             error.message.includes('No account') ||
             error.message.includes('Incorrect PIN') ||
-            error.message.includes('disabled')
+            error.message.includes('disabled') ||
+            error.message.includes('register')
           )) {
             throw error;
           }

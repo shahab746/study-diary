@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { testSheetConnection, buildCurriculumHierarchy, fetchSpecialCoursesFromSheet } from '@/lib/sheet-sync';
+import { getRegisteredUserCount } from '@/lib/registered-users';
 
 /**
  * Health check endpoint — tests Google Sheets connectivity.
@@ -49,6 +50,17 @@ export async function GET() {
     diagnostics.specialCourses = { status: 'ok', count: courses.length };
   } catch (err) {
     diagnostics.specialCourses = { status: 'failed', error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // Test 4: Registration
+  try {
+    diagnostics.registration = {
+      status: 'ok',
+      serverCacheUsers: getRegisteredUserCount(),
+      appsScriptConfigured: !!process.env.GOOGLE_APPS_SCRIPT_URL,
+    };
+  } catch (err) {
+    diagnostics.registration = { status: 'failed', error: err instanceof Error ? err.message : String(err) };
   }
 
   const hasErrors = (diagnostics.sheetConnection as any)?.connected === false ||

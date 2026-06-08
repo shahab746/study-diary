@@ -5,6 +5,7 @@ import {
   fetchSpecialCoursesFromSheet,
   buildCurriculumHierarchy,
 } from '@/lib/sheet-sync';
+import { findRegisteredUserByPhone } from '@/lib/registered-users';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 
@@ -76,7 +77,32 @@ export async function GET(request: Request) {
       }
     }
 
-    // If no student found with phone, try first user (fallback)
+    // If no student found in Sheets, check registered-users cache (for newly registered users)
+    if (!student && phone) {
+      const cachedUser = await findRegisteredUserByPhone(phone, false);
+      if (cachedUser) {
+        academicGroup = cachedUser.academicGroup || '';
+        student = {
+          name: cachedUser.name,
+          phone: cachedUser.phone,
+          grade: cachedUser.grade,
+          board: cachedUser.board,
+          field: cachedUser.field,
+          status: normalizeStatus(cachedUser.status),
+          startDate: cachedUser.startDate,
+          targetDate: cachedUser.targetDate,
+          currentDay: cachedUser.currentDay,
+          totalDays: cachedUser.totalDays,
+          topicsDone: cachedUser.topicsDone,
+          daysLeft: cachedUser.daysLeft,
+          pacingGoal: cachedUser.pacingGoal || '5M',
+          academicGroup: cachedUser.academicGroup,
+          pin: cachedUser.pin,
+        };
+      }
+    }
+
+    // Last resort: if still no student, try first user from Sheets (fallback)
     if (!student) {
       const { fetchUsersFromSheet } = await import('@/lib/sheet-sync');
       const allUsers = await fetchUsersFromSheet(false);
