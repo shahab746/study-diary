@@ -28,3 +28,26 @@ Stage Summary:
 - SHA-256 fingerprint: D3:57:88:20:5C:B5:C0:16:84:C9:B5:DA:55:C9:7A:20:06:D8:DA:3C:2F:9A:55:A7:FA:23:DC:2E:B6:A7:3E:3B
 - Digital Asset Links file created at public/.well-known/assetlinks.json
 - TWA project source: /home/z/studydiary-twa/
+
+---
+Task ID: 0
+Agent: Main Agent
+Task: Phase 0 - Install Dexie.js, create IndexedDB schema, build useLocalDB hook
+
+Work Log:
+- Installed dexie@4.4.3
+- Created /src/lib/local-db.ts with full Dexie database schema (9 tables)
+- Created /src/lib/use-local-db.ts with useLocalDB hook containing:
+  - Progress operations: toggleProgress, getProgress, getCompletedTopicIds, countCompleted, setProgress
+  - Pacing operations: savePacingGoal, getPacingGoal
+  - Curriculum cache: cacheCurriculum, cacheStudent, getCachedStudent, isCurriculumCached, getLastSync
+  - Export/Import: exportData, importData (for backup & restore)
+- Added helper functions: localId(), getCurrentPhone(), clearLocalData(), clearAllData(), getLocalDBStats()
+- Build passes, lint passes
+- No breaking changes — existing app still works with Turso DB
+
+Stage Summary:
+- Dexie.js IndexedDB layer is ready as foundation
+- localDB tables: students, subjects, chapters, topics, progress, specialCourses, config, pacingGoals, syncMeta
+- useLocalDB hook ready for Phase 1 (progress writes) and Phase 2 (data reads)
+- Next phase: Swap progress/pacing API calls → useLocalDB methods
