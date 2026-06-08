@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { testSheetConnection, buildCurriculumHierarchy, fetchSpecialCoursesFromSheet } from '@/lib/sheet-sync';
 
 /**
- * Health check endpoint — tests Google Sheets connectivity instead of Turso.
+ * Health check endpoint — tests Google Sheets connectivity.
  * GET /api/health
  */
 export async function GET() {

@@ -8,7 +8,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   devIndicators: false,
   turbopack: {},
-  serverExternalPackages: ["@prisma/client", "@prisma/adapter-libsql", "@libsql/client"],
+  serverExternalPackages: [],
+  allowedDevOrigins: [
+    /^https?:\/\/[a-z0-9-]+\.space-z\.ai$/,
+  ],
 };
 
 export default withPWA({
@@ -27,19 +30,45 @@ export default withPWA({
       },
     },
     {
-      urlPattern: /^https:\/\/my-project-rho-snowy\.vercel\.app\/api\/.*/i,
+      urlPattern: /\/api\/data.*/i,
       handler: "NetworkFirst",
       options: {
-        cacheName: "api-calls",
-        expiration: { maxEntries: 50, maxAgeSeconds: 2 * 60 },
+        cacheName: "api-data",
+        expiration: { maxEntries: 30, maxAgeSeconds: 2 * 60 },
+        networkTimeoutSeconds: 8,
+      },
+    },
+    {
+      urlPattern: /\/api\/subject\/.*/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "api-subject",
+        expiration: { maxEntries: 30, maxAgeSeconds: 5 * 60 },
+        networkTimeoutSeconds: 8,
+      },
+    },
+    {
+      urlPattern: /\/api\/health.*/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "api-health",
+        expiration: { maxEntries: 10, maxAgeSeconds: 60 },
         networkTimeoutSeconds: 5,
       },
     },
     {
-      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
+      urlPattern: /\/_next\/static\/.*/i,
       handler: "CacheFirst",
       options: {
-        cacheName: "static-images",
+        cacheName: "next-static",
+        expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+      },
+    },
+    {
+      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|woff2?)$/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "static-assets",
         expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
       },
     },

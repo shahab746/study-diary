@@ -10,7 +10,7 @@ import {
   Search, Plus, Star, Clock, Play, MoreHorizontal, X, ChevronLeft,
   Check, Flame, RotateCcw, BookOpenText, ArrowLeft,
   FileText, Menu, LogOut, Sigma, Cpu, Zap, Beaker, Atom, Pi, Landmark,
-  FileText as PdfIcon, Lock
+  FileText as PdfIcon, Lock, Wifi, WifiOff, RefreshCw, CloudOff
 } from 'lucide-react';
 
 // ============================================
@@ -252,9 +252,15 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
 
   // Format lastSynced time
   const lastSynced = store.lastSynced;
+  const isOnline = store.isOnline;
+  const pendingSyncCount = store.pendingSyncCount;
   const syncLabel = lastSynced
     ? `Synced ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : 'Not synced';
+
+  const handleManualSync = () => {
+    if (isOnline) store.syncNow();
+  };
 
   return (
     <div className="view active">
@@ -262,9 +268,21 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
       <div className="hero-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="hero-date">{getDateLine()}</div>
-          <span style={{ fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: lastSynced ? '#22C55E' : '#8E8E93', display: 'inline-block' }} />
-            {syncLabel}
+          <span 
+            style={{ fontSize: 11, color: isOnline ? '#8E8E93' : '#FF9500', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+            onClick={handleManualSync}
+            title={isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending syncs — tap to sync` : 'Tap to sync') : 'Offline — changes saved locally'}
+          >
+            {isOnline ? (
+              pendingSyncCount > 0 ? (
+                <RefreshCw width={10} height={10} style={{ color: '#FF9500' }} />
+              ) : (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+              )
+            ) : (
+              <WifiOff width={10} height={10} style={{ color: '#FF9500' }} />
+            )}
+            {isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending` : syncLabel) : 'Offline'}
           </span>
         </div>
         <div className="hero-greeting">{getGreeting()}, <span style={{ color: '#FF3B30' }}>{student?.name || 'Student'}</span>.</div>
@@ -963,6 +981,7 @@ export default function Home() {
 
   // Fetch data when session is available
   const fetchData = store.fetchData;
+  const initNetwork = store._initNetworkListeners;
   useEffect(() => {
     if (status === 'authenticated' && session?.user && !initialFetchDone) {
       const phone = (session.user as Record<string, unknown>).phone as string;
@@ -971,6 +990,12 @@ export default function Home() {
       }
     }
   }, [status, session, initialFetchDone, fetchData]);
+
+  // Initialize network listeners for offline/online detection
+  useEffect(() => {
+    const cleanup = initNetwork();
+    return () => { cleanup?.(); };
+  }, [initNetwork]);
 
   // Show login page if not authenticated
   if (status === 'unauthenticated') {

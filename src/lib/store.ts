@@ -2,6 +2,92 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { localDB, localId } from '@/lib/local-db';
 
+// ═══════════════════════════════════════════════
+// Offline Mutation Queue
+// ═══════════════════════════════════════════════
+
+interface PendingMutation {
+  id: string;
+  type: 'progress' | 'pacing';
+  payload: Record<string, unknown>;
+  createdAt: string;
+  retryCount: number;
+}
+
+const MUTATION_QUEUE_KEY = 'study-diary-mutation-queue';
+
+function loadQueue(): PendingMutation[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(MUTATION_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveQueue(queue: PendingMutation[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MUTATION_QUEUE_KEY, JSON.stringify(queue));
+  } catch { /* quota exceeded — drop oldest */ }
+}
+
+function enqueueMutation(mutation: PendingMutation): void {
+  const queue = loadQueue();
+  queue.push(mutation);
+  saveQueue(queue);
+}
+
+function dequeueByPayload(type: string, matchFn: (m: PendingMutation) => boolean): void {
+  const queue = loadQueue();
+  const idx = queue.findIndex(m => m.type === type && matchFn(m));
+  if (idx !== -1) {
+    queue.splice(idx, 1);
+    saveQueue(queue);
+  }
+}
+
+function getQueueLength(): number {
+  return loadQueue().length;
+}
+
+/** Replay all pending mutations when back online */
+async function replayQueue(): Promise<number> {
+  const queue = loadQueue();
+  if (queue.length === 0) return 0;
+
+  let replayed = 0;
+  const toRemove: string[] = [];
+  for (const mutation of queue) {
+    try {
+      if (mutation.type === 'progress') {
+        const res = await fetch('/api/sync-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mutation.payload),
+        });
+        if (res.ok) {
+          toRemove.push(mutation.id);
+          replayed++;
+        } else {
+          mutation.retryCount = (mutation.retryCount || 0) + 1;
+          if (mutation.retryCount >= 5) {
+            toRemove.push(mutation.id);
+          }
+        }
+      } else if (mutation.type === 'pacing') {
+        toRemove.push(mutation.id);
+        replayed++;
+      }
+    } catch {
+      break;
+    }
+  }
+  if (toRemove.length > 0) {
+    saveQueue(queue.filter(m => !toRemove.includes(m.id)));
+  }
+  return replayed;
+}
+
 // Types
 export interface SubjectProgress {
   subjectId: string;
@@ -143,9 +229,12 @@ interface StudyOSState {
 
   // Sync tracking
   lastSynced: string | null;
+  isOnline: boolean;
+  pendingSyncCount: number;
 
   // Actions
   fetchData: (phone?: string) => Promise<void>;
+  syncNow: () => Promise<void>;
   toggleTaskComplete: (topicId: string) => Promise<void>;
   setPacingGoal: (goal: string) => Promise<void>;
   setExpandedSubject: (subjectId: string | null) => void;
@@ -156,6 +245,7 @@ interface StudyOSState {
   toggleFocusTimer: () => void;
   setFocusTimerOpen: (open: boolean) => void;
   setHighlightTopicId: (id: string | null) => void;
+  _initNetworkListeners: () => (() => void) | void;
 }
 
 export const useStudyOS = create<StudyOSState>()(
@@ -189,6 +279,48 @@ export const useStudyOS = create<StudyOSState>()(
       highlightTopicId: null,
       isFreeUser: false,
       lastSynced: null,
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      pendingSyncCount: 0,
+
+      syncNow: async () => {
+        const state = get();
+        const phone = state.student?.phone || '';
+        if (!phone) return;
+
+        try {
+          // Collect all local progress for this student
+          const progress = await localDB.progress
+            .where('studentPhone')
+            .equals(phone)
+            .toArray();
+
+          if (progress.length === 0) return;
+
+          const records = progress.map(p => ({
+            topicId: p.topicId,
+            completed: p.completed,
+            dateCompleted: p.dateCompleted || '',
+          }));
+
+          const res = await fetch('/api/sync-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, records }),
+          });
+
+          if (res.ok) {
+            // Also replay any queued mutations
+            const replayed = await replayQueue();
+            set({
+              lastSynced: new Date().toISOString(),
+              pendingSyncCount: getQueueLength(),
+            });
+            console.log(`✅ Sync complete: ${records.length} progress records, ${replayed} queued mutations replayed`);
+          }
+        } catch (error) {
+          console.warn('Sync failed (will retry later):', error);
+        }
+      },
 
       fetchData: async (phone?: string) => {
         // Clear old data first to prevent showing wrong user's data
@@ -235,6 +367,8 @@ export const useStudyOS = create<StudyOSState>()(
             isFreeUser: data.isFreeUser || false,
             isLoading: false,
             lastSynced: new Date().toISOString(),
+            isOnline: true,
+            pendingSyncCount: getQueueLength(),
           });
 
           // ── Cache student profile into IndexedDB ──
@@ -351,7 +485,7 @@ export const useStudyOS = create<StudyOSState>()(
         });
         set({ subjects: updatedSubjects });
 
-        // ── Write to IndexedDB ONLY (no API call — progress is client-side now) ──
+        // ── Write to IndexedDB ──
         try {
           const existing = await localDB.progress
             .where('[topicId+studentPhone]')
@@ -372,6 +506,35 @@ export const useStudyOS = create<StudyOSState>()(
               dateCompleted: newCompleted ? new Date().toISOString() : null,
             });
           }
+
+          // Queue mutation for server sync
+          const mutationId = localId();
+          enqueueMutation({
+            id: mutationId,
+            type: 'progress',
+            payload: { phone, records: [{ topicId, completed: newCompleted, dateCompleted: newCompleted ? new Date().toISOString() : '' }] },
+            createdAt: new Date().toISOString(),
+            retryCount: 0,
+          });
+          set({ pendingSyncCount: getQueueLength() });
+
+          // If online, try immediate sync and dequeue on success
+          if (navigator.onLine) {
+            fetch('/api/sync-progress', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone, records: [{ topicId, completed: newCompleted, dateCompleted: newCompleted ? new Date().toISOString() : '' }] }),
+            }).then(res => {
+              if (res.ok) {
+                // Dequeue this specific mutation
+                const queue = loadQueue().filter(m => m.id !== mutationId);
+                saveQueue(queue);
+                set({ lastSynced: new Date().toISOString(), pendingSyncCount: getQueueLength() });
+              }
+            }).catch(() => {
+              // Will be replayed later
+            });
+          }
         } catch (idxErr) {
           console.warn('IndexedDB write failed (non-critical):', idxErr);
         }
@@ -389,7 +552,7 @@ export const useStudyOS = create<StudyOSState>()(
           topicsPerDay: pacingInfo?.topicsPerDay || 4,
         });
 
-        // ── Write pacing goal to IndexedDB ONLY (no API call) ──
+        // ── Write pacing goal to IndexedDB ──
         try {
           await localDB.pacingGoals.put({
             id: phone,
@@ -398,6 +561,16 @@ export const useStudyOS = create<StudyOSState>()(
             topicsPerDay: pacingInfo?.topicsPerDay || 4,
             updatedAt: new Date().toISOString(),
           });
+
+          // Queue mutation for server sync
+          enqueueMutation({
+            id: localId(),
+            type: 'pacing',
+            payload: { phone, goal, topicsPerDay: pacingInfo?.topicsPerDay || 4 },
+            createdAt: new Date().toISOString(),
+            retryCount: 0,
+          });
+          set({ pendingSyncCount: getQueueLength() });
         } catch (idxErr) {
           console.warn('IndexedDB pacing write failed (non-critical):', idxErr);
         }
@@ -465,7 +638,7 @@ export const useStudyOS = create<StudyOSState>()(
 
         set({ subjectDetail: updatedDetail });
 
-        // ── Write to IndexedDB ONLY (no API call — progress is client-side now) ──
+        // ── Write to IndexedDB ──
         try {
           const existing = await localDB.progress
             .where('[topicId+studentPhone]')
@@ -486,6 +659,32 @@ export const useStudyOS = create<StudyOSState>()(
               dateCompleted: newCompleted ? new Date().toISOString() : null,
             });
           }
+
+          // Queue mutation for server sync
+          const mutationId2 = localId();
+          enqueueMutation({
+            id: mutationId2,
+            type: 'progress',
+            payload: { phone, records: [{ topicId, completed: newCompleted, dateCompleted: newCompleted ? new Date().toISOString() : '' }] },
+            createdAt: new Date().toISOString(),
+            retryCount: 0,
+          });
+          set({ pendingSyncCount: getQueueLength() });
+
+          // If online, try immediate sync and dequeue on success
+          if (navigator.onLine) {
+            fetch('/api/sync-progress', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone, records: [{ topicId, completed: newCompleted, dateCompleted: newCompleted ? new Date().toISOString() : '' }] }),
+            }).then(res => {
+              if (res.ok) {
+                const queue = loadQueue().filter(m => m.id !== mutationId2);
+                saveQueue(queue);
+                set({ lastSynced: new Date().toISOString(), pendingSyncCount: getQueueLength() });
+              }
+            }).catch(() => {});
+          }
         } catch (idxErr) {
           console.warn('IndexedDB write failed (non-critical):', idxErr);
         }
@@ -505,6 +704,35 @@ export const useStudyOS = create<StudyOSState>()(
 
       setHighlightTopicId: (id: string | null) => {
         set({ highlightTopicId: id });
+      },
+
+      // Online/offline detection
+      _initNetworkListeners: () => {
+        if (typeof window === 'undefined') return;
+
+        const handleOnline = () => {
+          set({ isOnline: true });
+          // Auto-replay queued mutations when coming back online
+          replayQueue().then(replayed => {
+            if (replayed > 0) {
+              set({ pendingSyncCount: getQueueLength(), lastSynced: new Date().toISOString() });
+              console.log(`✅ Back online: ${replayed} mutations replayed`);
+            }
+          });
+        };
+
+        const handleOffline = () => {
+          set({ isOnline: false });
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        // Return cleanup function
+        return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+        };
       },
     }),
     {
