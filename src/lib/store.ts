@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { localDB, localId } from '@/lib/local-db';
 
 // Types
 export interface SubjectProgress {
@@ -234,6 +235,77 @@ export const useStudyOS = create<StudyOSState>()(
             isFreeUser: data.isFreeUser || false,
             isLoading: false,
           });
+
+          // ── Phase 1: Cache student profile into IndexedDB ──
+          if (data.student?.phone) {
+            try {
+              await localDB.students.put({
+                id: data.student.phone,
+                name: data.student.name,
+                phone: data.student.phone,
+                grade: data.student.grade,
+                board: data.student.board,
+                field: data.student.field,
+                status: data.student.status || 'free',
+                startDate: data.student.startDate,
+                targetDate: data.student.targetDate,
+                currentDay: data.student.currentDay || 1,
+                totalDays: data.student.totalDays || 0,
+                topicsDone: data.student.topicsDone || 0,
+                daysLeft: data.student.daysLeft || 0,
+                pacingGoal: data.student.pacingGoal || '5M',
+                pin: data.student.pin || '1234',
+                academicGroup: data.student.academicGroup || '',
+              });
+
+              // Cache progress data from the API response
+              // The API returns progress data embedded in subjects & tasks
+              // We extract completed topic IDs and store them
+              if (data.todayTasks) {
+                for (const task of data.todayTasks) {
+                  if (task.completed && task.topicId) {
+                    const existing = await localDB.progress
+                      .where('[topicId+studentPhone]')
+                      .equals([task.topicId, data.student.phone])
+                      .first();
+                    if (!existing) {
+                      await localDB.progress.put({
+                        id: localId(),
+                        topicId: task.topicId,
+                        studentPhone: data.student.phone,
+                        completed: true,
+                        dateCompleted: new Date().toISOString(),
+                      });
+                    }
+                  }
+                }
+              }
+
+              // Cache pacing goals
+              if (data.pacingGoals && data.student.pacingGoal) {
+                const goal = data.student.pacingGoal;
+                const goalData = data.pacingGoals[goal];
+                if (goalData) {
+                  await localDB.pacingGoals.put({
+                    id: data.student.phone,
+                    goal,
+                    targetDate: goalData.targetDate || '',
+                    topicsPerDay: goalData.topicsPerDay || 4,
+                    updatedAt: new Date().toISOString(),
+                  });
+                }
+              }
+
+              // Update sync meta
+              await localDB.syncMeta.put({
+                id: 'student',
+                lastSynced: new Date().toISOString(),
+                rowCount: 1,
+              });
+            } catch (idxErr) {
+              console.warn('IndexedDB cache failed (non-critical):', idxErr);
+            }
+          }
         } catch (error) {
           console.error('Failed to fetch data:', error);
           set({ isLoading: false });
@@ -247,6 +319,7 @@ export const useStudyOS = create<StudyOSState>()(
         const task = state.todayTasks.find(t => t.topicId === topicId);
         const newCompleted = !task?.completed;
 
+        // Optimistic UI update (instant)
         set({
           todayTasks: state.todayTasks.map(t =>
             t.topicId === topicId ? { ...t, completed: newCompleted } : t
@@ -279,6 +352,32 @@ export const useStudyOS = create<StudyOSState>()(
         });
         set({ subjects: updatedSubjects });
 
+        // ── Phase 1: Write to IndexedDB FIRST (instant, survives offline) ──
+        try {
+          const existing = await localDB.progress
+            .where('[topicId+studentPhone]')
+            .equals([topicId, phone])
+            .first();
+
+          if (existing) {
+            await localDB.progress.update(existing.id, {
+              completed: newCompleted,
+              dateCompleted: newCompleted ? new Date().toISOString() : null,
+            });
+          } else {
+            await localDB.progress.add({
+              id: localId(),
+              topicId,
+              studentPhone: phone,
+              completed: newCompleted,
+              dateCompleted: newCompleted ? new Date().toISOString() : null,
+            });
+          }
+        } catch (idxErr) {
+          console.warn('IndexedDB write failed (non-critical):', idxErr);
+        }
+
+        // ── Then sync to API in background (for Turso, will be removed in Phase 5) ──
         try {
           const res = await fetch('/api/progress', {
             method: 'POST',
@@ -287,14 +386,12 @@ export const useStudyOS = create<StudyOSState>()(
           });
 
           if (!res.ok) {
-            console.warn('Sync failed, reverting optimistic update');
-            set({ todayTasks: state.todayTasks, syncing: false });
-          } else {
-            set({ syncing: false });
+            console.warn('API sync failed — progress saved locally in IndexedDB');
           }
         } catch {
-          set({ syncing: false });
+          console.warn('API sync failed — progress saved locally in IndexedDB');
         }
+        set({ syncing: false });
       },
 
       setPacingGoal: async (goal: string) => {
@@ -307,6 +404,20 @@ export const useStudyOS = create<StudyOSState>()(
           topicsPerDay: pacingInfo?.topicsPerDay || 4,
         });
 
+        // ── Phase 1: Write pacing goal to IndexedDB FIRST ──
+        try {
+          await localDB.pacingGoals.put({
+            id: phone,
+            goal,
+            targetDate: pacingInfo?.targetDate || new Date().toISOString().split('T')[0],
+            topicsPerDay: pacingInfo?.topicsPerDay || 4,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (idxErr) {
+          console.warn('IndexedDB pacing write failed (non-critical):', idxErr);
+        }
+
+        // ── Then sync to API in background ──
         try {
           const res = await fetch('/api/pacing', {
             method: 'POST',
@@ -321,7 +432,7 @@ export const useStudyOS = create<StudyOSState>()(
             get().fetchData();
           }
         } catch {
-          // Silent failure
+          console.warn('API sync failed — pacing goal saved locally in IndexedDB');
         }
       },
 
@@ -384,6 +495,32 @@ export const useStudyOS = create<StudyOSState>()(
 
         set({ subjectDetail: updatedDetail });
 
+        // ── Phase 1: Write to IndexedDB FIRST ──
+        try {
+          const existing = await localDB.progress
+            .where('[topicId+studentPhone]')
+            .equals([topicId, phone])
+            .first();
+
+          if (existing) {
+            await localDB.progress.update(existing.id, {
+              completed: newCompleted,
+              dateCompleted: newCompleted ? new Date().toISOString() : null,
+            });
+          } else {
+            await localDB.progress.add({
+              id: localId(),
+              topicId,
+              studentPhone: phone,
+              completed: newCompleted,
+              dateCompleted: newCompleted ? new Date().toISOString() : null,
+            });
+          }
+        } catch (idxErr) {
+          console.warn('IndexedDB write failed (non-critical):', idxErr);
+        }
+
+        // ── Then sync to API in background ──
         try {
           await fetch('/api/progress', {
             method: 'POST',
@@ -391,7 +528,7 @@ export const useStudyOS = create<StudyOSState>()(
             body: JSON.stringify({ topicId, studentPhone: phone, completed: newCompleted }),
           });
         } catch {
-          // Silent failure
+          console.warn('API sync failed — progress saved locally in IndexedDB');
         }
       },
 
