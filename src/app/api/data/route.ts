@@ -1,85 +1,36 @@
-import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import {
+  findUserByPhone,
+  fetchProgressFromSheet,
+  fetchSpecialCoursesFromSheet,
+  buildCurriculumHierarchy,
+} from '@/lib/sheet-sync';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
-// The Google Sheet stores color names ("Blue", "Teal") and emoji icons ("⚛️").
-// The UI needs hex colors and Lucide icon component names.
 
 const COLOR_MAP: Record<string, string> = {
-  'Blue': '#3B82F6',
-  'Teal': '#14B8A6',
-  'Purple': '#8B5CF6',
-  'Green': '#22C55E',
-  'Amber': '#F59E0B',
-  'Rose': '#F43F5E',
-  'Sky': '#0EA5E9',
-  'Orange': '#F97316',
-  'Emerald': '#10B981',
-  'Gray': '#6B7280',
-  'Red': '#EF4444',
+  'Blue': '#3B82F6', 'Teal': '#14B8A6', 'Purple': '#8B5CF6', 'Green': '#22C55E',
+  'Amber': '#F59E0B', 'Rose': '#F43F5E', 'Sky': '#0EA5E9', 'Orange': '#F97316',
+  'Emerald': '#10B981', 'Gray': '#6B7280', 'Red': '#EF4444',
 };
 
-const ICON_MAP: Record<string, string> = {
-  '⚛️': 'atom',
-  '🧪': 'beaker',
-  '💻': 'cpu',
-  '🧬': 'beaker',
-  '📐': 'pi',
-  '📖': 'book',
-  '📝': 'book',
-  '🇵🇰': 'landmark',
-  '☪️': 'landmark',
-  '📚': 'book',
-  // Also support direct Lucide names
-  'sigma': 'sigma',
-  'cpu': 'cpu',
-  'zap': 'zap',
-  'book': 'book',
-  'beaker': 'beaker',
-  'atom': 'atom',
-  'pi': 'pi',
-  'landmark': 'landmark',
-};
-
-// Subject name → Lucide icon (canonical mapping)
 const SUBJECT_ICON_MAP: Record<string, string> = {
-  'Physics': 'atom',
-  'Chemistry': 'beaker',
-  'Computer Science': 'cpu',
-  'Biology': 'beaker',
-  'Mathematics': 'pi',
-  'Maths': 'pi',
-  'English': 'book',
-  'Urdu': 'book',
-  'Pak Studies': 'landmark',
-  'Islamiat': 'landmark',
+  'Physics': 'atom', 'Chemistry': 'beaker', 'Computer Science': 'cpu',
+  'Biology': 'beaker', 'Mathematics': 'pi', 'Maths': 'pi',
+  'English': 'book', 'Urdu': 'book', 'Pak Studies': 'landmark', 'Islamiat': 'landmark',
 };
 
 function mapColor(color: string): string {
-  // If already a hex color, return as-is
   if (color?.startsWith('#')) return color;
   return COLOR_MAP[color] || '#6B7280';
 }
 
 function mapIcon(icon: string, subjectName?: string): string {
-  // Prefer subject-name-based mapping
-  if (subjectName && SUBJECT_ICON_MAP[subjectName]) {
-    return SUBJECT_ICON_MAP[subjectName];
-  }
-  // Then try emoji/icon mapping
-  if (icon && ICON_MAP[icon]) {
-    return ICON_MAP[icon];
-  }
-  // If it's already a valid Lucide name, return it
-  const validIcons = ['sigma', 'cpu', 'zap', 'book', 'beaker', 'atom', 'pi', 'landmark'];
-  if (validIcons.includes(icon?.toLowerCase())) {
-    return icon.toLowerCase();
-  }
+  if (subjectName && SUBJECT_ICON_MAP[subjectName]) return SUBJECT_ICON_MAP[subjectName];
   return 'book';
 }
 
 // Normalize student status from Google Sheet values
-// Sheet has: "true" = paid, "false" = free
 function normalizeStatus(status: string): string {
   if (!status) return 'free';
   const s = status.toLowerCase().trim();
@@ -89,159 +40,86 @@ function normalizeStatus(status: string): string {
   return s;
 }
 
-// Force dynamic rendering — always return fresh data from the DB
+// Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
-    const isTurso = !!process.env.LIBSQL_URL;
 
-    // ─── STEP 1: Fetch student profile ────────────────────────────────
-    let student = null;
+    // ─── STEP 1: Fetch student profile from Google Sheets ─────────────
+    let student: Record<string, any> | null = null;
     let academicGroup = '';
-    const studentSelect = {
-      name: true, phone: true, grade: true, board: true, field: true,
-      status: true, startDate: true, targetDate: true, currentDay: true,
-      totalDays: true, topicsDone: true, daysLeft: true, pacingGoal: true,
-      academicGroup: true,
-    } as const;
 
     if (phone) {
-      const localStudent = await db.student.findUnique({
-        where: { phone },
-        select: studentSelect,
-      });
-      if (localStudent) {
-        academicGroup = localStudent.academicGroup || '';
-        student = localStudent;
+      const sheetUser = await findUserByPhone(phone, true);
+      if (sheetUser) {
+        academicGroup = sheetUser.academicGroup || '';
+        student = {
+          name: sheetUser.name,
+          phone: sheetUser.phone,
+          grade: sheetUser.grade,
+          board: sheetUser.board,
+          field: sheetUser.field,
+          status: normalizeStatus(sheetUser.status),
+          startDate: sheetUser.startDate,
+          targetDate: sheetUser.targetDate,
+          currentDay: sheetUser.currentDay,
+          totalDays: sheetUser.totalDays,
+          topicsDone: sheetUser.topicsDone,
+          daysLeft: sheetUser.daysLeft,
+          pacingGoal: sheetUser.pacingGoal || '5M',
+          academicGroup: sheetUser.academicGroup,
+          pin: sheetUser.pin,
+        };
       }
     }
+
+    // If no student found with phone, try first user (fallback)
     if (!student) {
-      const localStudent = await db.student.findFirst({ select: studentSelect });
-      if (localStudent) {
-        academicGroup = localStudent.academicGroup || '';
-        student = localStudent;
+      const { fetchUsersFromSheet } = await import('@/lib/sheet-sync');
+      const allUsers = await fetchUsersFromSheet(false);
+      const firstUser = allUsers[0];
+      if (firstUser) {
+        academicGroup = firstUser.academicGroup || '';
+        student = {
+          name: firstUser.name,
+          phone: firstUser.phone,
+          grade: firstUser.grade,
+          board: firstUser.board,
+          field: firstUser.field,
+          status: normalizeStatus(firstUser.status),
+          startDate: firstUser.startDate,
+          targetDate: firstUser.targetDate,
+          currentDay: firstUser.currentDay,
+          totalDays: firstUser.totalDays,
+          topicsDone: firstUser.topicsDone,
+          daysLeft: firstUser.daysLeft,
+          pacingGoal: firstUser.pacingGoal || '5M',
+          academicGroup: firstUser.academicGroup,
+          pin: firstUser.pin,
+        };
       }
     }
 
     const studentGrade = String(student?.grade || '10');
+
+    // ─── STEP 2: Fetch curriculum, progress, special courses in parallel ──
+    const [subjects, progressRows, specialCourses] = await Promise.all([
+      buildCurriculumHierarchy(),
+      phone ? fetchProgressFromSheet() : Promise.resolve([]),
+      fetchSpecialCoursesFromSheet(),
+    ]);
+
+    // ─── STEP 3: Filter subjects by grade ──────────────────────────────
     const gradeVariants = [studentGrade, `Grade ${studentGrade}`];
+    const gradeSet = new Set(gradeVariants);
 
-    // ─── STEP 2: Fetch ALL data in batch queries ──────────────────────
-    // CRITICAL: Use batch queries instead of N+1 includes to avoid 
-    // hundreds of sequential HTTP round-trips to Turso
-    
-    let subjects: any[];
-    let chapters: any[];
-    let topics: any[];
-    let progress: any[];
-    let specialCourses: any[];
+    const filteredSubjects = subjects.filter(s => gradeSet.has(s.grade));
 
-    if (isTurso) {
-      // Direct SQL — 5 queries total instead of 500+
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { createClient } = require('@libsql/client') as typeof import('@libsql/client');
-      const client = createClient({
-        url: process.env.LIBSQL_URL!,
-        authToken: process.env.LIBSQL_AUTH_TOKEN || undefined,
-      });
-
-      const gradePlaceholders = gradeVariants.map(() => '?').join(', ');
-      
-      const [subjectsResult, chaptersResult, topicsResult, progressResult, specialCoursesResult] = await Promise.all([
-        client.execute({
-          sql: `SELECT * FROM Subject WHERE "grade" IN (${gradePlaceholders}) ORDER BY "order" ASC`,
-          args: gradeVariants,
-        }),
-        client.execute(`SELECT * FROM Chapter ORDER BY number ASC`),
-        client.execute(`SELECT * FROM Topic ORDER BY number ASC`),
-        client.execute({
-          sql: 'SELECT * FROM Progress WHERE "studentPhone" = ?',
-          args: [student?.phone || ''],
-        }),
-        client.execute({
-          sql: `SELECT * FROM SpecialCourse WHERE "grade" IN (${gradePlaceholders}) ORDER BY "order" ASC`,
-          args: gradeVariants,
-        }),
-      ]);
-
-      client.close();
-
-      // Convert to camelCase objects
-      const toCamel = (row: any) => {
-        const result: any = {};
-        for (const [key, value] of Object.entries(row as Record<string, any>)) {
-          const camelKey = key.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
-          result[camelKey] = value;
-        }
-        return result;
-      };
-
-      subjects = subjectsResult.rows.map(toCamel);
-      chapters = chaptersResult.rows.map(toCamel);
-      topics = topicsResult.rows.map(toCamel);
-      progress = progressResult.rows.map(toCamel);
-      specialCourses = specialCoursesResult.rows.map(toCamel);
-    } else {
-      // Local: use Prisma with includes (efficient locally)
-      const [subjectsResult, allProgress, specialCoursesResult] = await Promise.all([
-        db.subject.findMany({
-          where: { grade: { in: gradeVariants } },
-          orderBy: { order: 'asc' },
-          include: {
-            chapters: {
-              orderBy: { number: 'asc' },
-              include: {
-                topics: { orderBy: { number: 'asc' } },
-              },
-            },
-          },
-        }),
-        db.progress.findMany({ where: { studentPhone: student?.phone || '' } }),
-        db.specialCourse.findMany({
-          where: { grade: { in: gradeVariants } },
-          orderBy: { order: 'asc' },
-        }),
-      ]);
-
-      subjects = subjectsResult;
-      progress = allProgress;
-      specialCourses = specialCoursesResult;
-      chapters = []; // Not needed for Prisma (already nested)
-      topics = [];   // Not needed for Prisma (already nested)
-    }
-
-    // ─── STEP 3: Assemble relationships in memory (Turso only) ────────
-    if (isTurso) {
-      // Build lookup maps for O(1) access
-      const chaptersBySubject = new Map<string, any[]>();
-      for (const ch of chapters) {
-        const list = chaptersBySubject.get(ch.subjectId) || [];
-        list.push(ch);
-        chaptersBySubject.set(ch.subjectId, list);
-      }
-
-      const topicsByChapter = new Map<string, any[]>();
-      for (const t of topics) {
-        const list = topicsByChapter.get(t.chapterId) || [];
-        list.push(t);
-        topicsByChapter.set(t.chapterId, list);
-      }
-
-      // Assemble subjects with nested chapters & topics
-      for (const subject of subjects) {
-        const subjectChapters = chaptersBySubject.get(subject.id) || [];
-        for (const ch of subjectChapters) {
-          ch.topics = topicsByChapter.get(ch.id) || [];
-        }
-        subject.chapters = subjectChapters;
-      }
-    }
-
-    // ─── STEP 4: Filter subjects by Group_Eligibility ─────────────────
-    const eligibleSubjects = subjects.filter((subject: any) => {
+    // ─── STEP 4: Filter by Group_Eligibility ───────────────────────────
+    const eligibleSubjects = filteredSubjects.filter(subject => {
       const eligibility = subject.groupEligibility || 'Both';
       if (eligibility === 'Both') return true;
       if (academicGroup && eligibility === academicGroup) return true;
@@ -249,16 +127,18 @@ export async function GET(request: Request) {
       return false;
     });
 
-    // ─── STEP 5: Compute per-subject progress ─────────────────────────
+    // ─── STEP 5: Build progress lookup ─────────────────────────────────
     const progressSet = new Set(
-      progress.filter((p: any) => p.completed).map((p: any) => p.topicId)
+      progressRows.filter(p => p.phone === (student?.phone || '') && p.completed).map(p => p.topicId)
     );
 
     const isFreeUser = normalizeStatus(student?.status || '') === 'free';
-    const subjectProgress = eligibleSubjects.map((subject: any) => {
-      const allTopics = subject.chapters.flatMap((ch: any) => ch.topics || []);
-      const completedTopics = allTopics.filter((t: any) => progressSet.has(t.id));
-      const availableTopics = isFreeUser ? allTopics.filter((t: any) => t.isFree) : allTopics;
+
+    // ─── STEP 6: Compute per-subject progress ──────────────────────────
+    const subjectProgress = eligibleSubjects.map(subject => {
+      const allTopics = subject.chapters.flatMap(ch => ch.topics);
+      const completedTopics = allTopics.filter(t => progressSet.has(t.id));
+      const availableTopics = isFreeUser ? allTopics.filter(t => t.isFree) : allTopics;
 
       return {
         subjectId: subject.id,
@@ -266,35 +146,35 @@ export async function GET(request: Request) {
         color: mapColor(subject.color),
         icon: mapIcon(subject.icon, subject.name),
         totalTopics: availableTopics.length,
-        completedTopics: completedTopics.filter((t: any) =>
-          isFreeUser ? allTopics.find((at: any) => at.id === t.id)?.isFree : true
+        completedTopics: completedTopics.filter(t =>
+          isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
         ).length,
         progressPct: availableTopics.length > 0
-          ? Math.round((completedTopics.filter((t: any) =>
-              isFreeUser ? allTopics.find((at: any) => at.id === t.id)?.isFree : true
+          ? Math.round((completedTopics.filter(t =>
+              isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
             ).length / availableTopics.length) * 100)
           : 0,
         chapterCount: subject.chapters.length,
         isLocked: isFreeUser && subject.name !== 'Physics',
-        chapters: subject.chapters.map((ch: any) => ({
+        chapters: subject.chapters.map(ch => ({
           id: ch.id,
           number: ch.number,
           name: ch.name,
-          totalTopics: (ch.topics || []).length,
-          completedTopics: (ch.topics || []).filter((t: any) => progressSet.has(t.id)).length,
+          totalTopics: ch.topics.length,
+          completedTopics: ch.topics.filter(t => progressSet.has(t.id)).length,
         })),
       };
     });
 
-    // ─── STEP 6: Build today's tasks ──────────────────────────────────
-    const pacingGoal = student?.pacingGoal || '5M';
+    // ─── STEP 7: Build today's tasks ───────────────────────────────────
+    const pacingGoal = (student as any)?.pacingGoal || '5M';
     const pacingMonths: Record<string, number> = { '3M': 3, '5M': 5, '6M': 6 };
     const months = pacingMonths[pacingGoal] || 5;
     const totalDaysInPlan = months * 30;
 
-    const allTopicsFlat = eligibleSubjects.flatMap((s: any) => s.chapters.flatMap((ch: any) => ch.topics || []));
+    const allTopicsFlat = eligibleSubjects.flatMap(s => s.chapters.flatMap(ch => ch.topics));
     const totalTopicsCount = allTopicsFlat.length;
-    const totalCompleted = progress.filter((p: any) => p.completed).length;
+    const totalCompleted = progressRows.filter(p => p.phone === (student?.phone || '') && p.completed).length;
     const totalRemaining = totalTopicsCount - totalCompleted;
 
     const currentDay = student?.currentDay || 1;
@@ -313,7 +193,6 @@ export async function GET(request: Request) {
         chapterName: string;
         videoLink: string;
         pdfLink: string;
-        chapterId: string;
         isFree: boolean;
       }>;
       totalTopics: number;
@@ -324,20 +203,20 @@ export async function GET(request: Request) {
     for (const subject of eligibleSubjects) {
       if (isFreeUser && subject.name !== 'Physics') continue;
 
-      const allSubjectTopics = subject.chapters.flatMap((ch: any) => ch.topics || []);
-      const completedCount = allSubjectTopics.filter((t: any) => progressSet.has(t.id)).length;
+      const allSubjectTopics = subject.chapters.flatMap(ch => ch.topics);
+      const completedCount = allSubjectTopics.filter(t => progressSet.has(t.id)).length;
 
       const remaining = allSubjectTopics
-        .filter((t: any) => !progressSet.has(t.id))
-        .filter((t: any) => isFreeUser ? t.isFree : true)
-        .sort((a: any, b: any) => {
-          const chA = subject.chapters.find((ch: any) => ch.id === a.chapterId);
-          const chB = subject.chapters.find((ch: any) => ch.id === b.chapterId);
+        .filter(t => !progressSet.has(t.id))
+        .filter(t => isFreeUser ? t.isFree : true)
+        .sort((a, b) => {
+          const chA = subject.chapters.find(ch => ch.id === a.chapterId);
+          const chB = subject.chapters.find(ch => ch.id === b.chapterId);
           if (chA && chB && chA.number !== chB.number) return chA.number - chB.number;
           return a.number - b.number;
         })
-        .map((t: any) => {
-          const chapter = subject.chapters.find((ch: any) => ch.id === t.chapterId);
+        .map(t => {
+          const chapter = subject.chapters.find(ch => ch.id === t.chapterId);
           return {
             topicId: t.id,
             topicName: t.name,
@@ -345,7 +224,6 @@ export async function GET(request: Request) {
             chapterName: chapter?.name || '',
             videoLink: t.videoLink,
             pdfLink: t.pdfLink,
-            chapterId: t.chapterId,
             isFree: t.isFree,
           };
         });
@@ -433,20 +311,18 @@ export async function GET(request: Request) {
 
     // Performance data
     const performanceData = [
-      { month: 'May', lectures: completedCountForMonth(progress, 5) },
-      { month: 'Jun', lectures: completedCountForMonth(progress, 6) },
-      { month: 'Jul', lectures: completedCountForMonth(progress, 7) },
+      { month: 'May', lectures: completedCountForMonth(progressRows, student?.phone || '', 5) },
+      { month: 'Jun', lectures: completedCountForMonth(progressRows, student?.phone || '', 6) },
+      { month: 'Jul', lectures: completedCountForMonth(progressRows, student?.phone || '', 7) },
     ];
 
     // Focus score
     const focusScore = finalTodayTasks.length > 0
-      ? Math.round((finalTodayTasks.filter(t =>
-          progressSet.has(t.topicId)
-        ).length / finalTodayTasks.length) * 100)
+      ? Math.round((finalTodayTasks.filter(t => progressSet.has(t.topicId)).length / finalTodayTasks.length) * 100)
       : 0;
 
     // Streak
-    const streak = calculateStreak(progress);
+    const streak = calculateStreak(progressRows, student?.phone || '');
 
     // Program week
     const programWeek = Math.ceil(currentDay / 7);
@@ -460,10 +336,20 @@ export async function GET(request: Request) {
       '6M': { months: 6, targetDate: getTargetDate(6), topicsPerDay: Math.ceil(totalRemaining / 180) },
     };
 
+    // Map special courses to expected format
+    const specialCoursesFormatted = specialCourses.map(sc => ({
+      id: `sc_${sc.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${sc.order}`,
+      name: sc.name,
+      subject: sc.subject,
+      topic: sc.topic,
+      videoLink: sc.videoLink,
+      pdfLink: sc.pdfLink,
+    }));
+
     return NextResponse.json({
       student,
       subjects: subjectProgress,
-      specialCourses,
+      specialCourses: specialCoursesFormatted,
       todayTasks: finalTodayTasks,
       performanceData,
       pacingGoals,
@@ -494,20 +380,20 @@ function toValidUrl(value: string): string {
   return '';
 }
 
-function completedCountForMonth(progress: any[], month: number): number {
-  return progress.filter((p: any) => {
-    if (!p.completed || !p.dateCompleted) return false;
+function completedCountForMonth(progress: Array<{ phone: string; completed: boolean; dateCompleted: string }>, phone: string, month: number): number {
+  return progress.filter(p => {
+    if (p.phone !== phone || !p.completed || !p.dateCompleted) return false;
     const d = new Date(p.dateCompleted);
     return d.getMonth() === month - 1;
   }).length;
 }
 
-function calculateStreak(progress: any[]): number {
+function calculateStreak(progress: Array<{ phone: string; completed: boolean; dateCompleted: string }>, phone: string): number {
   const completedDates = progress
-    .filter((p: any) => p.completed && p.dateCompleted)
-    .map((p: any) => new Date(p.dateCompleted).toDateString())
-    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
-    .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime());
+    .filter(p => p.phone === phone && p.completed && p.dateCompleted)
+    .map(p => new Date(p.dateCompleted).toDateString())
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
   if (completedDates.length === 0) return 0;
 

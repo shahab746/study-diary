@@ -1,6 +1,6 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { db } from '@/lib/db';
+import { findUserByPhone } from '@/lib/sheet-sync';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -27,121 +27,50 @@ export const authOptions: NextAuthOptions = {
         const cleanPhone = credentials.phone.trim();
         const cleanPin = credentials.pin.trim();
 
-        console.log(`🔐 Auth: Looking up phone="${cleanPhone}"`);
+        console.log(`🔐 Auth: Looking up phone="${cleanPhone}" in Google Sheets`);
 
         try {
-          // Check local database first, with Google Sheets fallback if DB is unavailable
-          let student = null;
-          try {
-            student = await db.student.findUnique({ where: { phone: cleanPhone } });
-          } catch (dbErr) {
-            console.warn('🔐 Auth: DB lookup failed, trying Google Sheets fallback:', dbErr instanceof Error ? dbErr.message : String(dbErr));
-          }
+          // Look up user directly from Google Sheets
+          const sheetUser = await findUserByPhone(cleanPhone, true);
 
-          // If DB lookup failed or user not found, try Google Sheets directly
-          if (!student) {
-            try {
-              const { findUserByPhone, invalidateCache } = await import('@/lib/sheet-sync');
-              invalidateCache('sheet_users');
-              const sheetUser = await findUserByPhone(cleanPhone, true);
-              if (sheetUser) {
-                student = {
-                  name: sheetUser.name,
-                  phone: sheetUser.phone,
-                  grade: sheetUser.grade,
-                  board: sheetUser.board,
-                  field: sheetUser.field,
-                  status: sheetUser.status,
-                  pin: sheetUser.pin,
-                  academicGroup: sheetUser.academicGroup,
-                };
-                // Try to save to DB for future fast lookups
-                try {
-                  await db.student.upsert({
-                    where: { phone: sheetUser.phone },
-                    create: {
-                      name: sheetUser.name,
-                      phone: sheetUser.phone,
-                      grade: sheetUser.grade,
-                      board: sheetUser.board,
-                      field: sheetUser.field,
-                      status: sheetUser.status,
-                      startDate: sheetUser.startDate ? new Date(sheetUser.startDate) : new Date(),
-                      targetDate: sheetUser.targetDate ? new Date(sheetUser.targetDate) : new Date(),
-                      currentDay: sheetUser.currentDay,
-                      totalDays: sheetUser.totalDays,
-                      topicsDone: sheetUser.topicsDone,
-                      daysLeft: sheetUser.daysLeft,
-                      pin: sheetUser.pin,
-                      academicGroup: sheetUser.academicGroup,
-                    },
-                    update: {
-                      name: sheetUser.name,
-                      grade: sheetUser.grade,
-                      board: sheetUser.board,
-                      field: sheetUser.field,
-                      status: sheetUser.status,
-                      currentDay: sheetUser.currentDay,
-                      totalDays: sheetUser.totalDays,
-                      topicsDone: sheetUser.topicsDone,
-                      daysLeft: sheetUser.daysLeft,
-                      pin: sheetUser.pin,
-                      academicGroup: sheetUser.academicGroup,
-                    },
-                  });
-                } catch (saveErr) {
-                  console.warn('🔐 Auth: Failed to save user to DB after Google Sheets lookup:', saveErr instanceof Error ? saveErr.message : String(saveErr));
-                }
-              }
-            } catch (sheetErr) {
-              console.warn('🔐 Auth: Google Sheets fallback also failed:', sheetErr instanceof Error ? sheetErr.message : String(sheetErr));
-            }
-          }
-
-          if (!student) {
-            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in local DB or Google Sheets`);
+          if (!sheetUser) {
+            console.warn(`🔐 Auth: No user found for phone="${cleanPhone}" in Google Sheets`);
             throw new Error('No account found. Please try again or contact support.');
           }
 
-          if (student.pin !== cleanPin) {
+          if (sheetUser.pin !== cleanPin) {
             console.warn(`🔐 Auth: Wrong PIN for phone="${cleanPhone}"`);
             throw new Error('Incorrect PIN');
           }
 
-          if (student.status === 'blocked' || student.status === 'disabled') {
-            throw new Error('Your account has been disabled. Please contact support.');
-          }
-
-          // Normalize status from Google Sheet: "true" = paid, "false" = free
-          const normalizedStatus = student.status?.toLowerCase().trim();
+          // Normalize status
+          const normalizedStatus = sheetUser.status?.toLowerCase().trim();
           if (normalizedStatus === 'blocked' || normalizedStatus === 'disabled') {
             throw new Error('Your account has been disabled. Please contact support.');
           }
 
-          console.log(`🔐 Auth: Login successful for "${student.name}" (${student.status})`);
+          console.log(`🔐 Auth: Login successful for "${sheetUser.name}" (${sheetUser.status})`);
 
           return {
-            id: student.phone,
-            name: student.name,
-            phone: student.phone,
-            grade: student.grade,
-            board: student.board,
-            field: student.field,
-            status: student.status,
-            academicGroup: student.academicGroup,
+            id: sheetUser.phone,
+            name: sheetUser.name,
+            phone: sheetUser.phone,
+            grade: sheetUser.grade,
+            board: sheetUser.board,
+            field: sheetUser.field,
+            status: sheetUser.status,
+            academicGroup: sheetUser.academicGroup,
           };
         } catch (error) {
           // Re-throw our own error messages
-          if (error instanceof Error && error.message.includes('No account')) {
+          if (error instanceof Error && (
+            error.message.includes('No account') ||
+            error.message.includes('Incorrect PIN') ||
+            error.message.includes('disabled')
+          )) {
             throw error;
           }
-          if (error instanceof Error && error.message.includes('Incorrect PIN')) {
-            throw error;
-          }
-          if (error instanceof Error && error.message.includes('disabled')) {
-            throw error;
-          }
-          // Unexpected errors — include the actual error message for debugging
+          // Unexpected errors
           console.error('🔐 Auth: Unexpected error during authorization:', error);
           const errMsg = error instanceof Error ? error.message : String(error);
           throw new Error(`Connection error: ${errMsg}`);

@@ -471,3 +471,210 @@ export async function fetchSubjectEligibilityMap(forceRefresh = false): Promise<
   
   return eligibilityMap;
 }
+
+// ============================================
+// Deterministic ID Generators
+// ============================================
+// Since we no longer have a database generating IDs, we need
+// deterministic IDs based on the curriculum data so they're
+// stable across requests and match progress data.
+
+export function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function makeSubjectId(subjectName: string, grade: string): string {
+  const g = grade.startsWith('Grade') ? grade : `Grade ${grade}`;
+  return `subj_${normalizeName(subjectName)}_${normalizeName(g)}`;
+}
+
+export function makeChapterId(subjectId: string, chapterNo: number): string {
+  return `ch_${subjectId}_${chapterNo}`;
+}
+
+export function makeTopicId(chapterId: string, topicNo: number): string {
+  return `topic_${chapterId}_${topicNo}`;
+}
+
+// ============================================
+// Build Full Curriculum Hierarchy from Sheet
+// ============================================
+// Converts flat curriculum rows into nested Subject→Chapter→Topic
+// structure with deterministic IDs, ready for API responses.
+
+export interface BuiltSubject {
+  id: string;
+  name: string;
+  grade: string;
+  board: string;
+  field: string;
+  totalTopics: number;
+  chapterCount: number;
+  color: string;
+  icon: string;
+  order: number;
+  groupEligibility: string;
+  chapters: BuiltChapter[];
+}
+
+export interface BuiltChapter {
+  id: string;
+  subjectId: string;
+  number: number;
+  name: string;
+  topics: BuiltTopic[];
+}
+
+export interface BuiltTopic {
+  id: string;
+  chapterId: string;
+  number: number;
+  name: string;
+  videoLink: string;
+  pdfLink: string;
+  isFree: boolean;
+  dayNumber: number;
+}
+
+const SUBJECT_STYLING: Record<string, { color: string; icon: string; order: number }> = {
+  'Physics': { color: 'Blue', icon: '⚛️', order: 1 },
+  'Chemistry': { color: 'Teal', icon: '🧪', order: 2 },
+  'Computer Science': { color: 'Purple', icon: '💻', order: 3 },
+  'Biology': { color: 'Green', icon: '🧬', order: 4 },
+  'Maths': { color: 'Amber', icon: '📐', order: 5 },
+  'Mathematics': { color: 'Amber', icon: '📐', order: 5 },
+  'English': { color: 'Rose', icon: '📖', order: 6 },
+  'Urdu': { color: 'Sky', icon: '📝', order: 7 },
+  'Pak Studies': { color: 'Orange', icon: '🇵🇰', order: 8 },
+  'Islamiat': { color: 'Emerald', icon: '☪️', order: 9 },
+};
+
+export async function buildCurriculumHierarchy(forceRefresh = false): Promise<BuiltSubject[]> {
+  const curriculum = await fetchCurriculumFromSheet(forceRefresh);
+  if (curriculum.length === 0) return [];
+
+  // Group by subject+grade
+  const subjectGroups = new Map<string, SheetCurriculumRow[]>();
+  for (const row of curriculum) {
+    const key = `${row.subject}|||${row.grade}`;
+    if (!subjectGroups.has(key)) subjectGroups.set(key, []);
+    subjectGroups.get(key)!.push(row);
+  }
+
+  const subjects: BuiltSubject[] = [];
+
+  for (const [subjectKey, rows] of subjectGroups) {
+    const [subjectName, grade] = subjectKey.split('|||');
+    const firstRow = rows[0];
+    const board = firstRow.board || 'BISE Abbottabad';
+    const field = firstRow.field || 'Science';
+    const styling = SUBJECT_STYLING[subjectName] || { color: 'Gray', icon: '📚', order: 99 };
+    const gradeDisplay = grade.startsWith('Grade') ? grade : `Grade ${grade}`;
+    const subjectId = makeSubjectId(subjectName, gradeDisplay);
+
+    // Group by chapter
+    const chapterGroups = new Map<string, SheetCurriculumRow[]>();
+    for (const row of rows) {
+      const chKey = `${row.chapterNo}|||${row.chapterName}`;
+      if (!chapterGroups.has(chKey)) chapterGroups.set(chKey, []);
+      chapterGroups.get(chKey)!.push(row);
+    }
+
+    const chapters: BuiltChapter[] = [];
+    for (const [chapterKey, chapterRows] of chapterGroups) {
+      const [chapterNoStr, chapterName] = chapterKey.split('|||');
+      const chapterNo = parseInt(chapterNoStr) || 0;
+      const chapterId = makeChapterId(subjectId, chapterNo);
+
+      const topics: BuiltTopic[] = chapterRows.map(row => ({
+        id: makeTopicId(chapterId, row.topicNo),
+        chapterId,
+        number: row.topicNo,
+        name: row.topicName,
+        videoLink: row.videoLink || '',
+        pdfLink: row.pdfLink || '',
+        isFree: row.isFree,
+        dayNumber: row.totalDays || 0,
+      }));
+
+      chapters.push({ id: chapterId, subjectId, number: chapterNo, name: chapterName, topics });
+    }
+
+    subjects.push({
+      id: subjectId,
+      name: subjectName,
+      grade: gradeDisplay,
+      board,
+      field,
+      totalTopics: rows.length,
+      chapterCount: chapterGroups.size,
+      color: styling.color,
+      icon: styling.icon,
+      order: styling.order,
+      groupEligibility: firstRow.groupEligibility || 'Both',
+      chapters,
+    });
+  }
+
+  // Sort by order
+  subjects.sort((a, b) => a.order - b.order);
+  return subjects;
+}
+
+// ============================================
+// Fetch Special Courses from Google Sheet
+// ============================================
+
+export interface SheetSpecialCourse {
+  name: string;
+  subject: string;
+  topic: string;
+  videoLink: string;
+  pdfLink: string;
+  grade: string;
+  board: string;
+  order: number;
+}
+
+export async function fetchSpecialCoursesFromSheet(forceRefresh = false): Promise<SheetSpecialCourse[]> {
+  const cacheKey = 'sheet_special_courses';
+  
+  if (!forceRefresh) {
+    const cached = getCached<SheetSpecialCourse[]>(cacheKey);
+    if (cached) return cached;
+  }
+
+  try {
+    const rows = await fetchSheetAsCSV(SHEETS.SPECIAL_COURSES, forceRefresh);
+
+    if (rows.length < 2) {
+      return [];
+    }
+
+    const courses: SheetSpecialCourse[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row[0]) continue; // Skip rows without name
+      
+      courses.push({
+        name: String(row[0] || '').trim(),
+        subject: String(row[1] || '').trim(),
+        topic: String(row[2] || '').trim(),
+        videoLink: String(row[3] || '').trim(),
+        pdfLink: String(row[4] || '').trim(),
+        grade: String(row[5] || '').trim(),
+        board: String(row[6] || '').trim(),
+        order: parseInt(String(row[7] || '0'), 10) || 0,
+      });
+    }
+
+    setCache(cacheKey, courses);
+    console.log(`✅ Fetched ${courses.length} special courses from live Google Sheet`);
+    return courses;
+  } catch (error) {
+    console.error('Failed to fetch special courses from sheet:', error);
+    const cached = getCached<SheetSpecialCourse[]>(cacheKey);
+    if (cached) return cached;
+    return [];
+  }
+}

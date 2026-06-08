@@ -250,11 +250,23 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
 
   const nextTask = tasks.find(t => !t.completed);
 
+  // Format lastSynced time
+  const lastSynced = store.lastSynced;
+  const syncLabel = lastSynced
+    ? `Synced ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Not synced';
+
   return (
     <div className="view active">
       {/* Hero Card */}
       <div className="hero-card">
-        <div className="hero-date">{getDateLine()}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="hero-date">{getDateLine()}</div>
+          <span style={{ fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: lastSynced ? '#22C55E' : '#8E8E93', display: 'inline-block' }} />
+            {syncLabel}
+          </span>
+        </div>
         <div className="hero-greeting">{getGreeting()}, <span style={{ color: '#FF3B30' }}>{student?.name || 'Student'}</span>.</div>
         <div className="hero-message">
           {nextTask

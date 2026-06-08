@@ -141,6 +141,9 @@ interface StudyOSState {
   focusTimerOpen: boolean;
   highlightTopicId: string | null;
 
+  // Sync tracking
+  lastSynced: string | null;
+
   // Actions
   fetchData: (phone?: string) => Promise<void>;
   toggleTaskComplete: (topicId: string) => Promise<void>;
@@ -185,6 +188,7 @@ export const useStudyOS = create<StudyOSState>()(
       focusTimerOpen: false,
       highlightTopicId: null,
       isFreeUser: false,
+      lastSynced: null,
 
       fetchData: async (phone?: string) => {
         // Clear old data first to prevent showing wrong user's data
@@ -198,11 +202,7 @@ export const useStudyOS = create<StudyOSState>()(
           streak: 0,
         });
         try {
-          // NOTE: Removed fire-and-forget sync calls — they add unnecessary 
-          // latency on every page load. Data should be seeded via /api/seed 
-          // endpoint once, then fetched directly from the DB.
-
-          // Fetch actual dashboard data immediately
+          // Fetch actual dashboard data from API (which reads from Google Sheets)
           const params = phone ? `?phone=${encodeURIComponent(phone)}` : '';
           const res = await fetch(`/api/data${params}`, { cache: 'no-store' });
           if (!res.ok) {
@@ -234,9 +234,10 @@ export const useStudyOS = create<StudyOSState>()(
             activePacingGoal: data.student?.pacingGoal || '5M',
             isFreeUser: data.isFreeUser || false,
             isLoading: false,
+            lastSynced: new Date().toISOString(),
           });
 
-          // ── Phase 1: Cache student profile into IndexedDB ──
+          // ── Cache student profile into IndexedDB ──
           if (data.student?.phone) {
             try {
               await localDB.students.put({
@@ -259,8 +260,6 @@ export const useStudyOS = create<StudyOSState>()(
               });
 
               // Cache progress data from the API response
-              // The API returns progress data embedded in subjects & tasks
-              // We extract completed topic IDs and store them
               if (data.todayTasks) {
                 for (const task of data.todayTasks) {
                   if (task.completed && task.topicId) {
@@ -352,7 +351,7 @@ export const useStudyOS = create<StudyOSState>()(
         });
         set({ subjects: updatedSubjects });
 
-        // ── Phase 1: Write to IndexedDB FIRST (instant, survives offline) ──
+        // ── Write to IndexedDB ONLY (no API call — progress is client-side now) ──
         try {
           const existing = await localDB.progress
             .where('[topicId+studentPhone]')
@@ -377,20 +376,6 @@ export const useStudyOS = create<StudyOSState>()(
           console.warn('IndexedDB write failed (non-critical):', idxErr);
         }
 
-        // ── Then sync to API in background (for Turso, will be removed in Phase 5) ──
-        try {
-          const res = await fetch('/api/progress', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topicId, studentPhone: phone, completed: newCompleted }),
-          });
-
-          if (!res.ok) {
-            console.warn('API sync failed — progress saved locally in IndexedDB');
-          }
-        } catch {
-          console.warn('API sync failed — progress saved locally in IndexedDB');
-        }
         set({ syncing: false });
       },
 
@@ -404,7 +389,7 @@ export const useStudyOS = create<StudyOSState>()(
           topicsPerDay: pacingInfo?.topicsPerDay || 4,
         });
 
-        // ── Phase 1: Write pacing goal to IndexedDB FIRST ──
+        // ── Write pacing goal to IndexedDB ONLY (no API call) ──
         try {
           await localDB.pacingGoals.put({
             id: phone,
@@ -417,23 +402,8 @@ export const useStudyOS = create<StudyOSState>()(
           console.warn('IndexedDB pacing write failed (non-critical):', idxErr);
         }
 
-        // ── Then sync to API in background ──
-        try {
-          const res = await fetch('/api/pacing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pacingGoal: goal, studentPhone: phone }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            set({ activePacingGoal: goal, topicsPerDay: data.topicsPerDay });
-            // Refresh tasks for new pacing
-            get().fetchData();
-          }
-        } catch {
-          console.warn('API sync failed — pacing goal saved locally in IndexedDB');
-        }
+        // Refresh tasks for new pacing
+        get().fetchData();
       },
 
       setExpandedSubject: (subjectId: string | null) => {
@@ -495,7 +465,7 @@ export const useStudyOS = create<StudyOSState>()(
 
         set({ subjectDetail: updatedDetail });
 
-        // ── Phase 1: Write to IndexedDB FIRST ──
+        // ── Write to IndexedDB ONLY (no API call — progress is client-side now) ──
         try {
           const existing = await localDB.progress
             .where('[topicId+studentPhone]')
@@ -518,17 +488,6 @@ export const useStudyOS = create<StudyOSState>()(
           }
         } catch (idxErr) {
           console.warn('IndexedDB write failed (non-critical):', idxErr);
-        }
-
-        // ── Then sync to API in background ──
-        try {
-          await fetch('/api/progress', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topicId, studentPhone: phone, completed: newCompleted }),
-          });
-        } catch {
-          console.warn('API sync failed — progress saved locally in IndexedDB');
         }
       },
 
