@@ -88,20 +88,26 @@ export const authOptions: NextAuthOptions = {
           if (isSupabaseConfigured()) {
             const { getSupabase } = await import('@/lib/supabase');
             const sb = getSupabase();
-            await sb.from('users').insert({
+            // Sanitize dates for Sheets data with bad values
+            const safeDate = (v: string | undefined) => {
+              if (!v || v.trim() === '' || v.includes('#REF!') || v.includes('#VALUE!')) return new Date().toISOString().split('T')[0];
+              const d = new Date(v);
+              return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : v;
+            };
+            sb.from('users').insert({
               name: sheetUser.name,
               phone: sheetUser.phone,
-              pin: sheetUser.pin,
+              pin: sheetUser.pin || '1234',
               grade: sheetUser.grade,
               board: sheetUser.board,
               field: sheetUser.field,
               status: sheetUser.status === 'true' ? 'paid' : sheetUser.status === 'false' ? 'free' : sheetUser.status,
               academic_group: sheetUser.academicGroup,
-              start_date: sheetUser.startDate || new Date().toISOString().split('T')[0],
-              target_date: sheetUser.targetDate,
+              start_date: safeDate(sheetUser.startDate),
+              target_date: safeDate(sheetUser.targetDate),
               current_day: sheetUser.currentDay,
               total_days: sheetUser.totalDays,
-              pacing_goal: sheetUser.pacingGoal,
+              pacing_goal: sheetUser.pacingGoal || '5M',
               topics_done: sheetUser.topicsDone,
               days_left: sheetUser.daysLeft,
               topics_per_day: sheetUser.topicsPerDay,

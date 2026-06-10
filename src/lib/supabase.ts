@@ -451,6 +451,19 @@ export async function migrateSheetsToSupabase(): Promise<{ migrated: number; err
   let migrated = 0;
   let errors = 0;
 
+  /** Sanitize date values — handle empty strings, #REF!, and other bad data */
+  function sanitizeDate(value: string | undefined): string {
+    if (!value || value.trim() === '' || value.includes('#REF!') || value.includes('#VALUE!')) {
+      return new Date().toISOString().split('T')[0]; // default to today
+    }
+    // Check if it's a valid date
+    const d = new Date(value);
+    if (isNaN(d.getTime())) {
+      return new Date().toISOString().split('T')[0]; // default to today
+    }
+    return value;
+  }
+
   for (const su of sheetUsers) {
     // Check if already exists
     const { data: existing } = await sb
@@ -464,24 +477,24 @@ export async function migrateSheetsToSupabase(): Promise<{ migrated: number; err
     const { error } = await sb.from('users').insert({
       name: su.name,
       phone: su.phone,
-      pin: su.pin,
+      pin: su.pin || '1234', // default PIN if missing
       grade: su.grade,
       board: su.board,
       field: su.field,
       status: su.status === 'true' ? 'paid' : su.status === 'false' ? 'free' : su.status,
       academic_group: su.academicGroup,
-      start_date: su.startDate,
-      target_date: su.targetDate,
+      start_date: sanitizeDate(su.startDate),
+      target_date: sanitizeDate(su.targetDate),
       current_day: su.currentDay,
       total_days: su.totalDays,
-      pacing_goal: su.pacingGoal,
+      pacing_goal: su.pacingGoal || '5M',
       topics_done: su.topicsDone,
       days_left: su.daysLeft,
       topics_per_day: su.topicsPerDay,
     });
 
     if (error) {
-      console.error(`❌ Migration error for ${su.phone}:`, error);
+      console.error(`❌ Migration error for ${su.phone}:`, error.message);
       errors++;
     } else {
       migrated++;
