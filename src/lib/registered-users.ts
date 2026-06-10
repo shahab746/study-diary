@@ -46,18 +46,31 @@ export interface RegisteredUser {
 // File-Based JSON Store
 // ═══════════════════════════════════════════════
 
-const DATA_DIR = join(process.cwd(), '.data');
+// On Vercel (read-only filesystem), use /tmp; locally use .data dir
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL ? join('/tmp', 'study-diary-data') : join(process.cwd(), '.data');
 const USERS_FILE = join(DATA_DIR, 'registered-users.json');
+
+// In-memory fallback for when filesystem is unavailable (e.g., Vercel edge)
+const memoryStore = new Map<string, RegisteredUser>();
 
 /** Ensure the .data directory exists */
 function ensureDataDir(): void {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    if (!existsSync(DATA_DIR)) {
+      mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch {
+    // Filesystem may be read-only on serverless — use memory fallback
   }
 }
 
-/** Read all registered users from the JSON file */
+/** Read all registered users from the JSON file (or memory fallback) */
 function readUsersFromFile(): Map<string, RegisteredUser> {
+  // On Vercel without Supabase, use memory store
+  if (IS_VERCEL && memoryStore.size > 0) {
+    return new Map(memoryStore);
+  }
   try {
     ensureDataDir();
     if (!existsSync(USERS_FILE)) {
@@ -71,18 +84,24 @@ function readUsersFromFile(): Map<string, RegisteredUser> {
     }
     return map;
   } catch {
-    return new Map<string, RegisteredUser>();
+    return new Map(memoryStore);
   }
 }
 
-/** Write all registered users to the JSON file */
+/** Write all registered users to the JSON file (or memory fallback) */
 function writeUsersToFile(users: Map<string, RegisteredUser>): void {
+  // Always update memory store
+  memoryStore.clear();
+  for (const [k, v] of users) {
+    memoryStore.set(k, v);
+  }
   try {
     ensureDataDir();
     const arr = Array.from(users.values());
     writeFileSync(USERS_FILE, JSON.stringify(arr, null, 2), 'utf-8');
   } catch (error) {
-    console.error('Failed to write registered users file:', error);
+    // Filesystem may be read-only — memory store is the fallback
+    console.warn('⚠️ File write skipped (using memory fallback):', error instanceof Error ? error.message : String(error));
   }
 }
 
