@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server';
 import {
   findUserByPhone,
+  dbUserToSheetUser,
+  getUserProgress,
+  isSupabaseConfigured,
+  type SheetUserCompat,
+} from '@/lib/supabase';
+import {
+  findUserByPhone as findUserByPhoneSheet,
   fetchProgressFromSheet,
   fetchSpecialCoursesFromSheet,
   buildCurriculumHierarchy,
+  fetchUsersFromSheet,
 } from '@/lib/sheet-sync';
 import { findRegisteredUserByPhone } from '@/lib/registered-users';
 
@@ -49,62 +57,92 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // ─── STEP 1: Fetch student profile from Google Sheets ─────────────
+    // ─── STEP 1: Fetch student profile ─────────────────────────────
     let student: Record<string, any> | null = null;
     let academicGroup = '';
+    let progressSource: 'supabase' | 'sheets' = 'sheets';
 
     if (phone) {
-      const sheetUser = await findUserByPhone(phone, true);
-      if (sheetUser) {
-        academicGroup = sheetUser.academicGroup || '';
-        student = {
-          name: sheetUser.name,
-          phone: sheetUser.phone,
-          grade: sheetUser.grade,
-          board: sheetUser.board,
-          field: sheetUser.field,
-          status: normalizeStatus(sheetUser.status),
-          startDate: sheetUser.startDate,
-          targetDate: sheetUser.targetDate,
-          currentDay: sheetUser.currentDay,
-          totalDays: sheetUser.totalDays,
-          topicsDone: sheetUser.topicsDone,
-          daysLeft: sheetUser.daysLeft,
-          pacingGoal: sheetUser.pacingGoal || '5M',
-          academicGroup: sheetUser.academicGroup,
-          pin: sheetUser.pin,
-        };
+      // Try Supabase first
+      if (isSupabaseConfigured()) {
+        const dbUser = await findUserByPhone(phone);
+        if (dbUser) {
+          const sheetUser = dbUserToSheetUser(dbUser);
+          academicGroup = sheetUser.academicGroup || '';
+          student = {
+            name: sheetUser.name,
+            phone: sheetUser.phone,
+            grade: sheetUser.grade,
+            board: sheetUser.board,
+            field: sheetUser.field,
+            status: normalizeStatus(sheetUser.status),
+            startDate: sheetUser.startDate,
+            targetDate: sheetUser.targetDate,
+            currentDay: sheetUser.currentDay,
+            totalDays: sheetUser.totalDays,
+            topicsDone: sheetUser.topicsDone,
+            daysLeft: sheetUser.daysLeft,
+            pacingGoal: sheetUser.pacingGoal || '5M',
+            academicGroup: sheetUser.academicGroup,
+            pin: sheetUser.pin,
+          };
+          progressSource = 'supabase';
+        }
+      }
+
+      // Fallback: Google Sheets
+      if (!student) {
+        const sheetUser = await findUserByPhoneSheet(phone, true);
+        if (sheetUser) {
+          academicGroup = sheetUser.academicGroup || '';
+          student = {
+            name: sheetUser.name,
+            phone: sheetUser.phone,
+            grade: sheetUser.grade,
+            board: sheetUser.board,
+            field: sheetUser.field,
+            status: normalizeStatus(sheetUser.status),
+            startDate: sheetUser.startDate,
+            targetDate: sheetUser.targetDate,
+            currentDay: sheetUser.currentDay,
+            totalDays: sheetUser.totalDays,
+            topicsDone: sheetUser.topicsDone,
+            daysLeft: sheetUser.daysLeft,
+            pacingGoal: sheetUser.pacingGoal || '5M',
+            academicGroup: sheetUser.academicGroup,
+            pin: sheetUser.pin,
+          };
+        }
+      }
+
+      // Fallback: registered-users cache
+      if (!student) {
+        const cachedUser = await findRegisteredUserByPhone(phone, false);
+        if (cachedUser) {
+          academicGroup = cachedUser.academicGroup || '';
+          student = {
+            name: cachedUser.name,
+            phone: cachedUser.phone,
+            grade: cachedUser.grade,
+            board: cachedUser.board,
+            field: cachedUser.field,
+            status: normalizeStatus(cachedUser.status),
+            startDate: cachedUser.startDate,
+            targetDate: cachedUser.targetDate,
+            currentDay: cachedUser.currentDay,
+            totalDays: cachedUser.totalDays,
+            topicsDone: cachedUser.topicsDone,
+            daysLeft: cachedUser.daysLeft,
+            pacingGoal: cachedUser.pacingGoal || '5M',
+            academicGroup: cachedUser.academicGroup,
+            pin: cachedUser.pin,
+          };
+        }
       }
     }
 
-    // If no student found in Sheets, check registered-users cache (for newly registered users)
-    if (!student && phone) {
-      const cachedUser = await findRegisteredUserByPhone(phone, false);
-      if (cachedUser) {
-        academicGroup = cachedUser.academicGroup || '';
-        student = {
-          name: cachedUser.name,
-          phone: cachedUser.phone,
-          grade: cachedUser.grade,
-          board: cachedUser.board,
-          field: cachedUser.field,
-          status: normalizeStatus(cachedUser.status),
-          startDate: cachedUser.startDate,
-          targetDate: cachedUser.targetDate,
-          currentDay: cachedUser.currentDay,
-          totalDays: cachedUser.totalDays,
-          topicsDone: cachedUser.topicsDone,
-          daysLeft: cachedUser.daysLeft,
-          pacingGoal: cachedUser.pacingGoal || '5M',
-          academicGroup: cachedUser.academicGroup,
-          pin: cachedUser.pin,
-        };
-      }
-    }
-
-    // Last resort: if still no student, try first user from Sheets (fallback)
+    // Last resort: first user from Sheets
     if (!student) {
-      const { fetchUsersFromSheet } = await import('@/lib/sheet-sync');
       const allUsers = await fetchUsersFromSheet(false);
       const firstUser = allUsers[0];
       if (firstUser) {
@@ -131,20 +169,40 @@ export async function GET(request: Request) {
 
     const studentGrade = String(student?.grade || '10');
 
-    // ─── STEP 2: Fetch curriculum, progress, special courses in parallel ──
-    const [subjects, progressRows, specialCourses] = await Promise.all([
+    // ─── STEP 2: Fetch curriculum + progress in parallel ──
+    const [subjects, specialCourses] = await Promise.all([
       buildCurriculumHierarchy(),
-      phone ? fetchProgressFromSheet() : Promise.resolve([]),
       fetchSpecialCoursesFromSheet(),
     ]);
 
-    // ─── STEP 3: Filter subjects by grade ──────────────────────────────
+    // ─── STEP 3: Get progress from Supabase or Sheets ──
+    let progressRows: Array<{ phone: string; topicId: string; completed: boolean; dateCompleted: string }> = [];
+
+    if (progressSource === 'supabase' && phone && isSupabaseConfigured()) {
+      const dbProgress = await getUserProgress(phone);
+      progressRows = dbProgress.map(p => ({
+        phone: p.phone,
+        topicId: p.topic_id,
+        completed: p.completed,
+        dateCompleted: p.date_completed || '',
+      }));
+    } else {
+      const sheetProgress = await fetchProgressFromSheet();
+      progressRows = sheetProgress.map(p => ({
+        phone: p.phone,
+        topicId: p.topicId,
+        completed: p.completed,
+        dateCompleted: p.dateCompleted,
+      }));
+    }
+
+    // ─── STEP 4: Filter subjects by grade ──────────────────────────────
     const gradeVariants = [studentGrade, `Grade ${studentGrade}`];
     const gradeSet = new Set(gradeVariants);
 
     const filteredSubjects = subjects.filter(s => gradeSet.has(s.grade));
 
-    // ─── STEP 4: Filter by Group_Eligibility ───────────────────────────
+    // ─── STEP 5: Filter by Group_Eligibility ───────────────────────────
     const eligibleSubjects = filteredSubjects.filter(subject => {
       const eligibility = subject.groupEligibility || 'Both';
       if (eligibility === 'Both') return true;
@@ -153,14 +211,14 @@ export async function GET(request: Request) {
       return false;
     });
 
-    // ─── STEP 5: Build progress lookup ─────────────────────────────────
+    // ─── STEP 6: Build progress lookup ─────────────────────────────────
     const progressSet = new Set(
       progressRows.filter(p => p.phone === (student?.phone || '') && p.completed).map(p => p.topicId)
     );
 
     const isFreeUser = normalizeStatus(student?.status || '') === 'free';
 
-    // ─── STEP 6: Compute per-subject progress ──────────────────────────
+    // ─── STEP 7: Compute per-subject progress ──────────────────────────
     const subjectProgress = eligibleSubjects.map(subject => {
       const allTopics = subject.chapters.flatMap(ch => ch.topics);
       const completedTopics = allTopics.filter(t => progressSet.has(t.id));
@@ -192,7 +250,7 @@ export async function GET(request: Request) {
       };
     });
 
-    // ─── STEP 7: Build today's tasks ───────────────────────────────────
+    // ─── STEP 8: Build today's tasks ───────────────────────────────────
     const pacingGoal = (student as any)?.pacingGoal || '5M';
     const pacingMonths: Record<string, number> = { '3M': 3, '5M': 5, '6M': 6 };
     const months = pacingMonths[pacingGoal] || 5;

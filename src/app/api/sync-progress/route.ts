@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  syncProgressToSupabase,
+  getUserProgress,
+  isSupabaseConfigured,
+} from '@/lib/supabase';
 import { fetchProgressFromSheet } from '@/lib/sheet-sync';
 
 /**
  * Progress Sync Endpoint
  *
- * Accepts progress data from the client's IndexedDB and:
- * 1. Validates the data
- * 2. Merges with existing Google Sheets progress (if any)
- * 3. Returns a consolidated view back to the client
- *
- * Since we don't have a Google Sheets API service account for writes,
- * progress is stored in client-side IndexedDB. This endpoint serves as:
- * - A validation/acknowledgement endpoint
- * - A way to reconcile server-side progress with client-side progress
- * - An export endpoint (GET) for downloading progress as CSV
- *
  * POST /api/sync-progress
  * Body: { phone: string, records: Array<{ topicId, completed, dateCompleted }> }
  *
+ * Now persists to Supabase (not just in-memory cache!)
+ * Falls back to in-memory cache if Supabase is not configured.
+ *
  * GET /api/sync-progress?phone=XXX
- * Returns: Server-side progress merged with IndexedDB progress
+ * Returns the consolidated progress data for a user
  */
 
-// In-memory progress store (resets on server restart, but IndexedDB is source of truth)
+// In-memory fallback cache (only used when Supabase is not configured)
 const serverProgressCache = new Map<string, Map<string, { completed: boolean; dateCompleted: string }>>();
 
 export async function POST(request: NextRequest) {
@@ -37,7 +34,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store progress in server-side cache
+    // ── Supabase: persist progress permanently ──
+    if (isSupabaseConfigured()) {
+      const result = await syncProgressToSupabase(phone, records);
+      return NextResponse.json({
+        success: true,
+        synced: result.synced,
+        merged: result.merged,
+        storage: 'supabase',
+        message: 'Progress synced and persisted to Supabase.',
+      });
+    }
+
+    // ── Fallback: in-memory cache ──
     let userCache = serverProgressCache.get(phone);
     if (!userCache) {
       userCache = new Map();
@@ -58,18 +67,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Also try to fetch server-side progress from Google Sheets for reconciliation
-    let serverRecords: Array<{ topicId: string; completed: boolean; dateCompleted: string }> = [];
+    let serverRecordsCount = 0;
     try {
       const sheetProgress = await fetchProgressFromSheet(false);
       const userSheetProgress = sheetProgress.filter(p => p.phone === phone);
-      serverRecords = userSheetProgress.map(p => ({
-        topicId: p.topicId,
-        completed: p.completed,
-        dateCompleted: p.dateCompleted,
-      }));
+      serverRecordsCount = userSheetProgress.length;
 
-      // Merge server records into cache
-      for (const sr of serverRecords) {
+      for (const sr of userSheetProgress) {
         if (!userCache.has(sr.topicId)) {
           userCache.set(sr.topicId, {
             completed: sr.completed,
@@ -85,9 +89,10 @@ export async function POST(request: NextRequest) {
       success: true,
       synced: records.length,
       merged,
-      serverRecordsCount: serverRecords.length,
+      serverRecordsCount,
       totalCached: userCache.size,
-      message: 'Progress synced successfully.',
+      storage: 'memory-cache',
+      message: 'Progress synced (in-memory only — configure Supabase for persistence).',
     });
   } catch (error) {
     console.error('Sync progress error:', error);
@@ -100,9 +105,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/sync-progress?phone=XXX
- * Returns the consolidated progress data for a user, useful for:
- * - Client reconciliation after login
- * - Exporting progress as data
+ * Returns the consolidated progress data for a user
  */
 export async function GET(request: NextRequest) {
   try {
@@ -117,7 +120,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Collect from server cache
+    // ── Supabase: read from persistent storage ──
+    if (isSupabaseConfigured()) {
+      const progress = await getUserProgress(phone);
+      const records = progress.map(p => ({
+        topicId: p.topic_id,
+        completed: p.completed,
+        dateCompleted: p.date_completed || '',
+      }));
+
+      if (format === 'csv') {
+        const csvLines = ['topicId,completed,dateCompleted'];
+        for (const r of records) {
+          csvLines.push(`${r.topicId},${r.completed},${r.dateCompleted}`);
+        }
+        return new NextResponse(csvLines.join('\n'), {
+          headers: {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': `attachment; filename="progress-${phone}.csv"`,
+          },
+        });
+      }
+
+      return NextResponse.json({
+        phone,
+        source: 'supabase',
+        totalRecords: records.length,
+        records,
+      });
+    }
+
+    // ── Fallback: in-memory cache + Google Sheets ──
     const userCache = serverProgressCache.get(phone);
     const cachedRecords: Array<{ topicId: string; completed: boolean; dateCompleted: string }> = [];
     if (userCache) {
@@ -126,7 +159,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Also collect from Google Sheets
     let sheetRecords: Array<{ topicId: string; completed: boolean; dateCompleted: string }> = [];
     try {
       const sheetProgress = await fetchProgressFromSheet(false);
@@ -141,18 +173,16 @@ export async function GET(request: NextRequest) {
       // Sheets unavailable
     }
 
-    // Merge: server cache takes precedence, then sheet data
     const merged = new Map<string, { topicId: string; completed: boolean; dateCompleted: string }>();
     for (const r of sheetRecords) {
       merged.set(r.topicId, r);
     }
     for (const r of cachedRecords) {
-      merged.set(r.topicId, r); // cache overwrites sheet
+      merged.set(r.topicId, r);
     }
 
     const allRecords = Array.from(merged.values());
 
-    // CSV export format
     if (format === 'csv') {
       const csvLines = ['topicId,completed,dateCompleted'];
       for (const r of allRecords) {
@@ -168,6 +198,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       phone,
+      source: 'memory-cache+sheets',
       totalRecords: allRecords.length,
       records: allRecords,
     });

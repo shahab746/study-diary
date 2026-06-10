@@ -1,5 +1,10 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import {
+  findUserByPhone,
+  dbUserToSheetUser,
+  isSupabaseConfigured,
+} from '@/lib/supabase';
 import { findRegisteredUserByPhone } from '@/lib/registered-users';
 
 export const authOptions: NextAuthOptions = {
@@ -30,7 +35,36 @@ export const authOptions: NextAuthOptions = {
         console.log(`🔐 Auth: Looking up phone="${cleanPhone}"`);
 
         try {
-          // Look up user — checks Google Sheets first, then registered-users cache
+          // ── Try Supabase first ──
+          if (isSupabaseConfigured()) {
+            const dbUser = await findUserByPhone(cleanPhone);
+
+            if (dbUser) {
+              if (dbUser.pin !== cleanPin) {
+                console.warn(`🔐 Auth: Wrong PIN for phone="${cleanPhone}" (Supabase)`);
+                throw new Error('Incorrect PIN');
+              }
+
+              const normalizedStatus = dbUser.status?.toLowerCase().trim();
+              if (normalizedStatus === 'blocked' || normalizedStatus === 'disabled') {
+                throw new Error('Your account has been disabled. Please contact support.');
+              }
+
+              console.log(`🔐 Auth: Login successful for "${dbUser.name}" (${dbUser.status}) [Supabase]`);
+              return {
+                id: dbUser.phone,
+                name: dbUser.name,
+                phone: dbUser.phone,
+                grade: dbUser.grade,
+                board: dbUser.board,
+                field: dbUser.field,
+                status: dbUser.status,
+                academicGroup: dbUser.academic_group,
+              };
+            }
+          }
+
+          // ── Fallback: Google Sheets + registered-users cache ──
           const sheetUser = await findRegisteredUserByPhone(cleanPhone, true);
 
           if (!sheetUser) {
@@ -39,17 +73,44 @@ export const authOptions: NextAuthOptions = {
           }
 
           if (sheetUser.pin !== cleanPin) {
-            console.warn(`🔐 Auth: Wrong PIN for phone="${cleanPhone}"`);
+            console.warn(`🔐 Auth: Wrong PIN for phone="${cleanPhone}" (Sheets)`);
             throw new Error('Incorrect PIN');
           }
 
-          // Normalize status
           const normalizedStatus = sheetUser.status?.toLowerCase().trim();
           if (normalizedStatus === 'blocked' || normalizedStatus === 'disabled') {
             throw new Error('Your account has been disabled. Please contact support.');
           }
 
-          console.log(`🔐 Auth: Login successful for "${sheetUser.name}" (${sheetUser.status})`);
+          console.log(`🔐 Auth: Login successful for "${sheetUser.name}" (${sheetUser.status}) [Sheets fallback]`);
+
+          // Auto-migrate to Supabase on login
+          if (isSupabaseConfigured()) {
+            const { getSupabase } = await import('@/lib/supabase');
+            const sb = getSupabase();
+            await sb.from('users').insert({
+              name: sheetUser.name,
+              phone: sheetUser.phone,
+              pin: sheetUser.pin,
+              grade: sheetUser.grade,
+              board: sheetUser.board,
+              field: sheetUser.field,
+              status: sheetUser.status === 'true' ? 'paid' : sheetUser.status === 'false' ? 'free' : sheetUser.status,
+              academic_group: sheetUser.academicGroup,
+              start_date: sheetUser.startDate || new Date().toISOString().split('T')[0],
+              target_date: sheetUser.targetDate,
+              current_day: sheetUser.currentDay,
+              total_days: sheetUser.totalDays,
+              pacing_goal: sheetUser.pacingGoal,
+              topics_done: sheetUser.topicsDone,
+              days_left: sheetUser.daysLeft,
+              topics_per_day: sheetUser.topicsPerDay,
+            }).catch((err: any) => {
+              if (err?.code !== '23505') {
+                console.warn('⚠️ Auto-migration failed (non-critical):', err.message);
+              }
+            });
+          }
 
           return {
             id: sheetUser.phone,

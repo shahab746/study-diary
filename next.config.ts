@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   turbopack: {},
   serverExternalPackages: [],
   allowedDevOrigins: [
-    /^https?:\/\/[a-z0-9-]+\.space-z\.ai$/,
+    'space-z.ai',
   ],
 };
 

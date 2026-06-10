@@ -251,20 +251,30 @@ export async function fetchUsersFromSheet(forceRefresh = false): Promise<SheetUs
       // Skip empty rows (no name or phone)
       if (!row[0] || !row[1]) continue;
       
+      // Column F can be "is_paid" (TRUE/FALSE) or "Status" (free/paid)
+      // Normalize to 'free' or 'paid' regardless of format
+      let status = String(row[5] || 'free').trim().toLowerCase();
+      if (status === 'true') {
+        status = 'paid';
+      } else if (status === 'false') {
+        status = 'free';
+      }
+      // Keep 'free'/'paid' as-is if already in that format
+
       users.push({
         name: String(row[0] || '').trim(),
         phone: String(row[1] || '').trim(),
         grade: parseInt(String(row[2] || '10'), 10) || 10,
         board: String(row[3] || '').trim(),
         field: String(row[4] || '').trim(),
-        status: String(row[5] || 'free').trim().toLowerCase(),
+        status,
         startDate: String(row[6] || '').trim(),
         targetDate: String(row[7] || '').trim(),
         currentDay: parseInt(String(row[8] || '1'), 10) || 1,
         totalDays: parseInt(String(row[9] || '438'), 10) || 438,
         pacingGoal: String(row[10] || '5M').trim(),
         topicsDone: parseInt(String(row[11] || '0'), 10) || 0,
-        daysLeft: parseInt(String(row[12] || '423'), 10) || 423,
+        daysLeft: parseInt(String(row[12] || '438'), 10) || 438,
         academicGroup: String(row[13] || '').trim(),
         topicsPerDay: parseInt(String(row[14] || '4'), 10) || 4,
         pin: String(row[15] || '').trim(),

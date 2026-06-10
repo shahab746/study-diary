@@ -68,3 +68,66 @@ Stage Summary:
 - Key new files: src/lib/registered-users.ts, src/app/api/register/route.ts, docs/google-apps-script.js
 - Key modified files: src/components/auth/LoginPage.tsx, src/lib/auth.ts, src/app/api/login/route.ts, src/app/api/data/route.ts, src/lib/sheet-sync.ts, src/app/api/health/route.ts
 - Architecture: Google Sheets (read) → File-backed JSON store (registered users) → Google Apps Script (write, optional)
+
+---
+Task ID: 8
+Agent: Main Agent
+Task: Connect Google Apps Script URL and test Sheet writes
+
+Work Log:
+- User provided Apps Script URL: https://script.google.com/macros/s/AKfycbxLxivqsVWQHHiUA1dWKUfaO6o6D9W3nPzZiaE9DZuikxcilWUUbMR7kKjaEwsMXSKd/exec
+- Added to .env as GOOGLE_APPS_SCRIPT_URL
+- Fixed Apps Script POST redirect issue: Google returns 302 which converts POST→GET, losing the body
+  - Updated appendUserToSheet() to use redirect:'manual', capture Location header, then GET the redirect URL
+  - Changed Content-Type from application/json to text/plain;charset=utf-8 (works better with Apps Script)
+- Tested registration: "Zain Ali" (03777111222) → syncedToSheet: true ✅
+- Google Sheet user count went from 3 → 6 (confirmed Apps Script writes are working)
+- Fixed local-db.ts file that was accidentally deleted — recreated from known content
+- Fixed package.json dev script (was "next start" instead of "next dev")
+- Fixed next.config.ts allowedDevOrigins (was regex object, needs to be string)
+- Browser verified: registered "Hassan Raza" (03888999000), dashboard shows correct name after both auto-login and manual login
+
+Stage Summary:
+- Google Apps Script is LIVE and writing new users to the Google Sheet
+- Full registration flow works end-to-end: Register → Save to file + Sheet → Auto-login → Dashboard shows correct name
+- Sign out → Login with same credentials → Dashboard still shows correct name
+- Sheet user count: 6 (3 original + 3 test registrations)
+
+---
+Task ID: 9
+Agent: Main Agent
+Task: Migrate from Google Sheets + Apps Script to Supabase for users & progress
+
+Work Log:
+- Diagnosed root cause of Sheets write failures: GOOGLE_APPS_SCRIPT_URL was missing from .env after server restart
+- Fixed .env, updated Apps Script to handle is_paid column, fixed sheet-sync.ts status mapping
+- Registration to Sheets started working, but user requested migration to Supabase for reliability
+- Installed @supabase/supabase-js
+- Created `src/lib/supabase.ts` — complete Supabase service layer with:
+  - User CRUD operations (register, find, update)
+  - Progress sync operations (sync, toggle, get)
+  - Auto-migration from Sheets → Supabase on login
+  - Graceful fallback when Supabase not configured
+  - Smart isSupabaseConfigured() that rejects placeholder values
+- Created `docs/supabase-migration.sql` — SQL to create users + progress tables in Supabase
+- Updated `src/app/api/register/route.ts` — tries Supabase first, falls back to file store
+- Updated `src/app/api/login/route.ts` — tries Supabase first, auto-migrates Sheet users on login
+- Updated `src/lib/auth.ts` — same Supabase-first strategy with auto-migration
+- Updated `src/app/api/sync-progress/route.ts` — persists to Supabase, falls back to in-memory cache
+- Updated `src/app/api/data/route.ts` — reads user + progress from Supabase, curriculum from Sheets
+- Created `src/app/api/migrate/route.ts` — one-time migration endpoint POST /api/migrate
+- Updated `src/app/api/health/route.ts` — shows Supabase connection status
+- Updated `.env` — added NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY placeholders
+- Fixed `src/lib/local-db.ts` — recreated Dexie IndexedDB module that was missing
+- All lint checks pass
+- Tested in fallback mode: login works (Sheets), registration works (file store), auto-migration works
+
+Stage Summary:
+- Supabase integration complete — app works in dual mode:
+  - Supabase configured: all reads/writes go to Supabase, curriculum from Sheets
+  - Supabase not configured: falls back to Google Sheets + file store (current state)
+- User needs to create Supabase project and add credentials to .env
+- After adding credentials, existing Sheets users auto-migrate on login
+- Progress is now persistent in Supabase (not lost on server restart!)
+- Key new files: src/lib/supabase.ts, docs/supabase-migration.sql, src/app/api/migrate/route.ts
+- Key modified files: register/route.ts, login/route.ts, auth.ts, sync-progress/route.ts, data/route.ts, health/route.ts

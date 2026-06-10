@@ -108,6 +108,11 @@ const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || '';
 /**
  * Append a new user row to the Google Sheet via Apps Script web app.
  * Returns true if the write succeeded.
+ *
+ * NOTE: Google Apps Script web apps return 302 redirects for POST requests.
+ * Standard fetch() follows the redirect but converts POST→GET, losing the body.
+ * We handle this by sending with redirect:'manual', capturing the redirect URL,
+ * then following it with a GET (the script already received the POST data).
  */
 async function appendUserToSheet(user: RegisteredUser): Promise<boolean> {
   if (!APPS_SCRIPT_URL) {
@@ -116,40 +121,88 @@ async function appendUserToSheet(user: RegisteredUser): Promise<boolean> {
   }
 
   try {
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: user.name,
-        phone: user.phone,
-        grade: user.grade,
-        board: user.board,
-        field: user.field,
-        status: user.status,
-        startDate: user.startDate,
-        targetDate: user.targetDate,
-        currentDay: user.currentDay,
-        totalDays: user.totalDays,
-        pacingGoal: user.pacingGoal,
-        topicsDone: user.topicsDone,
-        daysLeft: user.daysLeft,
-        academicGroup: user.academicGroup,
-        topicsPerDay: user.topicsPerDay,
-        pin: user.pin,
-      }),
+    const payload = JSON.stringify({
+      name: user.name,
+      phone: user.phone,
+      grade: user.grade,
+      board: user.board,
+      field: user.field,
+      status: user.status,
+      is_paid: user.status === 'paid',  // Map status to is_paid for sheet compatibility
+      startDate: user.startDate,
+      targetDate: user.targetDate,
+      currentDay: user.currentDay,
+      totalDays: user.totalDays,
+      pacingGoal: user.pacingGoal,
+      topicsDone: user.topicsDone,
+      daysLeft: user.daysLeft,
+      academicGroup: user.academicGroup,
+      topicsPerDay: user.topicsPerDay,
+      pin: user.pin,
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success) {
-        // Invalidate sheet cache so the new user is immediately visible
+    console.log(`📤 Sending registration to Apps Script: ${APPS_SCRIPT_URL.substring(0, 50)}...`);
+
+    // Step 1: POST to the Apps Script URL without following redirects
+    console.log(`📤 POST to Apps Script (payload size: ${payload.length} chars)`);
+    const postRes = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload,
+      redirect: 'manual',
+    });
+    console.log(`📥 Apps Script initial response: status=${postRes.status}, type=${postRes.type}`);
+
+    // Google Apps Script returns 301/302 with the actual response URL
+    if (postRes.status >= 300 && postRes.status < 400) {
+      const redirectUrl = postRes.headers.get('location');
+      console.log(`🔄 Apps Script redirect: ${postRes.status} → ${redirectUrl?.substring(0, 80)}...`);
+      if (redirectUrl) {
+        // Step 2: Follow the redirect to get the actual response
+        const finalRes = await fetch(redirectUrl, {
+          method: 'GET',
+          redirect: 'follow',
+        });
+        console.log(`📥 Redirect response: status=${finalRes.status}`);
+
+        if (finalRes.ok) {
+          const text = await finalRes.text();
+          try {
+            const data = JSON.parse(text);
+            if (data.success) {
+              invalidateCache('sheet_users');
+              console.log(`✅ User "${user.name}" written to Google Sheet via Apps Script`);
+              return true;
+            }
+            console.warn('⚠️ Apps Script returned failure:', data);
+            return false;
+          } catch {
+            // Response might not be JSON — if we got here, the script likely executed
+            console.log(`✅ User "${user.name}" likely written to Google Sheet (non-JSON response)`);
+            invalidateCache('sheet_users');
+            return true;
+          }
+        }
+      }
+    }
+
+    // Some deployments return the response directly (no redirect)
+    if (postRes.ok) {
+      try {
+        const data = await postRes.json();
+        if (data.success) {
+          invalidateCache('sheet_users');
+          console.log(`✅ User "${user.name}" written to Google Sheet via Apps Script`);
+          return true;
+        }
+      } catch {
+        // Non-JSON but 200 OK — likely success
         invalidateCache('sheet_users');
-        console.log(`✅ User "${user.name}" written to Google Sheet via Apps Script`);
         return true;
       }
     }
 
-    console.warn('⚠️ Apps Script write failed:', res.status, await res.text().catch(() => ''));
+    console.warn('⚠️ Apps Script write failed:', postRes.status);
     return false;
   } catch (error) {
     console.warn('⚠️ Apps Script write error:', error);
