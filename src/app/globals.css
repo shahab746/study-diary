@@ -1578,12 +1578,12 @@
     left: 0;
     right: 0;
     z-index: 50;
-    background: rgba(18,18,18,0.75);
+    background: rgba(18,18,18,0.8);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     border-top: 1px solid rgba(255,255,255,0.06);
-    padding: 8px 12px;
-    padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 8px);
+    padding: 6px 8px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 6px) + 6px);
   }
   .mobile-swipe-nav::before {
     content: '';
@@ -1596,7 +1596,7 @@
   }
   .mobile-swipe-track {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     width: 100%;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
@@ -1608,20 +1608,20 @@
   .mobile-swipe-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 16px;
-    border-radius: 12px;
+    gap: 5px;
+    padding: 8px 12px;
+    border-radius: 10px;
     background: rgba(255,255,255,0.04);
     border: 1px solid transparent;
     color: #8E8E93;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     scroll-snap-align: start;
     white-space: nowrap;
     transition: all .25s cubic-bezier(.4,0,.2,1);
     -webkit-tap-highlight-color: transparent;
-    flex: 1;
+    flex-shrink: 0;
     justify-content: center;
   }
   .mobile-swipe-item:active {
@@ -1640,6 +1640,19 @@
     background: rgba(255,255,255,0.08);
     color: #ccc;
   }
+  /* Sign out button — subtle danger style */
+  .mobile-swipe-item.sign-out-btn {
+    color: #FF6B60;
+    background: rgba(255,59,48,0.08);
+    border: 1px solid rgba(255,59,48,0.12);
+    flex-shrink: 0;
+  }
+  .mobile-swipe-item.sign-out-btn svg {
+    color: #FF6B60;
+  }
+  .mobile-swipe-item.sign-out-btn:active {
+    background: rgba(255,59,48,0.2);
+  }
   /* Fix lecture items on mobile */
   .lecture-item {
     flex-wrap: wrap;
@@ -1651,37 +1664,6 @@
   }
   .hamburger-btn {
     display: none !important;
-  }
-  .mobile-more-menu {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    right: 0;
-    background: rgba(30,30,30,0.85);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    padding: 6px;
-    min-width: 160px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    z-index: 60;
-  }
-  .mobile-more-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 10px 14px;
-    border-radius: 8px;
-    background: transparent;
-    border: none;
-    color: #ccc;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all .15s ease;
-  }
-  .mobile-more-item:hover {
-    background: rgba(255,255,255,0.06);
   }
 }
 

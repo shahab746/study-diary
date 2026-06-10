@@ -7,7 +7,7 @@ import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, t
 import { LoginPage } from '@/components/auth/LoginPage';
 import {
   Home as HomeIcon, ListTodo, BookOpen, Timer, Moon, Sun,
-  Search, Plus, Star, Clock, Play, MoreHorizontal, X, ChevronLeft,
+  Search, Plus, Star, Clock, Play, X, ChevronLeft,
   Check, Flame, RotateCcw, BookOpenText, ArrowLeft,
   FileText, Menu, LogOut, Sigma, Cpu, Zap, Beaker, Atom, Pi, Landmark,
   FileText as PdfIcon, Lock, Wifi, WifiOff, RefreshCw, CloudOff
@@ -153,56 +153,39 @@ function MobileNav({ currentView, setCurrentView }: {
   currentView: ViewId;
   setCurrentView: (v: ViewId) => void;
 }) {
-  const { theme, setTheme } = useTheme();
-  const [showMore, setShowMore] = useState(false);
-
-  const items: { id: ViewId; label: string; icon: React.ReactNode }[] = [
-    { id: 'today', label: 'Today', icon: <HomeIcon width={20} height={20} /> },
-    { id: 'tasks', label: 'Tasks', icon: <ListTodo width={20} height={20} /> },
-    { id: 'courses', label: 'Courses', icon: <BookOpen width={20} height={20} /> },
-    { id: 'focus-timer', label: 'Timer', icon: <Timer width={20} height={20} /> },
+  const items: { id: ViewId | 'sign-out'; label: string; icon: React.ReactNode }[] = [
+    { id: 'today', label: 'Today', icon: <HomeIcon width={18} height={18} /> },
+    { id: 'tasks', label: 'Tasks', icon: <ListTodo width={18} height={18} /> },
+    { id: 'courses', label: 'Courses', icon: <BookOpen width={18} height={18} /> },
+    { id: 'focus-timer', label: 'Focus Timer', icon: <Timer width={18} height={18} /> },
+    { id: 'sign-out', label: 'Sign Out', icon: <LogOut width={18} height={18} /> },
   ];
+
+  const handleTap = (id: ViewId | 'sign-out') => {
+    if (id === 'sign-out') {
+      signOut({ callbackUrl: '/' });
+      return;
+    }
+    setCurrentView(id);
+  };
 
   return (
     <nav className="mobile-swipe-nav">
       <div className="mobile-swipe-track">
-        {items.map(item => (
-          <button
-            key={item.id}
-            className={`mobile-swipe-item ${currentView === item.id ? 'active' : ''}`}
-            onClick={() => setCurrentView(item.id)}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </button>
-        ))}
-        <button
-          className={`mobile-swipe-item ${showMore ? 'active' : ''}`}
-          onClick={() => setShowMore(!showMore)}
-          style={{ position: 'relative' }}
-        >
-          <MoreHorizontal width={20} height={20} />
-          <span>More</span>
-          {showMore && (
-            <div className="mobile-more-menu">
-              <button
-                className="mobile-more-item"
-                onClick={(e) => { e.stopPropagation(); setTheme(theme === 'dark' ? 'light' : 'dark'); }}
-              >
-                {theme === 'dark' ? <Sun width={16} height={16} /> : <Moon width={16} height={16} />}
-                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              </button>
-              <button
-                className="mobile-more-item"
-                style={{ color: '#FF6B60' }}
-                onClick={(e) => { e.stopPropagation(); signOut({ callbackUrl: '/' }); }}
-              >
-                <LogOut width={16} height={16} />
-                Sign out
-              </button>
-            </div>
-          )}
-        </button>
+        {items.map(item => {
+          const isSignOut = item.id === 'sign-out';
+          const isActive = !isSignOut && currentView === item.id;
+          return (
+            <button
+              key={item.id}
+              className={`mobile-swipe-item ${isActive ? 'active' : ''} ${isSignOut ? 'sign-out-btn' : ''}`}
+              onClick={() => handleTap(item.id)}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
