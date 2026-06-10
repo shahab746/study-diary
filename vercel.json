@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
   "regions": ["iad1"],
-  "env": {
-    "NEXTAUTH_URL": "https://study-diary-app.vercel.app"
-  }
+  "buildCommand": "next build",
+  "installCommand": "bun install",
+  "outputDirectory": ".next"
 }
