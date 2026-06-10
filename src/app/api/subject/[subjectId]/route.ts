@@ -4,6 +4,7 @@ import {
   fetchProgressFromSheet,
   findUserByPhone,
 } from '@/lib/sheet-sync';
+import { findUserByPhone as findUserByPhoneDB, isSupabaseConfigured, dbUserToSheetUser, getUserProgress } from '@/lib/supabase';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 const COLOR_MAP: Record<string, string> = {
@@ -34,11 +35,34 @@ export async function GET(
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone') || '';
 
-    // Fetch curriculum hierarchy and progress in parallel
-    const [subjects, progressRows] = await Promise.all([
-      buildCurriculumHierarchy(),
-      phone ? fetchProgressFromSheet() : Promise.resolve([]),
-    ]);
+    // Fetch curriculum hierarchy
+    const subjects = await buildCurriculumHierarchy();
+
+    // Fetch progress — Supabase first, then Sheets fallback
+    let progressRows: Array<{ phone: string; topicId: string; completed: boolean }> = [];
+    let useSupabaseProgress = false;
+
+    if (phone && isSupabaseConfigured()) {
+      const dbUser = await findUserByPhoneDB(phone);
+      if (dbUser) {
+        useSupabaseProgress = true;
+        const dbProgress = await getUserProgress(phone);
+        progressRows = dbProgress.map(p => ({
+          phone: p.phone,
+          topicId: p.topic_id,
+          completed: p.completed,
+        }));
+      }
+    }
+
+    if (!useSupabaseProgress && phone) {
+      const sheetProgress = await fetchProgressFromSheet();
+      progressRows = sheetProgress.map(p => ({
+        phone: p.phone,
+        topicId: p.topicId,
+        completed: p.completed,
+      }));
+    }
 
     // Find the subject by ID
     const subject = subjects.find(s => s.id === subjectId);
@@ -52,6 +76,25 @@ export async function GET(
       const userGroup = sheetUser?.academicGroup || '';
       if (userGroup && subject.groupEligibility !== userGroup) {
         return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });
+      }
+    }
+
+    // Determine if user is free (is_paid = FALSE) or paid
+    let isFreeUser = false;
+    if (phone) {
+      // Check Supabase first
+      if (isSupabaseConfigured()) {
+        const dbUser = await findUserByPhoneDB(phone);
+        if (dbUser) {
+          const status = (dbUser as Record<string, unknown>).status as string;
+          isFreeUser = !status || status === 'free' || status === 'false';
+        }
+      }
+      // Fallback: Google Sheets
+      if (!isFreeUser) {
+        const sheetUser = await findUserByPhone(phone, false);
+        const status = sheetUser?.status || '';
+        isFreeUser = status === 'free' || status === 'false' || status === 'FALSE';
       }
     }
 
@@ -75,18 +118,23 @@ export async function GET(
         id: ch.id,
         number: ch.number,
         name: ch.name,
-        topics: ch.topics.map(t => ({
-          id: t.id,
-          number: t.number,
-          name: t.name,
-          videoLink: t.videoLink || '',
-          pdfLink: t.pdfLink || '',
-          hasVideo: !!(t.videoLink && t.videoLink.startsWith('http')),
-          hasPdf: !!(t.pdfLink && t.pdfLink.startsWith('http')),
-          dayNumber: t.dayNumber || 0,
-          completed: completedTopicIds.has(t.id),
-          isFree: !!t.isFree,
-        })),
+        topics: ch.topics.map(t => {
+          // Free users: hide video/PDF links on paid-only topics (isFree = false)
+          const isTopicFree = !!t.isFree;
+          const hideLinks = isFreeUser && !isTopicFree;
+          return {
+            id: t.id,
+            number: t.number,
+            name: t.name,
+            videoLink: hideLinks ? '' : (t.videoLink || ''),
+            pdfLink: hideLinks ? '' : (t.pdfLink || ''),
+            hasVideo: hideLinks ? false : !!(t.videoLink && t.videoLink.startsWith('http')),
+            hasPdf: hideLinks ? false : !!(t.pdfLink && t.pdfLink.startsWith('http')),
+            dayNumber: t.dayNumber || 0,
+            completed: completedTopicIds.has(t.id),
+            isFree: isTopicFree,
+          };
+        }),
         completedTopics: ch.topics.filter(t => completedTopicIds.has(t.id)).length,
         totalTopics: ch.topics.length,
       })),

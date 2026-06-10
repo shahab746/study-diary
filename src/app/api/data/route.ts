@@ -239,7 +239,7 @@ export async function GET(request: Request) {
             ).length / availableTopics.length) * 100)
           : 0,
         chapterCount: subject.chapters.length,
-        isLocked: isFreeUser && subject.name !== 'Physics',
+        isLocked: false, // Free users see all subjects — topic-level filtering handles access
         chapters: subject.chapters.map(ch => ({
           id: ch.id,
           number: ch.number,
@@ -285,7 +285,7 @@ export async function GET(request: Request) {
     }> = [];
 
     for (const subject of eligibleSubjects) {
-      if (isFreeUser && subject.name !== 'Physics') continue;
+      // All subjects visible to free users — only topics are filtered
 
       const allSubjectTopics = subject.chapters.flatMap(ch => ch.topics);
       const completedCount = allSubjectTopics.filter(t => progressSet.has(t.id)).length;
@@ -377,7 +377,7 @@ export async function GET(request: Request) {
             subjectColor: sq.subjectColor,
             chapterName: topic.chapterName,
             completed: false,
-            videoLink: toValidUrl(isFreeUser ? '' : topic.videoLink),
+            videoLink: toValidUrl(topic.videoLink), // Free topics already filtered — show links
             pdfLink: toValidUrl(topic.pdfLink),
             priority,
             subjectIcon: sq.subjectIcon,
