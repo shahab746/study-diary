@@ -99,6 +99,8 @@ export interface SubjectProgress {
   progressPct: number;
   chapterCount?: number;
   isLocked?: boolean;
+  freeTopicCount?: number;
+  premiumTopicCount?: number;
   chapters: {
     id: string;
     number: number;

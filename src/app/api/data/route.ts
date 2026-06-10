@@ -222,24 +222,28 @@ export async function GET(request: Request) {
     const subjectProgress = eligibleSubjects.map(subject => {
       const allTopics = subject.chapters.flatMap(ch => ch.topics);
       const completedTopics = allTopics.filter(t => progressSet.has(t.id));
-      const availableTopics = isFreeUser ? allTopics.filter(t => t.isFree) : allTopics;
+      const freeTopics = allTopics.filter(t => t.isFree);
+      const premiumTopics = allTopics.filter(t => !t.isFree);
+      const completedFreeTopics = completedTopics.filter(t => t.isFree);
+
+      // For free users: progress shows free-content completion against free-content total
+      // For paid users: progress shows full completion
+      const displayTotal = isFreeUser ? freeTopics.length : allTopics.length;
+      const displayCompleted = isFreeUser ? completedFreeTopics.length : completedTopics.length;
+      const displayPct = displayTotal > 0 ? Math.round((displayCompleted / displayTotal) * 100) : 0;
 
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         color: mapColor(subject.color),
         icon: mapIcon(subject.icon, subject.name),
-        totalTopics: availableTopics.length,
-        completedTopics: completedTopics.filter(t =>
-          isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
-        ).length,
-        progressPct: availableTopics.length > 0
-          ? Math.round((completedTopics.filter(t =>
-              isFreeUser ? allTopics.find(at => at.id === t.id)?.isFree : true
-            ).length / availableTopics.length) * 100)
-          : 0,
+        totalTopics: allTopics.length,
+        completedTopics: displayCompleted,
+        progressPct: displayPct,
         chapterCount: subject.chapters.length,
-        isLocked: false, // Free users see all subjects — topic-level filtering handles access
+        isLocked: false,
+        freeTopicCount: freeTopics.length,
+        premiumTopicCount: premiumTopics.length,
         chapters: subject.chapters.map(ch => ({
           id: ch.id,
           number: ch.number,
