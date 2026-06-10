@@ -9,9 +9,6 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   turbopack: {},
   serverExternalPackages: [],
-  allowedDevOrigins: [
-    'space-z.ai',
-  ],
 };
 
 export default withPWA({
