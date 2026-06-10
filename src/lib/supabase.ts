@@ -64,8 +64,16 @@ let _supabase: SupabaseClient | null = null;
  */
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    if (!isSupabaseConfigured()) {
+      // Return a no-op client that won't crash — all operations will be caught
       console.warn('⚠️ Supabase not configured — set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env');
+      // Use a dummy URL that won't crash createClient but operations will fail gracefully
+      const dummyUrl = 'https://placeholder.supabase.co';
+      const dummyKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MDAwMDAwMDAsImV4cCI6MTYwMDAwMDAwMH0.placeholder';
+      _supabase = createClient(dummyUrl, dummyKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      return _supabase;
     }
     const key = SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
     _supabase = createClient(SUPABASE_URL, key, {
