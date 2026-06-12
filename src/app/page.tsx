@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
 import { LoginPage } from '@/components/auth/LoginPage';
+import { LandingPage } from '@/components/landing/LandingPage';
 import {
   Home as HomeIcon, ListTodo, BookOpen, Timer, Moon, Sun,
   Search, Plus, Star, Clock, Play, X, ChevronLeft,
@@ -1336,6 +1337,7 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   const [subjectDetailId, setSubjectDetailId] = useState<string | null>(null);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const [showLoginFromLanding, setShowLoginFromLanding] = useState(false);
 
   // All hooks must be called before any conditional returns
   const handleNewTask = useCallback(() => setShowModal(true), []);
@@ -1376,9 +1378,12 @@ export default function Home() {
     return () => { cleanup?.(); };
   }, [initNetwork]);
 
-  // Show login page if not authenticated
+  // Show landing page if not authenticated
   if (status === 'unauthenticated') {
-    return <LoginPage />;
+    if (showLoginFromLanding) {
+      return <LoginPage />;
+    }
+    return <LandingPage onGetStarted={() => setShowLoginFromLanding(true)} />;
   }
 
   // Loading while checking auth
