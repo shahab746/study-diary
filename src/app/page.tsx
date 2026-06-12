@@ -542,7 +542,7 @@ function CoursesView({ onCourseClick }: { onCourseClick: (subjectId: string) => 
                 )}
               </div>
               <div className="course-instructor">
-                {subject.chapterCount} chapters · {subject.freeTopicCount || 0} free{isFreeUser && hasPremium ? ` of ${subject.totalTopics}` : ''}
+                {subject.chapterCount} chapters{isFreeUser && hasPremium ? ` · ${subject.freeTopicCount || 0} free of ${subject.totalTopics}` : ` · ${subject.totalTopics} topics`}
               </div>
               <div className="course-progress-row">
                 <div className="course-progress-pct" style={{ color: subject.color }}>{pct}%</div>
@@ -679,7 +679,8 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
   const subject = store.subjects.find(s => s.subjectId === subjectId);
   const detail = store.subjectDetail;
   const loading = store.subjectDetailLoading;
-  const isFreeUser = store.isFreeUser;
+  // Use isFreeUser from both store (global) and API response (per-request) for consistency
+  const isFreeUser = store.isFreeUser || detail?.isFreeUser === true;
 
   // Fetch detail on mount
   const openSubjectDetail = store.openSubjectDetail;
@@ -848,11 +849,11 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                           Day {topic.dayNumber}
                         </span>
                       )}
-                      {isPremium && (
+                      {isLockedForUser && (
                         <span style={{
                           fontSize: 10,
                           fontWeight: 700,
-                          background: isLockedForUser ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)',
+                          background: 'rgba(245,158,11,0.2)',
                           color: '#F59E0B',
                           padding: '2px 8px',
                           borderRadius: 4,
@@ -881,7 +882,7 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                         </button>
                       </a>
                     )}
-                    {isLockedForUser && !topic.hasVideo && !topic.hasPdf && (
+                    {isLockedForUser && (
                       <span style={{ fontSize: 11, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
                         <Lock width={12} height={12} /> Locked
                       </span>

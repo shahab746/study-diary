@@ -179,6 +179,7 @@ export interface SubjectDetail {
   chapterCount: number;
   chapters: SubjectDetailChapter[];
   completedTopics: number;
+  isFreeUser?: boolean;
 }
 
 type SidebarView = 'dashboard' | 'lectures' | 'calendar' | 'subjects' | 'insights' | 'search' | 'settings';
@@ -611,6 +612,17 @@ export const useStudyOS = create<StudyOSState>()(
         const detail = state.subjectDetail;
 
         if (!detail) return;
+
+        // Block free users from toggling premium (locked) topics
+        const isFreeUser = state.isFreeUser || detail.isFreeUser === true;
+        if (isFreeUser) {
+          for (const ch of detail.chapters) {
+            const topic = ch.topics.find(t => t.id === topicId);
+            if (topic && topic.isFree === false) {
+              return; // Blocked — premium topic for free user
+            }
+          }
+        }
 
         let currentCompleted = false;
         for (const ch of detail.chapters) {

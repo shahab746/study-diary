@@ -5,6 +5,7 @@ import {
   findUserByPhone,
 } from '@/lib/sheet-sync';
 import { findUserByPhone as findUserByPhoneDB, isSupabaseConfigured, dbUserToSheetUser, getUserProgress } from '@/lib/supabase';
+import { findRegisteredUserByPhone } from '@/lib/registered-users';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 const COLOR_MAP: Record<string, string> = {
@@ -24,6 +25,16 @@ function mapColor(color: string): string {
 function mapIcon(icon: string, name?: string): string {
   if (name && SUBJECT_ICON_MAP[name]) return SUBJECT_ICON_MAP[name];
   return 'book';
+}
+
+// Normalize student status — same logic as data route
+function normalizeStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
 }
 
 export async function GET(
@@ -70,31 +81,54 @@ export async function GET(
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
 
-    // Check Group_Eligibility
-    if (subject.groupEligibility && subject.groupEligibility !== 'Both' && phone) {
-      const sheetUser = await findUserByPhone(phone, false);
-      const userGroup = sheetUser?.academicGroup || '';
-      if (userGroup && subject.groupEligibility !== userGroup) {
-        return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });
-      }
-    }
+    // ─── Determine user status with same multi-source lookup as data API ───
+    let userStatus = 'free'; // default
 
-    // Determine if user is free (is_paid = FALSE) or paid
-    let isFreeUser = false;
     if (phone) {
-      // Check Supabase first
+      // 1. Try Supabase first
       if (isSupabaseConfigured()) {
         const dbUser = await findUserByPhoneDB(phone);
         if (dbUser) {
-          const status = (dbUser as Record<string, unknown>).status as string;
-          isFreeUser = !status || status === 'free' || status === 'false';
+          const sheetUser = dbUserToSheetUser(dbUser);
+          userStatus = normalizeStatus(sheetUser.status);
         }
       }
-      // Fallback: Google Sheets
-      if (!isFreeUser) {
+
+      // 2. Fallback: Google Sheets
+      if (userStatus === 'free') {
         const sheetUser = await findUserByPhone(phone, false);
-        const status = sheetUser?.status || '';
-        isFreeUser = status === 'free' || status === 'false' || status === 'FALSE';
+        if (sheetUser) {
+          userStatus = normalizeStatus(sheetUser.status);
+        }
+      }
+
+      // 3. Fallback: registered-users cache
+      if (userStatus === 'free') {
+        const cachedUser = await findRegisteredUserByPhone(phone, false);
+        if (cachedUser) {
+          userStatus = normalizeStatus(cachedUser.status);
+        }
+      }
+    }
+
+    const isFreeUser = userStatus === 'free';
+
+    // Check Group_Eligibility
+    if (subject.groupEligibility && subject.groupEligibility !== 'Both' && phone) {
+      let userGroup = '';
+      if (isSupabaseConfigured()) {
+        const dbUser = await findUserByPhoneDB(phone);
+        if (dbUser) {
+          const sheetUser = dbUserToSheetUser(dbUser);
+          userGroup = sheetUser.academicGroup || '';
+        }
+      }
+      if (!userGroup) {
+        const sheetUser = await findUserByPhone(phone, false);
+        userGroup = sheetUser?.academicGroup || '';
+      }
+      if (userGroup && subject.groupEligibility !== userGroup) {
+        return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });
       }
     }
 
@@ -119,7 +153,7 @@ export async function GET(
         number: ch.number,
         name: ch.name,
         topics: ch.topics.map(t => {
-          // Free users: hide video/PDF links on paid-only topics (isFree = false)
+          // Free users: hide video/PDF links on premium topics (isFree = false)
           const isTopicFree = !!t.isFree;
           const hideLinks = isFreeUser && !isTopicFree;
           return {
@@ -139,6 +173,7 @@ export async function GET(
         totalTopics: ch.topics.length,
       })),
       completedTopics: subject.chapters.flatMap(ch => ch.topics).filter(t => completedTopicIds.has(t.id)).length,
+      isFreeUser,
     };
 
     return NextResponse.json(result);
