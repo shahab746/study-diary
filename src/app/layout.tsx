@@ -31,24 +31,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Study Diary — The Study Operating System for Board Students",
-  description: "Study Diary transforms the Federal Board (FBISE) syllabus into a clear daily study plan with video lectures, PDF notes, progress tracking, and exam-focused preparation. Built for 9th–12th grade students in Pakistan.",
-  keywords: ["FBISE", "Federal Board", "study planner", "Pakistan", "9th class", "10th class", "11th class", "12th class", "FSc", "SSC", "HSSC", "study app", "exam preparation", "video lectures", "notes"],
-  authors: [{ name: "Study Diary" }],
-  creator: "Study Diary",
-  openGraph: {
-    title: "Study Diary — The Study Operating System for Board Students",
-    description: "Transform your FBISE syllabus into a clear daily study plan with videos, notes, and progress tracking.",
-    url: "https://studydiary.app",
-    siteName: "Study Diary",
-    locale: "en_PK",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Study Diary — The Study Operating System for Board Students",
-    description: "Transform your FBISE syllabus into a clear daily study plan with videos, notes, and progress tracking.",
-  },
+  title: "Study Diary — Lecture Tracker",
+  description: "Track lectures, manage study schedules, and crush your curriculum with elegance.",
   icons: {
     icon: [
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },

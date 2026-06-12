@@ -5,7 +5,6 @@ import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
 import { LoginPage } from '@/components/auth/LoginPage';
-import LandingPage from '@/components/landing/LandingPage';
 import {
   Home as HomeIcon, ListTodo, BookOpen, Timer, Moon, Sun,
   Search, Plus, Star, Clock, Play, X, ChevronLeft,
@@ -223,25 +222,24 @@ function LoadingSkeleton() {
 // ============================================
 // TODAY VIEW
 // ============================================
-function TodayView({ onNewTask, onFocusTimer, onCourseClick }: { onNewTask: () => void; onFocusTimer: () => void; onCourseClick: (subjectId: string) => void }) {
+function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocusTimer: () => void }) {
   const store = useStudyOS();
   const tasks = store.todayTasks;
   const student = store.student;
   const toggleTask = store.toggleTaskComplete;
-  const subjects = store.subjects;
 
   const completedCount = tasks.filter(t => t.completed).length;
   const focusScore = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : store.focusScore;
 
-  // Circular progress ring calculations
-  const ringRadius = 54;
-  const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringStrokeOffset = ringCircumference * (1 - focusScore / 100);
+  const nextTask = tasks.find(t => !t.completed);
 
-  // Sync status
+  // Format lastSynced time
   const lastSynced = store.lastSynced;
   const isOnline = store.isOnline;
   const pendingSyncCount = store.pendingSyncCount;
+  const syncLabel = lastSynced
+    ? `Synced ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Not synced';
 
   const handleManualSync = () => {
     if (isOnline) store.syncNow();
@@ -249,117 +247,109 @@ function TodayView({ onNewTask, onFocusTimer, onCourseClick }: { onNewTask: () =
 
   return (
     <div className="view active">
-      {/* Top Section: Greeting + Day + Sync */}
-      <div className="dashboard-header">
-        <div className="dashboard-greeting-row">
-          <div>
-            <div className="dashboard-greeting-text">{getGreeting()}</div>
-            <div className="dashboard-name-row">
-              <span className="dashboard-name">{student?.name || 'Student'}</span>
-              <span className="dashboard-day-badge">Day {student?.currentDay || 1}</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Streak badge */}
-            <div className="dashboard-streak">
-              <Flame width={18} height={18} style={{ color: '#FF9500' }} />
-              <span className="dashboard-streak-count">{store.streak}</span>
-            </div>
-            {/* Sync indicator */}
-            <span
-              className="dashboard-sync"
-              onClick={handleManualSync}
-              title={isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending syncs — tap to sync` : 'Tap to sync') : 'Offline — changes saved locally'}
-            >
-              {isOnline ? (
-                pendingSyncCount > 0 ? (
-                  <RefreshCw width={12} height={12} style={{ color: '#FF9500' }} />
-                ) : (
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-                )
+      {/* Hero Card */}
+      <div className="hero-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="hero-date">{getDateLine()}</div>
+          <span 
+            style={{ fontSize: 11, color: isOnline ? '#8E8E93' : '#FF9500', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+            onClick={handleManualSync}
+            title={isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending syncs — tap to sync` : 'Tap to sync') : 'Offline — changes saved locally'}
+          >
+            {isOnline ? (
+              pendingSyncCount > 0 ? (
+                <RefreshCw width={10} height={10} style={{ color: '#FF9500' }} />
               ) : (
-                <WifiOff width={12} height={12} style={{ color: '#FF9500' }} />
-              )}
-            </span>
-          </div>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+              )
+            ) : (
+              <WifiOff width={10} height={10} style={{ color: '#FF9500' }} />
+            )}
+            {isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending` : syncLabel) : 'Offline'}
+          </span>
+        </div>
+        <div className="hero-greeting">{getGreeting()}, <span style={{ color: '#FF3B30' }}>{student?.name || 'Student'}</span>.</div>
+        <div className="hero-message">
+          {nextTask
+            ? `Your next move is ${nextTask.topicName} in ${nextTask.subjectName}.`
+            : tasks.length > 0
+              ? 'All today\'s tasks are done! Great work.'
+              : 'No tasks scheduled for today. Enjoy your break!'
+          }
+        </div>
+        <div className="hero-actions">
+          {nextTask && (
+            <button className="btn btn-accent" onClick={onNewTask}>
+              <Star width={15} height={15} /> Start next best task
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={onFocusTimer}>
+            <Clock width={15} height={15} /> Focus 25m
+          </button>
+          <button className="btn btn-ghost" style={{ padding: '9px 12px' }} onClick={onNewTask}>
+            <Plus width={15} height={15} />
+          </button>
         </div>
       </div>
 
-      {/* Focus Score Ring Section */}
-      <div className="dashboard-focus-section">
-        <div className="dashboard-focus-ring-wrapper">
-          <svg className="dashboard-focus-ring" viewBox="0 0 120 120">
-            <circle className="focus-ring-track" cx="60" cy="60" r={ringRadius} />
-            <circle
-              className="focus-ring-progress"
-              cx="60" cy="60" r={ringRadius}
-              strokeDasharray={ringCircumference}
-              strokeDashoffset={ringStrokeOffset}
-            />
-          </svg>
-          <div className="dashboard-focus-center">
-            <div className="dashboard-focus-pct">{focusScore}%</div>
-            <div className="dashboard-focus-label">Focus Score</div>
-          </div>
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Focus Score</div>
+          <div className="stat-value">{focusScore}%</div>
+          <div className="stat-sub">today&apos;s tasks done</div>
         </div>
-        <div className="dashboard-focus-info">
-          {completedCount} of {tasks.length} tasks done
+        <div className="stat-card">
+          <div className="stat-label">Topics Done</div>
+          <div className="stat-value">{store.totalCompleted}</div>
+          <div className="stat-sub">of {store.totalTopics} total</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-label"><Flame width={13} height={13} />Streak</div>
+          <div className="stat-value">{store.streak}</div>
+          <div className="stat-sub">days in a row</div>
+        </div>
+
       </div>
 
-      {/* Subject Progress Grid */}
-      <div className="dashboard-section-header">
-        <span>Subjects</span>
-        <span className="dashboard-section-sub">{store.totalCompleted}/{store.totalTopics} done</span>
-      </div>
-      <div className="dashboard-subjects-grid">
-        {subjects.map(subject => (
-          <div key={subject.subjectId} className="dashboard-subject-card" onClick={() => onCourseClick(subject.subjectId)}>
-            <div className="dashboard-subject-icon" style={{ background: subject.color }}>
-              {getIcon(subject.icon)}
-            </div>
-            <div className="dashboard-subject-info">
-              <div className="dashboard-subject-name">{subject.subjectName}</div>
-              <div className="dashboard-subject-pct" style={{ color: subject.color }}>{subject.progressPct}%</div>
-            </div>
-            <div className="dashboard-subject-bar">
-              <div className="dashboard-subject-bar-fill" style={{ width: `${subject.progressPct}%`, background: subject.color }} />
-            </div>
+      {/* Mission Section */}
+      <div className="mission-section">
+        <div className="mission-header">
+          <div>
+            <div className="mission-title">Today&apos;s mission</div>
+            <div className="mission-hint">{completedCount} of {tasks.length} topics done · {store.topicsPerDay} topics/day pace</div>
           </div>
-        ))}
-      </div>
-
-      {/* Today's Tasks */}
-      <div className="dashboard-section-header" style={{ marginTop: 24 }}>
-        <span>Today&apos;s Tasks</span>
-        <span className="dashboard-section-sub">{completedCount} of {tasks.length}</span>
-      </div>
-      <div className="dashboard-tasks-list">
-        {tasks.map(task => (
-          <div key={task.topicId} className="dashboard-task-item">
-            <div
-              className={`dashboard-task-check ${task.completed ? 'checked' : ''}`}
-              onClick={() => toggleTask(task.topicId)}
-            >
-              {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
-            </div>
-            <div className="dashboard-task-info">
-              <div className="dashboard-task-name" style={{ color: task.completed ? '#666' : '#fff', textDecoration: task.completed ? 'line-through' : 'none' }}>
-                {task.topicName}
+        </div>
+        <div style={{ marginTop: 14 }}>
+          {tasks.map(task => (
+            <div key={task.topicId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div
+                className={`task-checkbox ${task.completed ? 'checked' : ''}`}
+                onClick={() => toggleTask(task.topicId)}
+              >
+                {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
               </div>
-              <div className="dashboard-task-subject">{task.subjectName}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: task.completed ? '#666' : '#fff', textDecoration: task.completed ? 'line-through' : 'none' }}>
+                  {task.topicName}
+                </div>
+                <div style={{ fontSize: 12, color: '#8E8E93' }}>{task.subjectName} · {task.chapterName}</div>
+              </div>
+              <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor, flexShrink: 0 }}>
+                {task.subjectName} · D{task.dayNumber}
+              </span>
             </div>
-          </div>
-        ))}
-        {tasks.length === 0 && (
-          <div className="dashboard-tasks-empty">
-            No tasks for today. Enjoy your break!
-          </div>
-        )}
+          ))}
+          {tasks.length === 0 && (
+            <div style={{ textAlign: 'center', color: '#666', padding: 20 }}>
+              No tasks for today. Check your pacing goal or enjoy the day off!
+            </div>
+          )}
+          <button className="mission-add" style={{ marginTop: 14 }} onClick={onNewTask}>
+            <Plus width={14} height={14} /> Add mission
+          </button>
+        </div>
       </div>
-      <button className="dashboard-add-task" onClick={onNewTask}>
-        <Plus width={14} height={14} /> Add task
-      </button>
     </div>
   );
 }
@@ -475,11 +465,9 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
 function CoursesView({ onCourseClick }: { onCourseClick: (subjectId: string) => void }) {
   const store = useStudyOS();
   const subjects = store.subjects;
-  const isFreeUser = store.isFreeUser;
 
   const totalTopics = subjects.reduce((sum, s) => sum + s.totalTopics, 0);
   const completedTopics = subjects.reduce((sum, s) => sum + s.completedTopics, 0);
-  const totalPremium = subjects.reduce((sum, s) => sum + (s.premiumTopicCount || 0), 0);
   const totalPct = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
 
   return (
@@ -489,74 +477,24 @@ function CoursesView({ onCourseClick }: { onCourseClick: (subjectId: string) => 
       </div>
       <div className="courses-subtitle">
         {completedTopics} of {totalTopics} topics · {totalPct}% complete
-        {isFreeUser && totalPremium > 0 && (
-          <span style={{ color: '#F59E0B', marginLeft: 8 }}>
-            · {totalPremium} premium
-          </span>
-        )}
       </div>
       <div className="courses-progress-bar">
         <div className="courses-progress-fill" style={{ width: `${totalPct}%` }} />
       </div>
 
-      {/* Free user upgrade banner */}
-      {isFreeUser && totalPremium > 0 && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
-          border: '1px solid rgba(245,158,11,0.3)',
-          borderRadius: 12,
-          padding: '14px 18px',
-          marginTop: 14,
-          marginBottom: 18,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-        }}>
-          <Lock width={20} height={20} style={{ color: '#F59E0B', flexShrink: 0 }} />
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#F59E0B' }}>
-              Unlock Premium Content
-            </div>
-            <div style={{ fontSize: 12, color: '#8E8E93', marginTop: 2 }}>
-              {totalPremium} topics are available with a premium subscription
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="courses-grid">
         {subjects.map(subject => {
           const pct = subject.progressPct;
-          const hasPremium = (subject.premiumTopicCount || 0) > 0;
           return (
             <div key={subject.subjectId} className="course-card" onClick={() => onCourseClick(subject.subjectId)}>
               <div className="course-icon" style={{ background: subject.color }}>
                 {getIcon(subject.icon)}
               </div>
-              <div className="course-name">
-                {subject.subjectName}
-                {isFreeUser && hasPremium && (
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    background: 'rgba(245,158,11,0.2)',
-                    color: '#F59E0B',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    marginLeft: 6,
-                    verticalAlign: 'middle',
-                    letterSpacing: '0.5px',
-                  }}>
-                    PREMIUM
-                  </span>
-                )}
-              </div>
-              <div className="course-instructor">
-                {subject.chapterCount} chapters · {subject.freeTopicCount || 0} free{isFreeUser && hasPremium ? ` of ${subject.totalTopics}` : ''}
-              </div>
+              <div className="course-name">{subject.subjectName}</div>
+              <div className="course-instructor">{subject.chapterCount} chapters{subject.isLocked ? ' · Locked' : ''}</div>
               <div className="course-progress-row">
                 <div className="course-progress-pct" style={{ color: subject.color }}>{pct}%</div>
-                <div className="course-lecture-count">{subject.completedTopics}/{isFreeUser && hasPremium ? subject.freeTopicCount : subject.totalTopics}</div>
+                <div className="course-lecture-count">{subject.completedTopics}/{subject.totalTopics}</div>
               </div>
               <div className="course-progress-bar">
                 <div className="course-progress-fill" style={{ width: `${pct}%`, background: subject.color }} />
@@ -689,7 +627,6 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
   const subject = store.subjects.find(s => s.subjectId === subjectId);
   const detail = store.subjectDetail;
   const loading = store.subjectDetailLoading;
-  const isFreeUser = store.isFreeUser;
 
   // Fetch detail on mount
   const openSubjectDetail = store.openSubjectDetail;
@@ -735,8 +672,6 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
   const allTopics = detail.chapters.flatMap(ch => ch.topics);
   const completedCount = allTopics.filter(t => t.completed).length;
   const remainingHours = Math.round((allTopics.length - completedCount) * 1.1);
-  const premiumCount = allTopics.filter(t => t.isFree === false).length;
-  const freeCount = allTopics.filter(t => t.isFree !== false).length;
 
   const filteredChapters = detail.chapters.map(ch => ({
     ...ch,
@@ -758,11 +693,6 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
           <div className="course-detail-title">{detail.name}</div>
           <div className="course-detail-subtitle">
             {pct}% complete · {detail.completedTopics}/{detail.totalTopics} topics · ~{remainingHours}h remaining
-            {isFreeUser && premiumCount > 0 && (
-              <span style={{ color: '#F59E0B', marginLeft: 6 }}>
-                · {premiumCount} premium
-              </span>
-            )}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -787,30 +717,6 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
         </div>
       </div>
 
-      {/* Free user upgrade banner in subject detail */}
-      {isFreeUser && premiumCount > 0 && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
-          border: '1px solid rgba(245,158,11,0.3)',
-          borderRadius: 12,
-          padding: '12px 16px',
-          marginBottom: 14,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}>
-          <Lock width={18} height={18} style={{ color: '#F59E0B', flexShrink: 0 }} />
-          <div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#F59E0B' }}>
-              {freeCount} free topics · {premiumCount} premium
-            </span>
-            <span style={{ fontSize: 12, color: '#8E8E93', marginLeft: 8 }}>
-              Upgrade to unlock all content
-            </span>
-          </div>
-        </div>
-      )}
-
       <div className="course-detail-filters">
         {(['all', 'todo', 'done'] as const).map(f => (
           <button
@@ -834,72 +740,50 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                 {chapter.completedTopics}/{chapter.totalTopics}
               </span>
             </div>
-            {chapter.topics.map(topic => {
-              const isPremium = topic.isFree === false;
-              const isLockedForUser = isFreeUser && isPremium;
-              return (
-                <div key={topic.id} className={`lecture-item ${isLockedForUser ? 'premium-locked' : ''}`}>
-                  <div
-                    className={`lecture-checkbox ${topic.completed ? 'checked' : ''} ${isLockedForUser ? 'disabled' : ''}`}
-                    onClick={() => !isLockedForUser && store.toggleSubjectDetailTopic(topic.id)}
-                    style={isLockedForUser ? { opacity: 0.3, cursor: 'not-allowed' } : {}}
-                  >
-                    {topic.completed && !isLockedForUser && <Check width={14} height={14} style={{ color: '#fff' }} />}
-                    {isLockedForUser && <Lock width={12} height={12} style={{ color: '#8E8E93' }} />}
+            {chapter.topics.map(topic => (
+              <div key={topic.id} className="lecture-item">
+                <div
+                  className={`lecture-checkbox ${topic.completed ? 'checked' : ''}`}
+                  onClick={() => store.toggleSubjectDetailTopic(topic.id)}
+                >
+                  {topic.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
+                </div>
+                <div className="lecture-info">
+                  <div className="lecture-name">
+                    <span style={{ color: '#666', marginRight: 8 }}>{topic.number}.</span>
+                    {topic.name}
                   </div>
-                  <div className="lecture-info" style={isLockedForUser ? { opacity: 0.5 } : {}}>
-                    <div className="lecture-name">
-                      <span style={{ color: '#666', marginRight: 8 }}>{topic.number}.</span>
-                      {topic.name}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {topic.dayNumber > 0 && (
-                        <span className="difficulty-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>
-                          Day {topic.dayNumber}
-                        </span>
-                      )}
-                      {isPremium && (
-                        <span style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          background: isLockedForUser ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)',
-                          color: '#F59E0B',
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          letterSpacing: '0.5px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}>
-                          <Lock width={10} height={10} /> PREMIUM
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="lecture-actions" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    {topic.hasVideo && (
-                      <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                        <button className="watch-btn" style={{ padding: '7px 14px' }}>
-                          <Play width={13} height={13} /> Watch
-                        </button>
-                      </a>
-                    )}
-                    {topic.hasPdf && (
-                      <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                        <button className="watch-btn" style={{ padding: '7px 14px', background: '#FF3B30' }}>
-                          <FileText width={13} height={13} /> Notes
-                        </button>
-                      </a>
-                    )}
-                    {isLockedForUser && !topic.hasVideo && !topic.hasPdf && (
-                      <span style={{ fontSize: 11, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
-                        <Lock width={12} height={12} /> Locked
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {topic.dayNumber > 0 && (
+                      <span className="difficulty-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>
+                        Day {topic.dayNumber}
                       </span>
                     )}
                   </div>
                 </div>
-              );
-            })}
+                <div className="lecture-actions" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  {topic.hasVideo && (
+                    <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                      <button className="watch-btn" style={{ padding: '7px 14px' }}>
+                        <Play width={13} height={13} /> Watch
+                      </button>
+                    </a>
+                  )}
+                  {topic.hasPdf && (
+                    <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                      <button className="watch-btn" style={{ padding: '7px 14px', background: '#FF3B30' }}>
+                        <FileText width={13} height={13} /> Notes
+                      </button>
+                    </a>
+                  )}
+                  {!topic.hasVideo && !topic.hasPdf && topic.isFree === false && (
+                    <span style={{ fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Lock width={12} height={12} /> Premium
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         ))}
         {filteredChapters.length === 0 && (
@@ -1096,9 +980,9 @@ export default function Home() {
     return () => { cleanup?.(); };
   }, [initNetwork]);
 
-  // Show landing page if not authenticated
+  // Show login page if not authenticated
   if (status === 'unauthenticated') {
-    return <LandingPage />;
+    return <LoginPage />;
   }
 
   // Loading while checking auth
@@ -1128,7 +1012,7 @@ export default function Home() {
 
     switch (currentView) {
       case 'today':
-        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} onCourseClick={handleCourseClick} />;
+        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
       case 'tasks':
         return <TasksView onNewTask={handleNewTask} />;
       case 'courses':
@@ -1136,7 +1020,7 @@ export default function Home() {
       case 'focus-timer':
         return <FocusTimerView />;
       default:
-        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} onCourseClick={handleCourseClick} />;
+        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
     }
   };
 
