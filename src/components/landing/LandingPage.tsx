@@ -12,7 +12,6 @@ import {
   BarChart3,
   WifiOff,
   GraduationCap,
-  ChevronRight,
   Check,
   Plus,
   Sparkles,
@@ -24,10 +23,13 @@ import {
   Zap,
   Lock,
   Users,
-  BookOpen,
-  HelpCircle,
   Crown,
   Rocket,
+  MessageCircle,
+  Shield,
+  Smartphone,
+  ChevronDown,
+  Heart,
 } from 'lucide-react';
 
 // ============================================
@@ -195,11 +197,7 @@ function FloatingCards() {
 function AnimatedStatItem({ value, suffix, label }: { value: number; suffix: string; label: string }) {
   const { count, ref } = useAnimatedCounter(value);
   return (
-    <motion.div
-      variants={staggerItem}
-      ref={ref}
-      className="text-center"
-    >
+    <motion.div variants={staggerItem} ref={ref} className="text-center">
       <p className="text-4xl font-extrabold text-white sm:text-5xl">
         {count}
         <span className="text-[#FF3B30]">{suffix}</span>
@@ -283,9 +281,7 @@ function DashboardMockup() {
                 <div
                   key={item}
                   className={`rounded-lg px-3 py-2 text-xs ${
-                    i === 0
-                      ? 'bg-[#FF3B30]/20 text-[#FF3B30]'
-                      : 'text-zinc-500'
+                    i === 0 ? 'bg-[#FF3B30]/20 text-[#FF3B30]' : 'text-zinc-500'
                   }`}
                 >
                   {item}
@@ -328,7 +324,10 @@ function DashboardMockup() {
                 >
                   <div className="flex items-center gap-1.5">
                     <metric.icon className="h-3 w-3" style={{ color: metric.color }} />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: metric.color }}>
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wider"
+                      style={{ color: metric.color }}
+                    >
                       {metric.label}
                     </span>
                   </div>
@@ -342,21 +341,23 @@ function DashboardMockup() {
               <p className="text-xs font-semibold text-zinc-400">TODAY&apos;S MISSION</p>
               <div className="mt-3 space-y-2">
                 {[
-                  { name: 'Kirchhoff\'s Laws', subject: 'Physics', done: false },
+                  { name: "Kirchhoff's Laws", subject: 'Physics', done: false },
                   { name: 'Quadratic Equations', subject: 'Math', done: true },
                   { name: 'Periodic Table Trends', subject: 'Chemistry', done: true },
                 ].map((task) => (
                   <div key={task.name} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
                     <div
                       className={`flex h-5 w-5 items-center justify-center rounded-full ${
-                        task.done
-                          ? 'bg-emerald-500/20'
-                          : 'border border-zinc-600'
+                        task.done ? 'bg-emerald-500/20' : 'border border-zinc-600'
                       }`}
                     >
                       {task.done && <Check className="h-3 w-3 text-emerald-400" />}
                     </div>
-                    <span className={`text-xs ${task.done ? 'text-zinc-500 line-through' : 'text-white'}`}>
+                    <span
+                      className={`text-xs ${
+                        task.done ? 'text-zinc-500 line-through' : 'text-white'
+                      }`}
+                    >
                       {task.name}
                     </span>
                     <span className="ml-auto text-[10px] text-zinc-600">{task.subject}</span>
@@ -368,6 +369,44 @@ function DashboardMockup() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+// ============================================
+// TESTIMONIAL COMPONENT
+// ============================================
+function TestimonialCard({
+  name,
+  grade,
+  text,
+  avatar,
+}: {
+  name: string;
+  grade: string;
+  text: string;
+  avatar: string;
+}) {
+  return (
+    <motion.div
+      variants={staggerItem}
+      className="rounded-2xl border border-white/5 bg-zinc-900/50 p-6 transition-all hover:border-white/10"
+    >
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#FF3B30] to-[#FF6B60] text-sm font-bold text-white">
+          {avatar}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">{name}</p>
+          <p className="text-xs text-zinc-500">{grade}</p>
+        </div>
+      </div>
+      <div className="mb-3 flex gap-1">
+        {[1, 2, 3, 4, 5].map((s) => (
+          <Star key={s} className="h-3.5 w-3.5 fill-[#F59E0B] text-[#F59E0B]" />
+        ))}
+      </div>
+      <p className="text-sm leading-relaxed text-zinc-400">&ldquo;{text}&rdquo;</p>
+    </motion.div>
   );
 }
 
@@ -409,9 +448,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         className={`fixed top-0 right-0 left-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? 'border-b border-white/5 bg-black/70 backdrop-blur-xl'
-            : 'bg-transparent'
+          scrolled ? 'border-b border-white/5 bg-black/70 backdrop-blur-xl' : 'bg-transparent'
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
@@ -513,9 +550,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-sm"
               >
                 <Sparkles className="h-3.5 w-3.5 text-[#FF3B30]" />
-                <span className="text-xs font-medium text-zinc-300">
-                  Track · Pace · Complete
-                </span>
+                <span className="text-xs font-medium text-zinc-300">Track · Pace · Complete</span>
               </motion.div>
 
               <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
@@ -526,9 +561,9 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               </h1>
 
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-zinc-400 sm:text-xl">
-                The smartest study planner for FBISE board exam prep. Get a
-                personalized daily plan, track every topic, and build unstoppable
-                momentum — from Chapter 1 to exam day.
+                The smartest study planner for FBISE board exam prep. Get a personalized daily
+                plan, track every topic, and build unstoppable momentum — from Chapter 1 to exam
+                day.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -547,7 +582,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 </button>
               </div>
 
-              <div className="mt-8 flex items-center gap-6 text-sm text-zinc-500">
+              <div className="mt-8 flex flex-wrap items-center gap-6 text-sm text-zinc-500">
                 <div className="flex items-center gap-1.5">
                   <Check className="h-4 w-4 text-emerald-500" />
                   <span>No credit card</span>
@@ -570,9 +605,45 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          3. PROBLEM SECTION
+          3. TRUSTED BY / SOCIAL BADGES
           ============================================ */}
-      <section className="scroll-mt-20 border-y border-white/5 bg-zinc-950 py-20 sm:py-28" id="problem">
+      <section className="border-y border-white/5 bg-zinc-950/30 py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <motion.div
+            variants={sectionVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="text-center"
+          >
+            <p className="mb-8 text-sm font-medium uppercase tracking-widest text-zinc-600">
+              Trusted by students across Pakistan
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-8 text-zinc-600">
+              {[
+                'FBISE Islamabad',
+                'BISE Lahore',
+                'BISE Karachi',
+                'BISE Rawalpindi',
+                'BISE Peshawar',
+              ].map((board) => (
+                <div
+                  key={board}
+                  className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2 text-sm font-medium text-zinc-500"
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  {board}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ============================================
+          4. PROBLEM SECTION
+          ============================================ */}
+      <section className="scroll-mt-20 bg-zinc-950 py-20 sm:py-28" id="problem">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
             variants={sectionVariants}
@@ -601,11 +672,11 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               {
                 num: '01',
                 text: '389 topics, zero visibility on where you stand',
-                sub: 'You don\'t know what you\'ve covered and what\'s left. It\'s overwhelming.',
+                sub: "You don't know what you've covered and what's left. It's overwhelming.",
               },
               {
                 num: '02',
-                text: 'Watching random YouTube videos isn\'t a study plan',
+                text: "Watching random YouTube videos isn't a study plan",
                 sub: 'Hours of screen time, no structured progress. Sound familiar?',
               },
               {
@@ -630,7 +701,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          4. FEATURES SECTION
+          5. FEATURES SECTION
           ============================================ */}
       <section className="scroll-mt-20 py-20 sm:py-28" id="features">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -652,7 +723,8 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               </span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-400">
-              Six powerful tools designed specifically for Pakistani students preparing for FBISE exams.
+              Six powerful tools designed specifically for Pakistani students preparing for FBISE
+              exams.
             </p>
           </motion.div>
 
@@ -691,7 +763,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               {
                 icon: WifiOff,
                 title: 'Offline First',
-                desc: 'Works without internet. Study on the bus, in the library, anywhere. Syncs when you\'re back online.',
+                desc: "Works without internet. Study on the bus, in the library, anywhere. Syncs when you're back online.",
                 color: '#8B5CF6',
               },
               {
@@ -726,9 +798,12 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          5. HOW IT WORKS
+          6. HOW IT WORKS
           ============================================ */}
-      <section className="scroll-mt-20 border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28" id="how-it-works">
+      <section
+        className="scroll-mt-20 border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28"
+        id="how-it-works"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
             variants={sectionVariants}
@@ -776,11 +851,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 icon: Flame,
               },
             ].map((item) => (
-              <motion.div
-                key={item.step}
-                variants={staggerItem}
-                className="group relative text-center"
-              >
+              <motion.div key={item.step} variants={staggerItem} className="group relative text-center">
                 {/* Connector line (desktop) */}
                 {item.step !== '3' && (
                   <div className="absolute top-12 right-0 hidden h-px w-1/2 bg-gradient-to-r from-white/10 to-transparent md:block" />
@@ -808,7 +879,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          6. DASHBOARD PREVIEW
+          7. DASHBOARD PREVIEW
           ============================================ */}
       <section className="scroll-mt-20 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -827,7 +898,8 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               Your study command center
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-400">
-              See everything at a glance — your daily plan, focus metrics, streak, and progress across every subject.
+              See everything at a glance — your daily plan, focus metrics, streak, and progress
+              across every subject.
             </p>
           </motion.div>
 
@@ -883,9 +955,66 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          7. STATISTICS / SOCIAL PROOF
+          8. TESTIMONIALS
           ============================================ */}
-      <section className="scroll-mt-20 border-y border-white/5 bg-zinc-950/50 py-16 sm:py-20">
+      <section className="border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <motion.div
+            variants={sectionVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            className="text-center"
+          >
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+              <MessageCircle className="h-3.5 w-3.5 text-[#FF3B30]" />
+              <span className="text-xs font-medium text-zinc-300">Student Stories</span>
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+              Loved by students{' '}
+              <span className="bg-gradient-to-r from-[#FF3B30] to-[#FF6B60] bg-clip-text text-transparent">
+                across Pakistan
+              </span>
+            </h2>
+          </motion.div>
+
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {[
+              {
+                name: 'Ahmed Raza',
+                grade: 'Grade 10, FBISE',
+                text: "Study Diary completely changed how I prepare for exams. The daily plan keeps me on track and I've maintained a 15-day streak!",
+                avatar: 'AR',
+              },
+              {
+                name: 'Fatima Noor',
+                grade: 'Grade 9, BISE Lahore',
+                text: "I used to waste hours finding the right YouTube lectures. Now every topic has one ready. My focus score went from 40% to 90%!",
+                avatar: 'FN',
+              },
+              {
+                name: 'Hassan Ali',
+                grade: 'Grade 11, FBISE',
+                text: "The offline feature is a lifesaver. I study on the bus ride to school and it syncs when I get home. Best study app for Pakistani students.",
+                avatar: 'HA',
+              },
+            ].map((testimonial) => (
+              <TestimonialCard key={testimonial.name} {...testimonial} />
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ============================================
+          9. STATISTICS / SOCIAL PROOF
+          ============================================ */}
+      <section className="border-y border-white/5 bg-zinc-950/50 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
             variants={staggerContainer}
@@ -895,10 +1024,10 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
             className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4"
           >
             {[
-              { value: 500, suffix: '+', label: 'Students' },
-              { value: 389, suffix: '+', label: 'Topics' },
-              { value: 5, suffix: '+', label: 'Subjects' },
-              { value: 3, suffix: '', label: 'Board Plans' },
+              { value: 500, suffix: '+', label: 'Active Students' },
+              { value: 389, suffix: '+', label: 'Curriculum Topics' },
+              { value: 5, suffix: '+', label: 'Subjects Covered' },
+              { value: 3, suffix: '', label: 'Pacing Plans' },
             ].map((stat) => (
               <AnimatedStatItem
                 key={stat.label}
@@ -912,7 +1041,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          8. PRICING SECTION
+          10. PRICING SECTION
           ============================================ */}
       <section className="scroll-mt-20 py-20 sm:py-28" id="pricing">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -950,7 +1079,9 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               <h3 className="text-xl font-bold text-white">Free</h3>
               <p className="mt-2 text-sm text-zinc-400">Get started with essential features</p>
               <div className="mt-6">
-                <span className="text-4xl font-extrabold text-white">₨0</span>
+                <span className="text-4xl font-extrabold text-white">
+                  {'\u20A8'}0
+                </span>
                 <span className="text-zinc-500">/forever</span>
               </div>
               <ul className="mt-8 space-y-4">
@@ -979,31 +1110,33 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
             {/* Premium Plan */}
             <motion.div
               variants={fadeInScale}
-              className="relative overflow-hidden rounded-2xl border border-[#FF3B30]/30 bg-gradient-to-b from-[#FF3B30]/5 to-zinc-900/50 p-8 shadow-lg shadow-[#FF3B30]/5"
+              className="relative overflow-hidden rounded-2xl border border-[#FF3B30]/20 bg-gradient-to-b from-[#FF3B30]/5 to-zinc-900/50 p-8"
             >
               {/* Popular badge */}
               <div className="absolute top-4 right-4 rounded-full bg-[#FF3B30] px-3 py-1 text-xs font-bold text-white">
-                POPULAR
+                Popular
               </div>
 
               <h3 className="text-xl font-bold text-white">Premium</h3>
-              <p className="mt-2 text-sm text-zinc-400">Full access to everything</p>
+              <p className="mt-2 text-sm text-zinc-400">Unlock everything for your exam prep</p>
               <div className="mt-6">
-                <span className="text-4xl font-extrabold text-white">Contact</span>
-                <span className="text-zinc-500"> for pricing</span>
+                <span className="text-4xl font-extrabold text-white">
+                  {'\u20A8'}499
+                </span>
+                <span className="text-zinc-500">/month</span>
               </div>
               <ul className="mt-8 space-y-4">
                 {[
-                  'Full access to all topics',
-                  'All video lectures & PDFs',
-                  'All board plans (6 boards)',
+                  'All 389+ topics unlocked',
+                  'Unlimited video lectures',
+                  'Unlimited PDF notes',
+                  'Advanced progress analytics',
+                  'Focus timer + sessions',
+                  'All board plans',
                   'Priority support',
-                  'Advanced analytics',
-                  'Custom pacing goals',
-                  'Offline full access',
-                  'Google Sheets sync',
+                  'Offline downloads',
                 ].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-sm text-zinc-200">
+                  <li key={item} className="flex items-center gap-3 text-sm text-zinc-300">
                     <Check className="h-4 w-4 flex-shrink-0 text-[#FF3B30]" />
                     {item}
                   </li>
@@ -1013,7 +1146,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 onClick={onGetStarted}
                 className="mt-8 w-full rounded-xl bg-[#FF3B30] py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#FF3B30]/25 transition-all hover:bg-[#E0342B] hover:shadow-xl hover:shadow-[#FF3B30]/30 active:scale-[0.98]"
               >
-                Contact for Premium
+                Upgrade to Premium
               </button>
             </motion.div>
           </motion.div>
@@ -1021,9 +1154,9 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          9. FAQ SECTION
+          11. FAQ SECTION
           ============================================ */}
-      <section className="scroll-mt-20 border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28" id="faq">
+      <section className="scroll-mt-20 border-t border-white/5 bg-zinc-950/50 py-20 sm:py-28" id="faq">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <motion.div
             variants={sectionVariants}
@@ -1033,7 +1166,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
             className="text-center"
           >
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
-              <HelpCircle className="h-3.5 w-3.5 text-[#FF3B30]" />
+              <Sparkles className="h-3.5 w-3.5 text-[#FF3B30]" />
               <span className="text-xs font-medium text-zinc-300">FAQ</span>
             </div>
             <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
@@ -1050,24 +1183,28 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           >
             {[
               {
-                q: 'Is Study Diary free?',
-                a: 'Yes! Basic access is completely free — you get topic tracking, progress monitoring, and the focus timer at no cost. Premium unlocks all video lectures, PDF notes, and advanced features.',
+                q: 'Is Study Diary really free?',
+                a: 'Yes! The free plan gives you access to basic topics, progress tracking, and the focus timer forever. No credit card required. Upgrade to Premium only when you need full access to all videos and notes.',
               },
               {
-                q: 'Which boards are supported?',
-                a: 'We support FBISE and all major BISE boards including BISE Abbottabad, BISE Lahore, BISE Karachi, BISE Rawalpindi, and BISE Peshawar. More boards are being added regularly.',
+                q: 'Which boards and grades are supported?',
+                a: 'We support FBISE (Federal Board) and major BISE boards for grades 9-12, covering Science, Arts, and Commerce groups. More boards are being added regularly.',
               },
               {
-                q: 'Does it work offline?',
-                a: 'Absolutely! Study Diary is offline-first. You can study anywhere — on the bus, at a friend\'s place, or wherever you don\'t have internet. Your progress syncs automatically when you\'re back online.',
+                q: 'Does it work without internet?',
+                a: 'Absolutely. Study Diary is designed to work offline. Your progress is saved locally and syncs automatically when you reconnect. Study anywhere — on the bus, in the library, or at home.',
               },
               {
-                q: 'How is the study plan generated?',
-                a: 'When you sign up, you enter your grade, board, and field (Science/Arts/Commerce). Our pacing engine then generates a personalized daily schedule based on your chosen timeline — 3-month, 5-month, or 6-month plan.',
+                q: 'How does the daily planner work?',
+                a: 'When you sign up, you choose a pacing goal (3, 5, or 6 months). The planner auto-generates a daily schedule that distributes all topics across your timeline. Just follow the plan — no more guessing what to study.',
+              },
+              {
+                q: 'What does Premium include?',
+                a: 'Premium unlocks all 389+ topics with full video lectures, PDF notes, advanced analytics, offline downloads, and priority support. Free users get limited access to videos and notes.',
               },
               {
                 q: 'Can I use it on my phone?',
-                a: 'Yes! Study Diary is a web app that works beautifully on any device — phone, tablet, or laptop. No downloads needed. Just open your browser and start studying.',
+                a: 'Yes! Study Diary is a Progressive Web App (PWA). You can install it on any phone — Android or iPhone — directly from the browser. It works just like a native app with offline support.',
               },
             ].map((item) => (
               <FAQItem key={item.q} question={item.q} answer={item.a} />
@@ -1077,7 +1214,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          10. FINAL CTA SECTION
+          12. FINAL CTA SECTION
           ============================================ */}
       <section className="relative overflow-hidden py-20 sm:py-28">
         {/* Background glow */}
@@ -1085,82 +1222,122 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           <div className="absolute top-1/2 left-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#FF3B30]/10 blur-[120px]" />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+        <div className="relative z-10 mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <motion.div
             variants={sectionVariants}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: '-100px' }}
           >
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FF3B30]/20 bg-[#FF3B30]/5 px-4 py-1.5">
+              <Rocket className="h-3.5 w-3.5 text-[#FF3B30]" />
+              <span className="text-xs font-semibold text-[#FF3B30]">Start Today</span>
+            </div>
             <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
-              Ready to ace your{' '}
+              Your board exam success{' '}
               <span className="bg-gradient-to-r from-[#FF3B30] to-[#FF6B60] bg-clip-text text-transparent">
-                board exams?
+                starts here
               </span>
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-lg text-zinc-400">
-              Join hundreds of FBISE students who stopped cramming and started tracking. Your study plan is waiting.
+              Join 500+ students who stopped cramming and started tracking. Your personalized
+              study plan is 2 minutes away.
             </p>
-            <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <button
                 onClick={onGetStarted}
                 className="group flex items-center gap-2 rounded-xl bg-[#FF3B30] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-[#FF3B30]/25 transition-all hover:bg-[#E0342B] hover:shadow-xl hover:shadow-[#FF3B30]/30 active:scale-95"
               >
-                Start Free — No Credit Card
+                Get Started Free
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
-            <p className="mt-4 text-sm text-zinc-500">
-              Free forever · No credit card required · Set up in 2 minutes
-            </p>
+            <p className="mt-4 text-sm text-zinc-600">No credit card · Free forever plan · 2 min setup</p>
           </motion.div>
         </div>
       </section>
 
       {/* ============================================
-          11. FOOTER
+          13. FOOTER
           ============================================ */}
       <footer className="border-t border-white/5 bg-zinc-950 py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            {/* Logo */}
-            <div className="flex items-center gap-2.5">
-              <BookOpenText className="h-6 w-6 text-[#FF3B30]" />
-              <span className="text-base font-bold tracking-tight text-white">Study Diary</span>
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center gap-2.5">
+                <BookOpenText className="h-6 w-6 text-[#FF3B30]" />
+                <span className="text-lg font-bold">Study Diary</span>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-zinc-500">
+                The smartest study planner for Pakistani students. Track your curriculum, build
+                streaks, and ace your board exams.
+              </p>
             </div>
 
-            {/* Links */}
-            <div className="flex items-center gap-6 text-sm text-zinc-500">
-              <button
-                onClick={() => handleNavClick('#features')}
-                className="transition-colors hover:text-white"
-              >
-                Features
-              </button>
-              <button
-                onClick={() => handleNavClick('#pricing')}
-                className="transition-colors hover:text-white"
-              >
-                Pricing
-              </button>
-              <button
-                onClick={() => handleNavClick('#faq')}
-                className="transition-colors hover:text-white"
-              >
-                FAQ
-              </button>
+            {/* Product */}
+            <div>
+              <h4 className="text-sm font-semibold text-white">Product</h4>
+              <ul className="mt-4 space-y-3">
+                {['Features', 'Pricing', 'How It Works', 'FAQ'].map((item) => (
+                  <li key={item}>
+                    <button
+                      onClick={() => {
+                        const href =
+                          item === 'Features'
+                            ? '#features'
+                            : item === 'Pricing'
+                              ? '#pricing'
+                              : item === 'How It Works'
+                                ? '#how-it-works'
+                                : '#faq';
+                        handleNavClick(href);
+                      }}
+                      className="text-sm text-zinc-500 transition-colors hover:text-white"
+                    >
+                      {item}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {/* Copyright */}
-            <p className="text-sm text-zinc-600">
-              © {new Date().getFullYear()} Study Diary
-            </p>
+            {/* Boards */}
+            <div>
+              <h4 className="text-sm font-semibold text-white">Boards</h4>
+              <ul className="mt-4 space-y-3">
+                {['FBISE Islamabad', 'BISE Lahore', 'BISE Karachi', 'BISE Rawalpindi'].map(
+                  (item) => (
+                    <li key={item}>
+                      <span className="text-sm text-zinc-500">{item}</span>
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+
+            {/* Support */}
+            <div>
+              <h4 className="text-sm font-semibold text-white">Support</h4>
+              <ul className="mt-4 space-y-3">
+                {['Contact Us', 'Privacy Policy', 'Terms of Service', 'Help Center'].map(
+                  (item) => (
+                    <li key={item}>
+                      <span className="text-sm text-zinc-500">{item}</span>
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
           </div>
 
-          <div className="mt-8 text-center">
+          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 sm:flex-row">
             <p className="text-sm text-zinc-600">
-              Made with ❤️ for Pakistani students
+              &copy; {new Date().getFullYear()} Study Diary. Built for Pakistani students.
             </p>
+            <div className="flex items-center gap-1 text-sm text-zinc-600">
+              Made with <Heart className="h-3.5 w-3.5 fill-[#FF3B30] text-[#FF3B30]" /> in Pakistan
+            </div>
           </div>
         </div>
       </footer>
