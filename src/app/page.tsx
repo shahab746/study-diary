@@ -1379,7 +1379,9 @@ export default function Home() {
   }, [initNetwork]);
 
   // Show landing page if not authenticated
-  if (status === 'unauthenticated') {
+  // Also show landing page if session exists but has no user data (edge case)
+  const hasValidSession = status === 'authenticated' && session?.user;
+  if (!hasValidSession) {
     if (showLoginFromLanding) {
       return <LoginPage />;
     }
