@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
 import { LoginPage } from '@/components/auth/LoginPage';
 import {
@@ -10,7 +11,8 @@ import {
   Search, Plus, Star, Clock, Play, X, ChevronLeft,
   Check, Flame, RotateCcw, BookOpenText, ArrowLeft,
   FileText, Menu, LogOut, Sigma, Cpu, Zap, Beaker, Atom, Pi, Landmark,
-  FileText as PdfIcon, Lock, Wifi, WifiOff, RefreshCw, CloudOff
+  FileText as PdfIcon, Lock, Wifi, WifiOff, RefreshCw, CloudOff,
+  Target, Trophy, TrendingUp, Sparkles
 } from 'lucide-react';
 
 // ============================================
@@ -220,6 +222,303 @@ function LoadingSkeleton() {
 }
 
 // ============================================
+// METRICS DASHBOARD — Mobile-First Design
+// ============================================
+
+/** Circular progress ring SVG component */
+function ProgressRing({
+  size = 68,
+  strokeWidth = 5,
+  progress = 0,
+  color = '#FF3B30',
+  trackColor = 'rgba(255,255,255,0.06)',
+  children,
+}: {
+  size?: number;
+  strokeWidth?: number;
+  progress?: number;
+  color?: string;
+  trackColor?: string;
+  children?: React.ReactNode;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - Math.min(progress, 100) / 100);
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={trackColor} strokeWidth={strokeWidth}
+        />
+        <motion.circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={color} strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1], delay: 0.3 }}
+        />
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Streak flame dots — gamified row of 7 day indicators */
+function StreakDots({ streak, maxDots = 7 }: { streak: number; maxDots?: number }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 6 }}>
+      {Array.from({ length: maxDots }).map((_, i) => {
+        const filled = i < streak;
+        const isToday = i === streak;
+        return (
+          <motion.div
+            key={i}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.1 * i + 0.5, type: 'spring', stiffness: 400, damping: 15 }}
+            style={{
+              width: filled ? 18 : 14,
+              height: filled ? 18 : 14,
+              borderRadius: '50%',
+              background: filled
+                ? `linear-gradient(135deg, #FF9500 0%, #FF3B30 100%)`
+                : isToday
+                  ? 'rgba(255,149,0,0.25)'
+                  : 'rgba(255,255,255,0.06)',
+              border: isToday ? '2px solid rgba(255,149,0,0.5)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: filled ? '0 2px 8px rgba(255,69,58,0.3)' : 'none',
+            }}
+          >
+            {filled && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 * i + 0.7 }}
+                style={{ fontSize: 9, lineHeight: 1 }}
+              >
+                🔥
+              </motion.span>
+            )}
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Main metrics dashboard with 3 cards: Focus, Progress, Streak */
+function MetricsDashboard({
+  focusScore,
+  totalCompleted,
+  totalTopics,
+  streak,
+  tasksCompleted,
+  tasksTotal,
+}: {
+  focusScore: number;
+  totalCompleted: number;
+  totalTopics: number;
+  streak: number;
+  tasksCompleted: number;
+  tasksTotal: number;
+}) {
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
+  const progressPct = totalTopics > 0 ? Math.round((totalCompleted / totalTopics) * 100) : 0;
+
+  // Motivational messages based on state
+  const focusMessage = useMemo(() => {
+    if (tasksTotal === 0) return 'No tasks yet';
+    if (focusScore === 0) return 'Start your first task!';
+    if (focusScore < 50) return 'Getting warmer…';
+    if (focusScore < 100) return 'Keep going!';
+    return 'Perfect day! 🎉';
+  }, [focusScore, tasksTotal]);
+
+  const progressMessage = useMemo(() => {
+    if (totalCompleted === 0) return 'Your journey begins today';
+    if (progressPct < 10) return 'Great start!';
+    if (progressPct < 50) return 'Solid progress!';
+    return 'You\'re crushing it!';
+  }, [totalCompleted, progressPct]);
+
+  const streakMessage = useMemo(() => {
+    if (streak === 0) return 'Start your streak today';
+    if (streak === 1) return 'Day one — keep it up!';
+    if (streak < 7) return `${7 - streak} days until a week!`;
+    return 'On fire! 🔥';
+  }, [streak]);
+
+  const cards = [
+    {
+      id: 'focus',
+      label: 'Focus',
+      icon: <Target width={14} height={14} />,
+      color: '#FF3B30',
+      colorDim: 'rgba(255,59,48,0.12)',
+      ringProgress: focusScore,
+      ringColor: focusScore >= 100 ? '#22C55E' : focusScore >= 50 ? '#FF9500' : '#FF3B30',
+      mainValue: `${focusScore}%`,
+      subLabel: focusMessage,
+      detail: `Today: ${tasksCompleted}/${tasksTotal} tasks`,
+    },
+    {
+      id: 'progress',
+      label: 'Progress',
+      icon: <TrendingUp width={14} height={14} />,
+      color: '#3B82F6',
+      colorDim: 'rgba(59,130,246,0.12)',
+      ringProgress: progressPct,
+      ringColor: progressPct >= 50 ? '#22C55E' : '#3B82F6',
+      mainValue: `${totalCompleted}`,
+      subLabel: progressMessage,
+      detail: `of ${totalTopics} topics · ${progressPct}%`,
+    },
+    {
+      id: 'streak',
+      label: 'Streak',
+      icon: <Flame width={14} height={14} />,
+      color: '#FF9500',
+      colorDim: 'rgba(255,149,0,0.12)',
+      ringProgress: Math.min(streak * (100 / 7), 100),
+      ringColor: streak >= 7 ? '#FF3B30' : '#FF9500',
+      mainValue: `${streak}`,
+      subLabel: streakMessage,
+      detail: 'days in a row',
+      hasDots: true,
+    },
+  ];
+
+  return (
+    <div className="metrics-dashboard">
+      {cards.map((card, idx) => (
+        <motion.button
+          key={card.id}
+          className={`metric-card ${expandedCard === card.id ? 'expanded' : ''}`}
+          onClick={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 * idx, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          whileTap={{ scale: 0.97 }}
+          style={{ '--card-color': card.color, '--card-color-dim': card.colorDim } as React.CSSProperties}
+        >
+          {/* Card header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+            <span style={{ color: card.color, display: 'flex', alignItems: 'center' }}>{card.icon}</span>
+            <span style={{
+              fontSize: 10, fontWeight: 600, color: card.color,
+              textTransform: 'uppercase', letterSpacing: '1px',
+            }}>
+              {card.label}
+            </span>
+          </div>
+
+          {/* Ring + Value */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <ProgressRing
+              size={62}
+              strokeWidth={5}
+              progress={card.ringProgress}
+              color={card.ringColor}
+            >
+              <span style={{
+                fontSize: 15, fontWeight: 700, color: '#fff',
+                fontFamily: 'var(--font-plus-jakarta), sans-serif',
+              }}>
+                {card.mainValue}
+              </span>
+            </ProgressRing>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 12, fontWeight: 500, color: '#fff',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {card.subLabel}
+              </div>
+              <div style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>
+                {card.detail}
+              </div>
+            </div>
+          </div>
+
+          {/* Streak dots — only for streak card */}
+          {card.hasDots && <StreakDots streak={streak} />}
+
+          {/* Mini progress bar for focus/progress cards */}
+          {!card.hasDots && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{
+                height: 3, borderRadius: 2,
+                background: 'rgba(255,255,255,0.06)',
+                overflow: 'hidden',
+              }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.max(card.ringProgress, 2)}%` }}
+                  transition={{ duration: 1, ease: [0.4, 0, 0.2, 1], delay: 0.5 + 0.15 * idx }}
+                  style={{
+                    height: '100%', borderRadius: 2,
+                    background: `linear-gradient(90deg, ${card.color}, ${card.ringColor})`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Expanded detail */}
+          <AnimatePresence>
+            {expandedCard === card.id && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div style={{
+                  marginTop: 12, paddingTop: 10,
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  fontSize: 12, color: '#8E8E93',
+                }}>
+                  {card.id === 'focus' && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Today&apos;s completion</span>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>{tasksCompleted}/{tasksTotal}</span>
+                    </div>
+                  )}
+                  {card.id === 'progress' && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Remaining</span>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>{totalTopics - totalCompleted} topics</span>
+                    </div>
+                  )}
+                  {card.id === 'streak' && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Best streak</span>
+                      <span style={{ color: '#fff', fontWeight: 600 }}>{Math.max(streak, 1)} days</span>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.button>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
 // TODAY VIEW
 // ============================================
 function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocusTimer: () => void }) {
@@ -292,25 +591,15 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label">Focus Score</div>
-          <div className="stat-value">{focusScore}%</div>
-          <div className="stat-sub">today&apos;s tasks done</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Topics Done</div>
-          <div className="stat-value">{store.totalCompleted}</div>
-          <div className="stat-sub">of {store.totalTopics} total</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label"><Flame width={13} height={13} />Streak</div>
-          <div className="stat-value">{store.streak}</div>
-          <div className="stat-sub">days in a row</div>
-        </div>
-
-      </div>
+      {/* Metrics Dashboard */}
+      <MetricsDashboard
+        focusScore={focusScore}
+        totalCompleted={store.totalCompleted}
+        totalTopics={store.totalTopics}
+        streak={store.streak}
+        tasksCompleted={completedCount}
+        tasksTotal={tasks.length}
+      />
 
       {/* Mission Section */}
       <div className="mission-section">
