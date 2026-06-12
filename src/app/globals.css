@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Smooth scrolling for landing page anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -661,6 +666,328 @@
 .mission-add:hover {
   color: #FF6B60;
   text-shadow: 0 0 12px rgba(255,59,48,0.3);
+}
+
+/* ============================================
+   DASHBOARD — Redesigned Home
+   ============================================ */
+
+.dashboard-header {
+  margin-bottom: 20px;
+}
+
+.dashboard-greeting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-greeting-text {
+  font-size: 14px;
+  color: #8E8E93;
+  margin-bottom: 2px;
+}
+
+.dashboard-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-plus-jakarta), sans-serif;
+}
+
+.dashboard-day-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #FF3B30;
+  background: rgba(255,59,48,0.12);
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-streak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,149,0,0.1);
+  border: 1px solid rgba(255,149,0,0.2);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+.dashboard-streak-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FF9500;
+  font-family: var(--font-plus-jakarta), sans-serif;
+}
+
+.dashboard-sync {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #8E8E93;
+}
+
+/* Focus Ring */
+.dashboard-focus-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28px;
+  padding: 24px 0;
+}
+
+.dashboard-focus-ring-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 12px;
+}
+
+.dashboard-focus-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.focus-ring-track {
+  fill: none;
+  stroke: rgba(255,255,255,0.06);
+  stroke-width: 6;
+}
+
+.focus-ring-progress {
+  fill: none;
+  stroke: #FF3B30;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1);
+  filter: drop-shadow(0 0 6px rgba(255,59,48,0.3));
+}
+
+.dashboard-focus-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-focus-pct {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-plus-jakarta), sans-serif;
+  line-height: 1;
+}
+
+.dashboard-focus-label {
+  font-size: 10px;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.dashboard-focus-info {
+  font-size: 13px;
+  color: #8E8E93;
+}
+
+/* Section Headers */
+.dashboard-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.dashboard-section-sub {
+  font-size: 12px;
+  color: #8E8E93;
+  font-weight: 400;
+}
+
+/* Subjects Grid */
+.dashboard-subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .dashboard-subjects-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.dashboard-subject-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.dashboard-subject-card:hover {
+  border-color: rgba(255,255,255,0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.dashboard-subject-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.dashboard-subject-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.dashboard-subject-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.dashboard-subject-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.dashboard-subject-pct {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-plus-jakarta), sans-serif;
+}
+
+.dashboard-subject-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.dashboard-subject-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .5s cubic-bezier(.4,0,.2,1);
+}
+
+/* Tasks List */
+.dashboard-tasks-list {
+  margin-bottom: 12px;
+}
+
+.dashboard-task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background .15s ease;
+}
+
+.dashboard-task-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-task-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #444;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+}
+
+.dashboard-task-check:hover {
+  border-color: #666;
+}
+
+.dashboard-task-check.checked {
+  background: linear-gradient(135deg, #10B981, #34D399);
+  border-color: #10B981;
+  box-shadow: 0 0 8px rgba(16,185,129,0.3);
+}
+
+.dashboard-task-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-task-name {
+  font-size: 14px;
+  font-weight: 500;
+  transition: color .2s ease;
+}
+
+.dashboard-task-subject {
+  font-size: 12px;
+  color: #8E8E93;
+  margin-top: 2px;
+}
+
+.dashboard-tasks-empty {
+  text-align: center;
+  color: #666;
+  padding: 24px;
+  font-size: 14px;
+}
+
+.dashboard-add-task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #FF3B30;
+  cursor: pointer;
+  font-weight: 500;
+  border: none;
+  background: none;
+  padding: 8px 0;
+  transition: color .2s ease;
+}
+
+.dashboard-add-task:hover {
+  color: #FF6B60;
+}
+
+@media (max-width: 768px) {
+  .dashboard-name { font-size: 18px; }
+  .dashboard-greeting-text { font-size: 13px; }
+  .dashboard-focus-ring-wrapper { width: 100px; height: 100px; }
+  .dashboard-focus-pct { font-size: 22px; }
+  .dashboard-subject-card { padding: 12px; }
+  .dashboard-subject-name { font-size: 13px; }
 }
 
 /* ============================================

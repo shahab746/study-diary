@@ -27,3 +27,43 @@ Stage Summary:
 - ✅ Health endpoint shows Supabase as primary storage
 - ✅ Auto-migration of Sheets users on login
 - ✅ 9 users now in Supabase (8 existing + 1 new test)
+
+---
+Task ID: 1
+Agent: Dashboard Redesign Agent
+Task: Redesign TodayView (Home/Dashboard) to match beautiful dark-themed dashboard layout
+
+Work Log:
+- Read full page.tsx (1168 lines) and globals.css to understand existing structure
+- Identified TodayView component at lines 226-356 with old hero-card + stats-grid + mission-section layout
+- Identified Home component renderContent() at lines 1120-1131 where TodayView is rendered
+- Identified handleCourseClick callback already exists in Home component
+- Replaced TodayView component with redesigned dark dashboard layout featuring:
+  - Top section: Greeting text + student name + Day badge + streak flame + sync indicator
+  - Focus Score circular progress ring (SVG) with red/orange stroke
+  - Subject Progress 2×2 grid (4 columns on desktop) with colored icons, percentages, progress bars
+  - Today's Tasks list with green gradient checkboxes and cleaner layout
+  - Add task button at bottom
+- Added onCourseClick prop to TodayView function signature
+- Updated both TodayView render calls in Home component (case 'today' and default) to pass onCourseClick={handleCourseClick}
+- Added ~320 lines of new CSS styles in globals.css after .mission-add:hover (line 669):
+  - Dashboard header, greeting row, name, day badge styles
+  - Streak badge and sync indicator styles
+  - Focus ring SVG styles (track, progress, center text)
+  - Section header styles
+  - Subjects grid (2-col mobile, 4-col desktop) with glass morphism cards
+  - Tasks list with circular checkboxes and clean layout
+  - Add task button styles
+  - Mobile responsive media queries
+- Ran `bun run lint` — passed with zero errors
+- Dev server confirmed running on port 3000
+
+Stage Summary:
+- ✅ TodayView completely redesigned with dark dashboard layout
+- ✅ Circular focus score ring with SVG animation
+- ✅ 2×2 subject progress grid (4 columns on desktop)
+- ✅ Clean task list with green gradient checkboxes
+- ✅ onCourseClick prop wired up for subject card navigation
+- ✅ All existing functionality preserved (sync, offline, etc.)
+- ✅ No changes to other views (TasksView, CoursesView, FocusTimerView, SubjectDetailView)
+- ✅ Lint passes cleanly

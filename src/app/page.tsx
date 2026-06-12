@@ -5,6 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
 import { LoginPage } from '@/components/auth/LoginPage';
+import LandingPage from '@/components/landing/LandingPage';
 import {
   Home as HomeIcon, ListTodo, BookOpen, Timer, Moon, Sun,
   Search, Plus, Star, Clock, Play, X, ChevronLeft,
@@ -222,24 +223,25 @@ function LoadingSkeleton() {
 // ============================================
 // TODAY VIEW
 // ============================================
-function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocusTimer: () => void }) {
+function TodayView({ onNewTask, onFocusTimer, onCourseClick }: { onNewTask: () => void; onFocusTimer: () => void; onCourseClick: (subjectId: string) => void }) {
   const store = useStudyOS();
   const tasks = store.todayTasks;
   const student = store.student;
   const toggleTask = store.toggleTaskComplete;
+  const subjects = store.subjects;
 
   const completedCount = tasks.filter(t => t.completed).length;
   const focusScore = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : store.focusScore;
 
-  const nextTask = tasks.find(t => !t.completed);
+  // Circular progress ring calculations
+  const ringRadius = 54;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringStrokeOffset = ringCircumference * (1 - focusScore / 100);
 
-  // Format lastSynced time
+  // Sync status
   const lastSynced = store.lastSynced;
   const isOnline = store.isOnline;
   const pendingSyncCount = store.pendingSyncCount;
-  const syncLabel = lastSynced
-    ? `Synced ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : 'Not synced';
 
   const handleManualSync = () => {
     if (isOnline) store.syncNow();
@@ -247,109 +249,117 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
 
   return (
     <div className="view active">
-      {/* Hero Card */}
-      <div className="hero-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="hero-date">{getDateLine()}</div>
-          <span 
-            style={{ fontSize: 11, color: isOnline ? '#8E8E93' : '#FF9500', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-            onClick={handleManualSync}
-            title={isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending syncs — tap to sync` : 'Tap to sync') : 'Offline — changes saved locally'}
-          >
-            {isOnline ? (
-              pendingSyncCount > 0 ? (
-                <RefreshCw width={10} height={10} style={{ color: '#FF9500' }} />
-              ) : (
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-              )
-            ) : (
-              <WifiOff width={10} height={10} style={{ color: '#FF9500' }} />
-            )}
-            {isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending` : syncLabel) : 'Offline'}
-          </span>
-        </div>
-        <div className="hero-greeting">{getGreeting()}, <span style={{ color: '#FF3B30' }}>{student?.name || 'Student'}</span>.</div>
-        <div className="hero-message">
-          {nextTask
-            ? `Your next move is ${nextTask.topicName} in ${nextTask.subjectName}.`
-            : tasks.length > 0
-              ? 'All today\'s tasks are done! Great work.'
-              : 'No tasks scheduled for today. Enjoy your break!'
-          }
-        </div>
-        <div className="hero-actions">
-          {nextTask && (
-            <button className="btn btn-accent" onClick={onNewTask}>
-              <Star width={15} height={15} /> Start next best task
-            </button>
-          )}
-          <button className="btn btn-secondary" onClick={onFocusTimer}>
-            <Clock width={15} height={15} /> Focus 25m
-          </button>
-          <button className="btn btn-ghost" style={{ padding: '9px 12px' }} onClick={onNewTask}>
-            <Plus width={15} height={15} />
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label">Focus Score</div>
-          <div className="stat-value">{focusScore}%</div>
-          <div className="stat-sub">today&apos;s tasks done</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Topics Done</div>
-          <div className="stat-value">{store.totalCompleted}</div>
-          <div className="stat-sub">of {store.totalTopics} total</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label"><Flame width={13} height={13} />Streak</div>
-          <div className="stat-value">{store.streak}</div>
-          <div className="stat-sub">days in a row</div>
-        </div>
-
-      </div>
-
-      {/* Mission Section */}
-      <div className="mission-section">
-        <div className="mission-header">
+      {/* Top Section: Greeting + Day + Sync */}
+      <div className="dashboard-header">
+        <div className="dashboard-greeting-row">
           <div>
-            <div className="mission-title">Today&apos;s mission</div>
-            <div className="mission-hint">{completedCount} of {tasks.length} topics done · {store.topicsPerDay} topics/day pace</div>
+            <div className="dashboard-greeting-text">{getGreeting()}</div>
+            <div className="dashboard-name-row">
+              <span className="dashboard-name">{student?.name || 'Student'}</span>
+              <span className="dashboard-day-badge">Day {student?.currentDay || 1}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Streak badge */}
+            <div className="dashboard-streak">
+              <Flame width={18} height={18} style={{ color: '#FF9500' }} />
+              <span className="dashboard-streak-count">{store.streak}</span>
+            </div>
+            {/* Sync indicator */}
+            <span
+              className="dashboard-sync"
+              onClick={handleManualSync}
+              title={isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending syncs — tap to sync` : 'Tap to sync') : 'Offline — changes saved locally'}
+            >
+              {isOnline ? (
+                pendingSyncCount > 0 ? (
+                  <RefreshCw width={12} height={12} style={{ color: '#FF9500' }} />
+                ) : (
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+                )
+              ) : (
+                <WifiOff width={12} height={12} style={{ color: '#FF9500' }} />
+              )}
+            </span>
           </div>
         </div>
-        <div style={{ marginTop: 14 }}>
-          {tasks.map(task => (
-            <div key={task.topicId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div
-                className={`task-checkbox ${task.completed ? 'checked' : ''}`}
-                onClick={() => toggleTask(task.topicId)}
-              >
-                {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: task.completed ? '#666' : '#fff', textDecoration: task.completed ? 'line-through' : 'none' }}>
-                  {task.topicName}
-                </div>
-                <div style={{ fontSize: 12, color: '#8E8E93' }}>{task.subjectName} · {task.chapterName}</div>
-              </div>
-              <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor, flexShrink: 0 }}>
-                {task.subjectName} · D{task.dayNumber}
-              </span>
-            </div>
-          ))}
-          {tasks.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#666', padding: 20 }}>
-              No tasks for today. Check your pacing goal or enjoy the day off!
-            </div>
-          )}
-          <button className="mission-add" style={{ marginTop: 14 }} onClick={onNewTask}>
-            <Plus width={14} height={14} /> Add mission
-          </button>
+      </div>
+
+      {/* Focus Score Ring Section */}
+      <div className="dashboard-focus-section">
+        <div className="dashboard-focus-ring-wrapper">
+          <svg className="dashboard-focus-ring" viewBox="0 0 120 120">
+            <circle className="focus-ring-track" cx="60" cy="60" r={ringRadius} />
+            <circle
+              className="focus-ring-progress"
+              cx="60" cy="60" r={ringRadius}
+              strokeDasharray={ringCircumference}
+              strokeDashoffset={ringStrokeOffset}
+            />
+          </svg>
+          <div className="dashboard-focus-center">
+            <div className="dashboard-focus-pct">{focusScore}%</div>
+            <div className="dashboard-focus-label">Focus Score</div>
+          </div>
+        </div>
+        <div className="dashboard-focus-info">
+          {completedCount} of {tasks.length} tasks done
         </div>
       </div>
+
+      {/* Subject Progress Grid */}
+      <div className="dashboard-section-header">
+        <span>Subjects</span>
+        <span className="dashboard-section-sub">{store.totalCompleted}/{store.totalTopics} done</span>
+      </div>
+      <div className="dashboard-subjects-grid">
+        {subjects.map(subject => (
+          <div key={subject.subjectId} className="dashboard-subject-card" onClick={() => onCourseClick(subject.subjectId)}>
+            <div className="dashboard-subject-icon" style={{ background: subject.color }}>
+              {getIcon(subject.icon)}
+            </div>
+            <div className="dashboard-subject-info">
+              <div className="dashboard-subject-name">{subject.subjectName}</div>
+              <div className="dashboard-subject-pct" style={{ color: subject.color }}>{subject.progressPct}%</div>
+            </div>
+            <div className="dashboard-subject-bar">
+              <div className="dashboard-subject-bar-fill" style={{ width: `${subject.progressPct}%`, background: subject.color }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Today's Tasks */}
+      <div className="dashboard-section-header" style={{ marginTop: 24 }}>
+        <span>Today&apos;s Tasks</span>
+        <span className="dashboard-section-sub">{completedCount} of {tasks.length}</span>
+      </div>
+      <div className="dashboard-tasks-list">
+        {tasks.map(task => (
+          <div key={task.topicId} className="dashboard-task-item">
+            <div
+              className={`dashboard-task-check ${task.completed ? 'checked' : ''}`}
+              onClick={() => toggleTask(task.topicId)}
+            >
+              {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
+            </div>
+            <div className="dashboard-task-info">
+              <div className="dashboard-task-name" style={{ color: task.completed ? '#666' : '#fff', textDecoration: task.completed ? 'line-through' : 'none' }}>
+                {task.topicName}
+              </div>
+              <div className="dashboard-task-subject">{task.subjectName}</div>
+            </div>
+          </div>
+        ))}
+        {tasks.length === 0 && (
+          <div className="dashboard-tasks-empty">
+            No tasks for today. Enjoy your break!
+          </div>
+        )}
+      </div>
+      <button className="dashboard-add-task" onClick={onNewTask}>
+        <Plus width={14} height={14} /> Add task
+      </button>
     </div>
   );
 }
@@ -1086,9 +1096,9 @@ export default function Home() {
     return () => { cleanup?.(); };
   }, [initNetwork]);
 
-  // Show login page if not authenticated
+  // Show landing page if not authenticated
   if (status === 'unauthenticated') {
-    return <LoginPage />;
+    return <LandingPage />;
   }
 
   // Loading while checking auth
@@ -1118,7 +1128,7 @@ export default function Home() {
 
     switch (currentView) {
       case 'today':
-        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
+        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} onCourseClick={handleCourseClick} />;
       case 'tasks':
         return <TasksView onNewTask={handleNewTask} />;
       case 'courses':
@@ -1126,7 +1136,7 @@ export default function Home() {
       case 'focus-timer':
         return <FocusTimerView />;
       default:
-        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
+        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} onCourseClick={handleCourseClick} />;
     }
   };
 
