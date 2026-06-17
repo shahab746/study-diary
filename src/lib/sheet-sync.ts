@@ -430,7 +430,7 @@ export async function fetchCurriculumFromSheet(forceRefresh = false): Promise<Sh
       return [];
     }
 
-    // Header: Grade, Board, Field, Subject, Chapter_No, Chapter_Name, Topic_No, Topic_Name, Video_Link, PDF_View_Link, Is_Free, Total_Days, Subject_Color, Group_Eligibility
+    // Header: Grade, Board, Field, Subject, Chapter_No, Chapter_Name, Topic_No, Topic_Name, Video_Link, PDF_View_Link, is_paid, Total_Days, Subject_Color, Group_Eligibility
     const curriculum: SheetCurriculumRow[] = [];
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -447,7 +447,7 @@ export async function fetchCurriculumFromSheet(forceRefresh = false): Promise<Sh
         topicName: String(row[7] || '').trim(),
         videoLink: String(row[8] || '').trim(),
         pdfLink: String(row[9] || '').trim(),
-        isFree: String(row[10] || 'TRUE').trim().toLowerCase() === 'true',
+        isFree: String(row[10] || 'FALSE').trim().toLowerCase() !== 'true', // is_paid=TRUE means NOT free
         totalDays: parseInt(String(row[11] || '0'), 10) || 0,
         subjectColor: String(row[12] || '').trim(),
         groupEligibility: String(row[13] || 'Both').trim(),
@@ -657,7 +657,16 @@ export async function fetchSpecialCoursesFromSheet(forceRefresh = false): Promis
   }
 
   try {
-    const rows = await fetchSheetAsCSV(SHEETS.SPECIAL_COURSES, forceRefresh);
+    // Use gviz API directly (same approach as fetchCurriculumFromSheet)
+    // because GID-based CSV export may be blocked
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEETS.SPECIAL_COURSES)}`;
+    const response = await fetch(url, forceRefresh ? { cache: 'no-store' } : { next: { revalidate: 300 } });
+
+    let rows: string[][] = [];
+    if (response.ok) {
+      const csvText = await response.text();
+      rows = parseCSV(csvText);
+    }
 
     if (rows.length < 2) {
       return [];

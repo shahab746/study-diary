@@ -63,3 +63,32 @@ Stage Summary:
 - GitHub repos updated: shahab746/study-diary and shahab746/study-diary-app
 - All 14 files committed and pushed
 - Server verified working with sequential API calls
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix Vercel deployment error by removing Prisma and using Supabase + Google Sheets
+
+Work Log:
+- Verified .env already has Supabase credentials configured
+- Tested Supabase REST API directly: user 03335041266 (Aqeel) exists with status "paid"
+- Rewrote src/lib/curriculum-service.ts to delegate to Google Sheets (sheet-sync.ts) instead of Prisma
+- Fixed is_paid column inversion bug in fetchCurriculumFromSheet (is_paid=TRUE means NOT free)
+- Fixed fetchSpecialCoursesFromSheet to use gviz API directly (GID-based CSV was blocked)
+- Updated src/lib/db.ts to be a no-op (removed Prisma client)
+- Removed @prisma/client and prisma from package.json via bun remove
+- Verified all API routes (login, data, subject, debug, register, migrate, sync-progress) use Supabase for users/progress
+- Verified curriculum data comes from Google Sheets "Curriculum" tab (1029 rows)
+- Tested all endpoints successfully:
+  - /api/debug?phone=03335041266 → user found, status=paid, canAccessPremiumContent=true
+  - /api/data?phone=03335041266 → 4 subjects (Physics, Chemistry, Biology, Mathematics), 474 topics
+  - /api/subject/subj_physics_grade10 → 91 topics, 9 chapters, premium topics visible for paid user
+  - /api/health → architecture confirmed as "Supabase + Google Sheets"
+- Lint passes clean
+
+Stage Summary:
+- Prisma completely removed - Vercel build will no longer fail
+- Architecture: Supabase (users + progress) + Google Sheets (curriculum: subjects, chapters, topics)
+- User 03335041266 verified: status=paid, can access all premium content
+- is_paid column properly inverted to isFree in curriculum parsing
+- Special Courses now fetched via gviz API (was failing with GID-based CSV)
