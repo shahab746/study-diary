@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   buildCurriculumHierarchy,
-  fetchProgressFromSheet,
-  findUserByPhone,
 } from '@/lib/sheet-sync';
-import { findUserByPhone as findUserByPhoneDB, isSupabaseConfigured, dbUserToSheetUser, getUserProgress } from '@/lib/supabase';
-import { findRegisteredUserByPhone } from '@/lib/registered-users';
+import { findUserByPhone, isSupabaseConfigured, dbUserToSheetUser, getUserProgress } from '@/lib/supabase';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 const COLOR_MAP: Record<string, string> = {
@@ -27,7 +24,6 @@ function mapIcon(icon: string, name?: string): string {
   return 'book';
 }
 
-// Normalize student status — same logic as data route
 function normalizeStatus(status: string): string {
   if (!status) return 'free';
   const s = status.toLowerCase().trim();
@@ -46,17 +42,28 @@ export async function GET(
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone') || '';
 
-    // Fetch curriculum hierarchy
+    // Fetch curriculum hierarchy from Google Sheets
     const subjects = await buildCurriculumHierarchy();
 
-    // Fetch progress — Supabase first, then Sheets fallback
+    // Find the subject by ID
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject) {
+      return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    }
+
+    // ─── Get user status + progress from Supabase ───
+    let userStatus = 'free';
+    let userGroup = '';
     let progressRows: Array<{ phone: string; topicId: string; completed: boolean }> = [];
-    let useSupabaseProgress = false;
 
     if (phone && isSupabaseConfigured()) {
-      const dbUser = await findUserByPhoneDB(phone);
+      const dbUser = await findUserByPhone(phone);
       if (dbUser) {
-        useSupabaseProgress = true;
+        const su = dbUserToSheetUser(dbUser);
+        userStatus = normalizeStatus(su.status);
+        userGroup = su.academicGroup || '';
+
+        // Get progress from Supabase
         const dbProgress = await getUserProgress(phone);
         progressRows = dbProgress.map(p => ({
           phone: p.phone,
@@ -66,80 +73,10 @@ export async function GET(
       }
     }
 
-    if (!useSupabaseProgress && phone) {
-      const sheetProgress = await fetchProgressFromSheet();
-      progressRows = sheetProgress.map(p => ({
-        phone: p.phone,
-        topicId: p.topicId,
-        completed: p.completed,
-      }));
-    }
-
-    // Find the subject by ID
-    const subject = subjects.find(s => s.id === subjectId);
-    if (!subject) {
-      return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
-    }
-
-    // ─── Determine user status — check ALL sources, take the highest access ───
-    // A user found as 'paid' in ANY source should get paid access.
-    // This prevents bad migrations or stale data from locking out paid users.
-    let userStatus = 'free'; // default
-    let userFound = false;
-
-    if (phone) {
-      // 1. Try Supabase first
-      if (isSupabaseConfigured()) {
-        const dbUser = await findUserByPhoneDB(phone);
-        if (dbUser) {
-          userFound = true;
-          const normalized = normalizeStatus(dbUserToSheetUser(dbUser).status);
-          if (normalized === 'paid') userStatus = 'paid';
-          else if (normalized !== 'free') userStatus = normalized; // blocked, etc.
-        }
-      }
-
-      // 2. Check Google Sheets — upgrade to 'paid' if found as paid there
-      if (userStatus !== 'paid') {
-        try {
-          const sheetUser = await findUserByPhone(phone, false);
-          if (sheetUser) {
-            userFound = true;
-            const normalized = normalizeStatus(sheetUser.status);
-            if (normalized === 'paid') userStatus = 'paid';
-          }
-        } catch { /* Sheets may be down */ }
-      }
-
-      // 3. Check registered-users cache — upgrade to 'paid' if found as paid there
-      if (userStatus !== 'paid') {
-        try {
-          const cachedUser = await findRegisteredUserByPhone(phone, false);
-          if (cachedUser) {
-            userFound = true;
-            const normalized = normalizeStatus(cachedUser.status);
-            if (normalized === 'paid') userStatus = 'paid';
-          }
-        } catch { /* Cache may be unavailable */ }
-      }
-    }
-
     const isFreeUser = userStatus === 'free';
 
     // Check Group_Eligibility
     if (subject.groupEligibility && subject.groupEligibility !== 'Both' && phone) {
-      let userGroup = '';
-      if (isSupabaseConfigured()) {
-        const dbUser = await findUserByPhoneDB(phone);
-        if (dbUser) {
-          const sheetUser = dbUserToSheetUser(dbUser);
-          userGroup = sheetUser.academicGroup || '';
-        }
-      }
-      if (!userGroup) {
-        const sheetUser = await findUserByPhone(phone, false);
-        userGroup = sheetUser?.academicGroup || '';
-      }
       if (userGroup && subject.groupEligibility !== userGroup) {
         return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });
       }
@@ -166,7 +103,6 @@ export async function GET(
         number: ch.number,
         name: ch.name,
         topics: ch.topics.map(t => {
-          // Free users: hide video/PDF links on premium topics (isFree = false)
           const isTopicFree = !!t.isFree;
           const hideLinks = isFreeUser && !isTopicFree;
           return {

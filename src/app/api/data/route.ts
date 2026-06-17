@@ -4,16 +4,11 @@ import {
   dbUserToSheetUser,
   getUserProgress,
   isSupabaseConfigured,
-  type SheetUserCompat,
 } from '@/lib/supabase';
 import {
-  findUserByPhone as findUserByPhoneSheet,
-  fetchProgressFromSheet,
   fetchSpecialCoursesFromSheet,
   buildCurriculumHierarchy,
-  fetchUsersFromSheet,
 } from '@/lib/sheet-sync';
-import { findRegisteredUserByPhone } from '@/lib/registered-users';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 
@@ -39,7 +34,6 @@ function mapIcon(icon: string, subjectName?: string): string {
   return 'book';
 }
 
-// Normalize student status from Google Sheet values
 function normalizeStatus(status: string): string {
   if (!status) return 'free';
   const s = status.toLowerCase().trim();
@@ -57,143 +51,55 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // ─── STEP 1: Fetch student profile ─────────────────────────────
-    // Check ALL sources and take the highest access level (paid > free).
-    // This prevents bad migrations or stale Supabase data from locking out paid users.
+    // ─── STEP 1: Fetch student profile from Supabase ──────────────
     let student: Record<string, any> | null = null;
     let academicGroup = '';
-    let progressSource: 'supabase' | 'sheets' = 'sheets';
 
-    if (phone) {
-      // Collect user data from all sources, then pick the one with highest access
-      let supabaseUser: Record<string, any> | null = null;
-      let sheetUser: Record<string, any> | null = null;
-      let cachedUser: Record<string, any> | null = null;
-
-      // 1. Try Supabase
-      if (isSupabaseConfigured()) {
-        const dbUser = await findUserByPhone(phone);
-        if (dbUser) {
-          const su = dbUserToSheetUser(dbUser);
-          supabaseUser = {
-            name: su.name, phone: su.phone, grade: su.grade,
-            board: su.board, field: su.field,
-            status: normalizeStatus(su.status),
-            startDate: su.startDate, targetDate: su.targetDate,
-            currentDay: su.currentDay, totalDays: su.totalDays,
-            topicsDone: su.topicsDone, daysLeft: su.daysLeft,
-            pacingGoal: su.pacingGoal || '5M',
-            academicGroup: su.academicGroup, pin: su.pin,
-          };
-        }
-      }
-
-      // 2. Try Google Sheets
-      try {
-        const su = await findUserByPhoneSheet(phone, true);
-        if (su) {
-          sheetUser = {
-            name: su.name, phone: su.phone, grade: su.grade,
-            board: su.board, field: su.field,
-            status: normalizeStatus(su.status),
-            startDate: su.startDate, targetDate: su.targetDate,
-            currentDay: su.currentDay, totalDays: su.totalDays,
-            topicsDone: su.topicsDone, daysLeft: su.daysLeft,
-            pacingGoal: su.pacingGoal || '5M',
-            academicGroup: su.academicGroup, pin: su.pin,
-          };
-        }
-      } catch { /* Sheets may be down */ }
-
-      // 3. Try registered-users cache
-      try {
-        const cu = await findRegisteredUserByPhone(phone, false);
-        if (cu) {
-          cachedUser = {
-            name: cu.name, phone: cu.phone, grade: cu.grade,
-            board: cu.board, field: cu.field,
-            status: normalizeStatus(cu.status),
-            startDate: cu.startDate, targetDate: cu.targetDate,
-            currentDay: cu.currentDay, totalDays: cu.totalDays,
-            topicsDone: cu.topicsDone, daysLeft: cu.daysLeft,
-            pacingGoal: cu.pacingGoal || '5M',
-            academicGroup: cu.academicGroup, pin: cu.pin,
-          };
-        }
-      } catch { /* Cache unavailable */ }
-
-      // Pick the best source: paid > free, prefer Supabase for progress data
-      if (supabaseUser && supabaseUser.status === 'paid') {
-        student = supabaseUser;
-        progressSource = 'supabase';
-      } else if (sheetUser && sheetUser.status === 'paid') {
-        student = sheetUser;
-        // If also found in Supabase, upgrade their status and use Supabase progress
-        if (supabaseUser) {
-          student = { ...supabaseUser, status: 'paid' };
-          progressSource = 'supabase';
-          // Sync the paid status back to Supabase
-          const { getSupabase } = await import('@/lib/supabase');
-          getSupabase().from('users').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('phone', phone).then(() => {
-            console.log(`✅ Synced paid status to Supabase for ${phone} (found paid in Sheets)`);
-          }).catch(() => {});
-        }
-      } else if (cachedUser && cachedUser.status === 'paid') {
-        student = cachedUser;
-        if (supabaseUser) {
-          student = { ...supabaseUser, status: 'paid' };
-          progressSource = 'supabase';
-          const { getSupabase } = await import('@/lib/supabase');
-          getSupabase().from('users').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('phone', phone).then(() => {
-            console.log(`✅ Synced paid status to Supabase for ${phone} (found paid in cache)`);
-          }).catch(() => {});
-        }
-      } else if (supabaseUser) {
-        student = supabaseUser;
-        progressSource = 'supabase';
-      } else if (sheetUser) {
-        student = sheetUser;
-      } else if (cachedUser) {
-        student = cachedUser;
-      }
-
-      if (student) {
-        academicGroup = student.academicGroup || '';
+    if (phone && isSupabaseConfigured()) {
+      const dbUser = await findUserByPhone(phone);
+      if (dbUser) {
+        const su = dbUserToSheetUser(dbUser);
+        academicGroup = su.academicGroup || '';
+        student = {
+          name: su.name,
+          phone: su.phone,
+          grade: su.grade,
+          board: su.board,
+          field: su.field,
+          status: normalizeStatus(su.status),
+          startDate: su.startDate,
+          targetDate: su.targetDate,
+          currentDay: su.currentDay,
+          totalDays: su.totalDays,
+          topicsDone: su.topicsDone,
+          daysLeft: su.daysLeft,
+          pacingGoal: su.pacingGoal || '5M',
+          academicGroup: su.academicGroup,
+          pin: su.pin,
+        };
       }
     }
 
     if (!student) {
-      console.warn(`⚠️ /api/data: No user found for phone="${phone}" — returning empty curriculum`);
+      console.warn(`⚠️ /api/data: No user found for phone="${phone}"`);
     }
 
     const studentGrade = String(student?.grade || '10');
 
-    // ─── STEP 2: Fetch curriculum + progress in parallel ──
-    const [subjects, specialCourses] = await Promise.all([
+    // ─── STEP 2: Fetch curriculum from Google Sheets + progress from Supabase ──
+    const [subjects, specialCourses, dbProgress] = await Promise.all([
       buildCurriculumHierarchy(),
       fetchSpecialCoursesFromSheet(),
+      phone && isSupabaseConfigured() ? getUserProgress(phone) : Promise.resolve([]),
     ]);
 
-    // ─── STEP 3: Get progress from Supabase or Sheets ──
-    let progressRows: Array<{ phone: string; topicId: string; completed: boolean; dateCompleted: string }> = [];
-
-    if (progressSource === 'supabase' && phone && isSupabaseConfigured()) {
-      const dbProgress = await getUserProgress(phone);
-      progressRows = dbProgress.map(p => ({
-        phone: p.phone,
-        topicId: p.topic_id,
-        completed: p.completed,
-        dateCompleted: p.date_completed || '',
-      }));
-    } else {
-      const sheetProgress = await fetchProgressFromSheet();
-      progressRows = sheetProgress.map(p => ({
-        phone: p.phone,
-        topicId: p.topicId,
-        completed: p.completed,
-        dateCompleted: p.dateCompleted,
-      }));
-    }
+    // ─── STEP 3: Build progress rows from Supabase ──
+    const progressRows = dbProgress.map(p => ({
+      phone: p.phone,
+      topicId: p.topic_id,
+      completed: p.completed,
+      dateCompleted: p.date_completed || '',
+    }));
 
     // ─── STEP 4: Filter subjects by grade ──────────────────────────────
     const gradeVariants = [studentGrade, `Grade ${studentGrade}`];
@@ -225,8 +131,6 @@ export async function GET(request: Request) {
       const premiumTopics = allTopics.filter(t => !t.isFree);
       const completedFreeTopics = completedTopics.filter(t => t.isFree);
 
-      // For free users: progress shows free-content completion against free-content total
-      // For paid users: progress shows full completion
       const displayTotal = isFreeUser ? freeTopics.length : allTopics.length;
       const displayCompleted = isFreeUser ? completedFreeTopics.length : completedTopics.length;
       const displayPct = displayTotal > 0 ? Math.round((displayCompleted / displayTotal) * 100) : 0;
@@ -288,8 +192,6 @@ export async function GET(request: Request) {
     }> = [];
 
     for (const subject of eligibleSubjects) {
-      // All subjects visible to free users — only topics are filtered
-
       const allSubjectTopics = subject.chapters.flatMap(ch => ch.topics);
       const completedCount = allSubjectTopics.filter(t => progressSet.has(t.id)).length;
 
@@ -380,7 +282,7 @@ export async function GET(request: Request) {
             subjectColor: sq.subjectColor,
             chapterName: topic.chapterName,
             completed: false,
-            videoLink: toValidUrl(topic.videoLink), // Free topics already filtered — show links
+            videoLink: toValidUrl(topic.videoLink),
             pdfLink: toValidUrl(topic.pdfLink),
             priority,
             subjectIcon: sq.subjectIcon,

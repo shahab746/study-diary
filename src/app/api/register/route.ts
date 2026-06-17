@@ -3,18 +3,12 @@ import {
   registerUserInSupabase,
   isSupabaseConfigured,
 } from '@/lib/supabase';
-import { registerUser } from '@/lib/registered-users';
 
 /**
- * Registration API endpoint
+ * Registration API — Supabase only
  *
  * POST /api/register
  * Body: { name, phone, pin, grade, board, field, academicGroup, confirmPin }
- *
- * Flow:
- * 1. Validate input
- * 2. Try Supabase first (primary), fall back to file-based store
- * 3. Return success + user data
  */
 export async function POST(request: Request) {
   try {
@@ -39,36 +33,15 @@ export async function POST(request: Request) {
       academicGroup: String(academicGroup || 'Pre-Medical').trim(),
     };
 
-    // Try Supabase first
-    if (isSupabaseConfigured()) {
-      const result = await registerUserInSupabase(input);
-
-      if (!result.success) {
-        return NextResponse.json(
-          { success: false, error: result.error },
-          { status: 400 }
-        );
-      }
-
-      console.log(`🎉 Registration successful (Supabase): "${result.user!.name}" (${result.user!.phone})`);
-
-      return NextResponse.json({
-        success: true,
-        user: {
-          name: result.user!.name,
-          phone: result.user!.phone,
-          grade: result.user!.grade,
-          board: result.user!.board,
-          field: result.user!.field,
-          status: result.user!.status,
-          academicGroup: result.user!.academic_group,
-          syncedToSheet: true, // Supabase IS the source of truth now
-        },
-      });
+    if (!isSupabaseConfigured()) {
+      console.error('Registration API: Supabase is not configured');
+      return NextResponse.json(
+        { success: false, error: 'Registration unavailable. Please try again later.' },
+        { status: 503 }
+      );
     }
 
-    // Fallback to file-based store (dev mode without Supabase)
-    const result = await registerUser(input);
+    const result = await registerUserInSupabase(input);
 
     if (!result.success) {
       return NextResponse.json(
@@ -77,7 +50,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`🎉 Registration successful (file store): "${result.user!.name}" (${result.user!.phone})`);
+    console.log(`🎉 Registration successful: "${result.user!.name}" (${result.user!.phone})`);
 
     return NextResponse.json({
       success: true,
@@ -88,8 +61,7 @@ export async function POST(request: Request) {
         board: result.user!.board,
         field: result.user!.field,
         status: result.user!.status,
-        academicGroup: result.user!.academicGroup,
-        syncedToSheet: result.user!.syncedToSheet,
+        academicGroup: result.user!.academic_group,
       },
     });
   } catch (error) {
@@ -106,51 +78,33 @@ export async function POST(request: Request) {
  * GET /api/register — list registered users (debug/admin)
  */
 export async function GET() {
-  // Try Supabase first
-  if (isSupabaseConfigured()) {
-    const { getSupabase } = await import('@/lib/supabase');
-    const sb = getSupabase();
-    const { data, error } = await sb
-      .from('users')
-      .select('name, phone, grade, board, field, academic_group, status, created_at')
-      .order('created_at', { ascending: false });
-
-    if (!error) {
-      return NextResponse.json({
-        source: 'supabase',
-        count: data?.length || 0,
-        users: data?.map(u => ({
-          name: u.name,
-          phone: u.phone,
-          grade: u.grade,
-          board: u.board,
-          field: u.field,
-          academicGroup: u.academic_group,
-          status: u.status,
-          registeredAt: u.created_at,
-          syncedToSheet: true,
-        })),
-      });
-    }
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ source: 'none', count: 0, users: [] });
   }
 
-  // Fallback
-  const { getRegisteredUsers, getRegisteredUserCount } = await import('@/lib/registered-users');
-  const users = getRegisteredUsers();
-  const count = getRegisteredUserCount();
+  const { getSupabase } = await import('@/lib/supabase');
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from('users')
+    .select('name, phone, grade, board, field, academic_group, status, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ source: 'supabase', error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({
-    source: 'file-store',
-    count,
-    users: users.map(u => ({
+    source: 'supabase',
+    count: data?.length || 0,
+    users: data?.map(u => ({
       name: u.name,
       phone: u.phone,
       grade: u.grade,
       board: u.board,
       field: u.field,
-      academicGroup: u.academicGroup,
-      registeredAt: u.registeredAt,
-      syncedToSheet: u.syncedToSheet,
+      academicGroup: u.academic_group,
+      status: u.status,
+      registeredAt: u.created_at,
     })),
   });
 }
