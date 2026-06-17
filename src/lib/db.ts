@@ -1,13 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+/**
+ * Database module — Supabase only (no Prisma)
+ *
+ * This file is kept for backward compatibility but is no longer used.
+ * All database operations now go through Supabase via @/lib/supabase
+ * and curriculum data comes from Google Sheets via @/lib/sheet-sync.
+ */
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const db = globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = db;
-}
-
-export default db;
+// Prisma has been removed. Use Supabase for user/progress data.
+// Use sheet-sync for curriculum data.
+export {};
