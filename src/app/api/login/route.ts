@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
-import {
-  findUserByPhone,
-  isSupabaseConfigured,
-} from '@/lib/supabase';
+import { findUserByPhone, normalizeStatus } from '@/lib/user-service';
 
 /**
- * Login API — Supabase only
+ * Login API — Prisma/SQLite
  *
  * POST /api/login
  * Body: { phone: string, pin: string }
@@ -27,18 +24,9 @@ export async function POST(request: Request) {
 
     console.log(`🔐 Login API: Looking up phone="${cleanPhone}"`);
 
-    // ── Supabase is the single source of truth for Users ──
-    if (!isSupabaseConfigured()) {
-      console.error('🔐 Login API: Supabase is not configured');
-      return NextResponse.json(
-        { success: false, error: 'Service unavailable. Please try again later.' },
-        { status: 503 }
-      );
-    }
+    const user = await findUserByPhone(cleanPhone);
 
-    const dbUser = await findUserByPhone(cleanPhone);
-
-    if (!dbUser) {
+    if (!user) {
       console.warn(`🔐 Login API: No user found for phone="${cleanPhone}"`);
       return NextResponse.json(
         { success: false, error: 'No account found with this phone number. Please register first.' },
@@ -46,7 +34,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (dbUser.pin !== cleanPin) {
+    if (user.pin !== cleanPin) {
       console.warn(`🔐 Login API: Wrong PIN for phone="${cleanPhone}"`);
       return NextResponse.json(
         { success: false, error: 'Incorrect PIN. Please try again.' },
@@ -54,26 +42,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const status = normalizeStatus(dbUser.status);
-    if (status === 'blocked' || status === 'disabled') {
+    const status = normalizeStatus(user.status);
+    if (status === 'blocked') {
       return NextResponse.json(
         { success: false, error: 'Your account has been disabled. Please contact support.' },
         { status: 403 }
       );
     }
 
-    console.log(`🔐 Login API: Success for "${dbUser.name}" (${status})`);
+    console.log(`🔐 Login API: Success for "${user.name}" (${status})`);
 
     return NextResponse.json({
       success: true,
       user: {
-        name: dbUser.name,
-        phone: dbUser.phone,
-        grade: dbUser.grade,
-        board: dbUser.board,
-        field: dbUser.field,
+        name: user.name,
+        phone: user.phone,
+        grade: user.grade,
+        board: user.board,
+        field: user.field,
         status,
-        academicGroup: dbUser.academic_group,
+        academicGroup: user.academicGroup,
       },
     });
   } catch (error) {
@@ -84,13 +72,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
-
-function normalizeStatus(status: string): string {
-  if (!status) return 'free';
-  const s = status.toLowerCase().trim();
-  if (s === 'true' || s === 'paid') return 'paid';
-  if (s === 'false' || s === 'free') return 'free';
-  if (s === 'blocked' || s === 'disabled') return s;
-  return s;
 }

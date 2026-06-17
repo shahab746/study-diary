@@ -5,50 +5,43 @@ import {
 } from '@/lib/sheet-sync';
 import {
   findUserByPhone,
-  dbUserToSheetUser,
-  isSupabaseConfigured,
   getUserProgress,
-} from '@/lib/supabase';
+  getUserCount,
+  normalizeStatus,
+} from '@/lib/user-service';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Debug endpoint — user lookup + stats.
  * GET /api/debug              → general stats
- * GET /api/debug?phone=03XXX  → detailed user lookup in Supabase
+ * GET /api/debug?phone=03XXX  → detailed user lookup in Prisma/SQLite
  */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // ── Phone-based user lookup (Supabase only) ──
+    // ── Phone-based user lookup (Prisma/SQLite) ──
     if (phone) {
       const cleanPhone = phone.trim();
-      const lookup: Record<string, any> = { phone: cleanPhone };
+      const lookup: Record<string, unknown> = { phone: cleanPhone };
 
-      if (!isSupabaseConfigured()) {
-        lookup.supabase = { configured: false };
-        lookup.verdict = { userExists: false, effectiveStatus: 'unknown', error: 'Supabase not configured' };
-        return NextResponse.json(lookup);
-      }
-
-      const dbUser = await findUserByPhone(cleanPhone);
-      if (dbUser) {
-        const su = dbUserToSheetUser(dbUser);
-        const status = normalizeStatus(su.status);
+      const user = await findUserByPhone(cleanPhone);
+      if (user) {
+        const status = normalizeStatus(user.status);
         const progress = await getUserProgress(cleanPhone);
 
-        lookup.supabase = {
+        lookup.database = {
           found: true,
-          name: dbUser.name,
-          status: dbUser.status,
+          name: user.name,
+          status: user.status,
           normalizedStatus: status,
-          grade: dbUser.grade,
-          board: dbUser.board,
-          academic_group: dbUser.academic_group,
-          pin: dbUser.pin,
-          topics_done: dbUser.topics_done,
+          grade: user.grade,
+          board: user.board,
+          academicGroup: user.academicGroup,
+          pin: user.pin,
+          topicsDone: user.topicsDone,
           progressCount: progress.length,
           completedCount: progress.filter(p => p.completed).length,
         };
@@ -60,7 +53,7 @@ export async function GET(request: Request) {
           canAccessPremiumContent: status === 'paid',
         };
       } else {
-        lookup.supabase = { found: false };
+        lookup.database = { found: false };
         lookup.verdict = {
           userExists: false,
           effectiveStatus: 'not_found',
@@ -73,11 +66,12 @@ export async function GET(request: Request) {
     }
 
     // ── General stats ──
-    const results: Record<string, any> = {};
+    const results: Record<string, unknown> = {};
 
-    const [subjects, courses] = await Promise.all([
+    const [subjects, courses, userCount] = await Promise.all([
       buildCurriculumHierarchy(),
       fetchSpecialCoursesFromSheet(),
+      getUserCount(),
     ]);
 
     results.curriculum = {
@@ -91,18 +85,8 @@ export async function GET(request: Request) {
       totalTopics: s.totalTopics, groupEligibility: s.groupEligibility,
     }));
 
-    // User count from Supabase
-    if (isSupabaseConfigured()) {
-      const { getSupabase } = await import('@/lib/supabase');
-      const sb = getSupabase();
-      const { count } = await sb.from('users').select('*', { count: 'exact', head: true });
-      results.userCount = count || 0;
-      results.userSource = 'supabase';
-    } else {
-      results.userCount = 0;
-      results.userSource = 'not_configured';
-    }
-
+    results.userCount = userCount;
+    results.userSource = 'prisma-sqlite';
     results.timestamp = new Date().toISOString();
     return NextResponse.json(results);
   } catch (error) {
@@ -111,13 +95,4 @@ export async function GET(request: Request) {
       error: error instanceof Error ? error.message : String(error),
     }, { status: 500 });
   }
-}
-
-function normalizeStatus(status: string): string {
-  if (!status) return 'free';
-  const s = status.toLowerCase().trim();
-  if (s === 'true' || s === 'paid') return 'paid';
-  if (s === 'false' || s === 'free') return 'free';
-  if (s === 'blocked' || s === 'disabled') return s;
-  return s;
 }

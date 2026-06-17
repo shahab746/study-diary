@@ -30,3 +30,53 @@ Stage Summary:
 - All 13 sections functional with Framer Motion animations
 - Page renders correctly on both desktop and mobile
 - No errors, clean lint
+
+---
+Task ID: 2
+Agent: Data Layer Agent
+Task: Rewrite data layer to use Prisma/SQLite instead of Supabase for user and progress data
+
+Work Log:
+- Read worklog.md, db.ts, schema.prisma, sheet-sync.ts, and all API route files
+- Identified all Supabase imports across 9 API route files + health endpoint
+- Created src/lib/user-service.ts — comprehensive Prisma-based user/progress service:
+  - normalizeStatus(): handles "true"/"TRUE"/"Paid"/"paid" → "paid", "false"/"FALSE"/"Free"/"free" → "free"
+  - findUserByPhone(): SQLite lookup with normalized status
+  - registerUser(): validates + creates user in SQLite
+  - updateUser(): updates user data in SQLite
+  - getUserProgress(): gets all progress records from SQLite
+  - toggleTopicProgress(): toggles topic completion + updates topicsDone count
+  - syncProgress(): bulk upsert progress records
+  - migrateUsersFromSheets(): reads Google Sheets users → inserts into SQLite (skip if exists)
+  - getUserCount(), getAllUsers(): utility functions for admin/debug
+- Rewrote src/app/api/login/route.ts — replaced Supabase with user-service
+- Rewrote src/app/api/data/route.ts — replaced Supabase with user-service; kept Sheets for curriculum
+- Rewrote src/app/api/subject/[subjectId]/route.ts — replaced Supabase with user-service
+- Rewrote src/app/api/register/route.ts — replaced Supabase with user-service
+- Rewrote src/app/api/debug/route.ts — replaced Supabase with user-service
+- Rewrote src/app/api/migrate/route.ts — replaced Supabase with user-service migrateUsersFromSheets()
+- Rewrote src/app/api/sync-progress/route.ts — replaced Supabase with user-service syncProgress()
+- Rewrote src/app/api/sync/route.ts — replaced Supabase with user-service
+- Rewrote src/app/api/seed/route.ts — replaced Supabase with user-service
+- Rewrote src/app/api/health/route.ts — replaced Supabase checks with Prisma checks
+- All Supabase imports removed from all API routes
+- Lint check passes clean (0 errors)
+- Verified all endpoints work:
+  - /api/health: database connected, userCount: 4 (before migration)
+  - /api/debug?phone=03335041266: user not found (expected — in Sheets only)
+  - /api/migrate: migrated 5 users, 4 skipped (already existed)
+  - /api/debug?phone=03335041266: found=true, normalizedStatus=paid ✓
+  - /api/login: successful login with correct status normalization
+  - /api/data: returns student + subjects + today's tasks correctly
+  - /api/register GET: lists users from SQLite with source="prisma-sqlite"
+  - /api/sync-progress: syncs progress records to SQLite
+- Frontend (page.tsx, store.ts) requires NO changes — API response shapes preserved
+
+Stage Summary:
+- Complete data layer migration from Supabase to Prisma/SQLite
+- 1 new file created: src/lib/user-service.ts
+- 9 API route files rewritten to use user-service instead of Supabase
+- Google Sheets remains the source for curriculum data (via sheet-sync.ts)
+- All Supabase dependencies removed from active code paths
+- Status normalization handles all legacy formats (true/false, Paid/Free, etc.)
+- Clean lint, all endpoints verified working

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   buildCurriculumHierarchy,
 } from '@/lib/sheet-sync';
-import { findUserByPhone, isSupabaseConfigured, dbUserToSheetUser, getUserProgress } from '@/lib/supabase';
+import { findUserByPhone, getUserProgress, normalizeStatus } from '@/lib/user-service';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 const COLOR_MAP: Record<string, string> = {
@@ -24,15 +24,6 @@ function mapIcon(icon: string, name?: string): string {
   return 'book';
 }
 
-function normalizeStatus(status: string): string {
-  if (!status) return 'free';
-  const s = status.toLowerCase().trim();
-  if (s === 'true' || s === 'paid') return 'paid';
-  if (s === 'false' || s === 'free') return 'free';
-  if (s === 'blocked' || s === 'disabled') return s;
-  return s;
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ subjectId: string }> }
@@ -51,23 +42,22 @@ export async function GET(
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
 
-    // ─── Get user status + progress from Supabase ───
+    // ─── Get user status + progress from Prisma/SQLite ───
     let userStatus = 'free';
     let userGroup = '';
     let progressRows: Array<{ phone: string; topicId: string; completed: boolean }> = [];
 
-    if (phone && isSupabaseConfigured()) {
-      const dbUser = await findUserByPhone(phone);
-      if (dbUser) {
-        const su = dbUserToSheetUser(dbUser);
-        userStatus = normalizeStatus(su.status);
-        userGroup = su.academicGroup || '';
+    if (phone) {
+      const user = await findUserByPhone(phone);
+      if (user) {
+        userStatus = normalizeStatus(user.status);
+        userGroup = user.academicGroup || '';
 
-        // Get progress from Supabase
+        // Get progress from Prisma
         const dbProgress = await getUserProgress(phone);
         progressRows = dbProgress.map(p => ({
           phone: p.phone,
-          topicId: p.topic_id,
+          topicId: p.topicId,
           completed: p.completed,
         }));
       }

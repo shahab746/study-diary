@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { migrateSheetsToSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { migrateUsersFromSheets } from '@/lib/user-service';
 
 /**
- * Seed / Migrate endpoint — syncs Google Sheets users into Supabase.
+ * Seed / Migrate endpoint — syncs Google Sheets users into SQLite (Prisma).
  *
- * GET /api/seed              — Migrates users from Sheets to Supabase
+ * GET /api/seed              — Migrates users from Sheets to SQLite
  * GET /api/seed?type=users   — Migrates users only
  * GET /api/seed?type=curriculum — Info only (curriculum reads from Sheets live)
  */
@@ -15,15 +15,8 @@ export async function GET(request: Request) {
 
     const results: Record<string, unknown> = { timestamp: new Date().toISOString() };
 
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({
-        success: false,
-        error: 'Supabase not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env',
-      }, { status: 400 });
-    }
-
     if (type === 'users' || type === 'full') {
-      results.users = await migrateSheetsToSupabase();
+      results.users = await migrateUsersFromSheets();
     }
 
     if (type === 'curriculum' || type === 'full') {

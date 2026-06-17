@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { migrateSheetsToSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { migrateUsersFromSheets } from '@/lib/user-service';
 import { invalidateCache } from '@/lib/sheet-sync';
 
 /**
- * Sync endpoint — migrates Google Sheets users to Supabase.
+ * Sync endpoint — migrates Google Sheets users to SQLite (Prisma).
  * Curriculum reads directly from Sheets (no DB sync needed).
  *
- * GET /api/sync?type=users       — Migrate users from Sheets to Supabase
+ * GET /api/sync?type=users       — Migrate users from Sheets to SQLite
  * GET /api/sync?type=curriculum  — Info only (curriculum reads from Sheets live)
  * GET /api/sync?type=full        — Migrate users + info
  */
@@ -16,10 +16,7 @@ export async function GET(request: Request) {
     const type = url.searchParams.get('type') || 'users';
 
     if (type === 'users') {
-      if (!isSupabaseConfigured()) {
-        return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
-      }
-      const result = await migrateSheetsToSupabase();
+      const result = await migrateUsersFromSheets();
       invalidateCache();
       return NextResponse.json({ success: true, ...result });
     }
@@ -32,10 +29,7 @@ export async function GET(request: Request) {
     }
 
     if (type === 'full') {
-      if (!isSupabaseConfigured()) {
-        return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
-      }
-      const userResult = await migrateSheetsToSupabase();
+      const userResult = await migrateUsersFromSheets();
       invalidateCache();
       return NextResponse.json({
         success: true,

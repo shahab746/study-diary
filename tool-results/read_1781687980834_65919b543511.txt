@@ -1,0 +1,1464 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback, useMemo } from 'react';
+     4→import { useSession, signOut } from 'next-auth/react';
+     5→import { useTheme } from 'next-themes';
+     6→import { motion, AnimatePresence } from 'framer-motion';
+     7→import { useStudyOS, type SubjectProgress, type TodayTask, type SubjectDetail, type SubjectDetailChapter } from '@/lib/store';
+     8→import { LoginPage } from '@/components/auth/LoginPage';
+     9→import { LandingPage } from '@/components/landing/LandingPage';
+    10→import {
+    11→  Home as HomeIcon, ListTodo, BookOpen, Timer, Moon, Sun,
+    12→  Search, Plus, Star, Clock, Play, X, ChevronLeft,
+    13→  Check, Flame, RotateCcw, BookOpenText, ArrowLeft,
+    14→  FileText, Menu, LogOut, Sigma, Cpu, Zap, Beaker, Atom, Pi, Landmark,
+    15→  FileText as PdfIcon, Lock, Wifi, WifiOff, RefreshCw, CloudOff,
+    16→  Target, Trophy, TrendingUp, Sparkles
+    17→} from 'lucide-react';
+    18→
+    19→// ============================================
+    20→// ICON MAP
+    21→// ============================================
+    22→const ICON_MAP: Record<string, React.ReactNode> = {
+    23→  sigma: <Sigma width={20} height={20} />,
+    24→  cpu: <Cpu width={20} height={20} />,
+    25→  zap: <Zap width={20} height={20} />,
+    26→  book: <BookOpen width={20} height={20} />,
+    27→  beaker: <Beaker width={20} height={20} />,
+    28→  atom: <Atom width={20} height={20} />,
+    29→  pi: <Pi width={20} height={20} />,
+    30→  landmark: <Landmark width={20} height={20} />,
+    31→};
+    32→function getIcon(iconName: string): React.ReactNode {
+    33→  return ICON_MAP[iconName?.toLowerCase()] || <BookOpen width={20} height={20} />;
+    34→}
+    35→
+    36→// ============================================
+    37→// TYPES
+    38→// ============================================
+    39→type ViewId = 'today' | 'tasks' | 'courses' | 'focus-timer';
+    40→
+    41→// ============================================
+    42→// HELPERS
+    43→// ============================================
+    44→const PRIORITY_COLORS = { high: '#FF3B30', medium: '#3B82F6', low: '#FF9500' };
+    45→const PRIORITY_LABELS = { high: 'HIGH PRIORITY', medium: 'MEDIUM PRIORITY', low: 'LOW PRIORITY' };
+    46→
+    47→function getGreeting(): string {
+    48→  const h = new Date().getHours();
+    49→  if (h < 12) return 'Good morning';
+    50→  if (h < 17) return 'Good afternoon';
+    51→  return 'Good evening';
+    52→}
+    53→
+    54→function getDateLine(): string {
+    55→  const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    56→  const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+    57→  const now = new Date();
+    58→  return `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+    59→}
+    60→
+    61→function formatTimer(totalSeconds: number): string {
+    62→  const m = Math.floor(totalSeconds / 60);
+    63→  const s = totalSeconds % 60;
+    64→  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    65→}
+    66→
+    67→// ============================================
+    68→// SIDEBAR COMPONENT
+    69→// ============================================
+    70→function Sidebar({ currentView, setCurrentView, onClose, studentName, totalLecs }: {
+    71→  currentView: ViewId;
+    72→  setCurrentView: (v: ViewId) => void;
+    73→  onClose?: () => void;
+    74→  studentName: string;
+    75→  totalLecs: number;
+    76→}) {
+    77→  const { theme, setTheme } = useTheme();
+    78→
+    79→  const navItems: { id: ViewId; label: string; icon: React.ReactNode }[] = [
+    80→    { id: 'today', label: 'Today', icon: <HomeIcon width={18} height={18} /> },
+    81→    { id: 'tasks', label: 'Tasks', icon: <ListTodo width={18} height={18} /> },
+    82→    { id: 'courses', label: 'Courses', icon: <BookOpen width={18} height={18} /> },
+    83→  ];
+    84→
+    85→  const bottomItems: { id: ViewId; label: string; icon: React.ReactNode }[] = [
+    86→    { id: 'focus-timer', label: 'Focus timer', icon: <Timer width={18} height={18} /> },
+    87→  ];
+    88→
+    89→  const handleNav = (id: ViewId) => {
+    90→    setCurrentView(id);
+    91→    onClose?.();
+    92→  };
+    93→
+    94→  return (
+    95→    <aside className="sidebar">
+    96→      <div className="sidebar-brand">
+    97→        <BookOpenText width={22} height={22} style={{ color: '#FF3B30' }} />
+    98→        <div>
+    99→          <h1 className="heading">Study Diary</h1>
+   100→          <span>{studentName || 'Student'} · {totalLecs} Topics</span>
+   101→        </div>
+   102→      </div>
+   103→
+   104→      <nav className="sidebar-nav">
+   105→        {navItems.map(item => (
+   106→          <div
+   107→            key={item.id}
+   108→            className={`sidebar-nav-item ${currentView === item.id ? 'active' : ''}`}
+   109→            onClick={() => handleNav(item.id)}
+   110→          >
+   111→            {item.icon}
+   112→            {item.label}
+   113→          </div>
+   114→        ))}
+   115→      </nav>
+   116→
+   117→      <div className="sidebar-section-label">Tools</div>
+   118→      <nav className="sidebar-nav">
+   119→        {bottomItems.map(item => (
+   120→          <div
+   121→            key={item.id}
+   122→            className={`sidebar-nav-item ${currentView === item.id ? 'active' : ''}`}
+   123→            onClick={() => handleNav(item.id)}
+   124→          >
+   125→            {item.icon}
+   126→            {item.label}
+   127→          </div>
+   128→        ))}
+   129→      </nav>
+   130→
+   131→      <div className="sidebar-bottom">
+   132→        <div
+   133→          className="sidebar-nav-item"
+   134→          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+   135→        >
+   136→          {theme === 'dark' ? <Sun width={18} height={18} /> : <Moon width={18} height={18} />}
+   137→          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+   138→        </div>
+   139→        <div
+   140→          className="sidebar-nav-item"
+   141→          onClick={() => signOut({ callbackUrl: '/' })}
+   142→          style={{ color: '#FF6B60' }}
+   143→        >
+   144→          <LogOut width={18} height={18} />
+   145→          Sign out
+   146→        </div>
+   147→      </div>
+   148→    </aside>
+   149→  );
+   150→}
+   151→
+   152→// ============================================
+   153→// MOBILE SWIPEABLE NAV
+   154→// ============================================
+   155→function MobileNav({ currentView, setCurrentView }: {
+   156→  currentView: ViewId;
+   157→  setCurrentView: (v: ViewId) => void;
+   158→}) {
+   159→  const items: { id: ViewId | 'sign-out'; label: string; icon: React.ReactNode }[] = [
+   160→    { id: 'today', label: 'Today', icon: <HomeIcon width={18} height={18} /> },
+   161→    { id: 'tasks', label: 'Tasks', icon: <ListTodo width={18} height={18} /> },
+   162→    { id: 'courses', label: 'Courses', icon: <BookOpen width={18} height={18} /> },
+   163→    { id: 'focus-timer', label: 'Focus Timer', icon: <Timer width={18} height={18} /> },
+   164→    { id: 'sign-out', label: 'Sign Out', icon: <LogOut width={18} height={18} /> },
+   165→  ];
+   166→
+   167→  const handleTap = (id: ViewId | 'sign-out') => {
+   168→    if (id === 'sign-out') {
+   169→      signOut({ callbackUrl: '/' });
+   170→      return;
+   171→    }
+   172→    setCurrentView(id);
+   173→  };
+   174→
+   175→  return (
+   176→    <nav className="mobile-swipe-nav">
+   177→      <div className="mobile-swipe-track">
+   178→        {items.map(item => {
+   179→          const isSignOut = item.id === 'sign-out';
+   180→          const isActive = !isSignOut && currentView === item.id;
+   181→          return (
+   182→            <button
+   183→              key={item.id}
+   184→              className={`mobile-swipe-item ${isActive ? 'active' : ''} ${isSignOut ? 'sign-out-btn' : ''}`}
+   185→              onClick={() => handleTap(item.id)}
+   186→            >
+   187→              {item.icon}
+   188→              <span>{item.label}</span>
+   189→            </button>
+   190→          );
+   191→        })}
+   192→      </div>
+   193→    </nav>
+   194→  );
+   195→}
+   196→
+   197→// ============================================
+   198→// LOADING SKELETON
+   199→// ============================================
+   200→function LoadingSkeleton() {
+   201→  return (
+   202→    <div className="view active">
+   203→      <div className="hero-card" style={{ opacity: 0.5 }}>
+   204→        <div style={{ height: 14, width: 120, background: '#2a2a2a', borderRadius: 6, marginBottom: 12 }} />
+   205→        <div style={{ height: 28, width: 260, background: '#2a2a2a', borderRadius: 6, marginBottom: 12 }} />
+   206→        <div style={{ height: 16, width: 400, background: '#2a2a2a', borderRadius: 6 }} />
+   207→      </div>
+   208→      <div className="stats-grid">
+   209→        {[1, 2, 3, 4].map(i => (
+   210→          <div key={i} className="stat-card" style={{ opacity: 0.5 }}>
+   211→            <div style={{ height: 32, width: 60, background: '#2a2a2a', borderRadius: 6, margin: '0 auto' }} />
+   212→          </div>
+   213→        ))}
+   214→      </div>
+   215→      <div className="mission-section" style={{ opacity: 0.5 }}>
+   216→        <div style={{ height: 16, width: 160, background: '#2a2a2a', borderRadius: 6, marginBottom: 20 }} />
+   217→        {[1, 2, 3].map(i => (
+   218→          <div key={i} style={{ height: 40, background: '#2a2a2a', borderRadius: 6, marginBottom: 8 }} />
+   219→        ))}
+   220→      </div>
+   221→    </div>
+   222→  );
+   223→}
+   224→
+   225→// ============================================
+   226→// METRICS DASHBOARD — Mobile-First Design
+   227→// ============================================
+   228→
+   229→/** Circular progress ring SVG component */
+   230→function ProgressRing({
+   231→  size = 68,
+   232→  strokeWidth = 5,
+   233→  progress = 0,
+   234→  color = '#FF3B30',
+   235→  trackColor = 'rgba(255,255,255,0.06)',
+   236→  children,
+   237→}: {
+   238→  size?: number;
+   239→  strokeWidth?: number;
+   240→  progress?: number;
+   241→  color?: string;
+   242→  trackColor?: string;
+   243→  children?: React.ReactNode;
+   244→}) {
+   245→  const radius = (size - strokeWidth) / 2;
+   246→  const circumference = 2 * Math.PI * radius;
+   247→  const offset = circumference * (1 - Math.min(progress, 100) / 100);
+   248→
+   249→  return (
+   250→    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+   251→      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+   252→        <circle
+   253→          cx={size / 2} cy={size / 2} r={radius}
+   254→          fill="none" stroke={trackColor} strokeWidth={strokeWidth}
+   255→        />
+   256→        <motion.circle
+   257→          cx={size / 2} cy={size / 2} r={radius}
+   258→          fill="none" stroke={color} strokeWidth={strokeWidth}
+   259→          strokeLinecap="round"
+   260→          strokeDasharray={circumference}
+   261→          initial={{ strokeDashoffset: circumference }}
+   262→          animate={{ strokeDashoffset: offset }}
+   263→          transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1], delay: 0.3 }}
+   264→        />
+   265→      </svg>
+   266→      <div style={{
+   267→        position: 'absolute', inset: 0,
+   268→        display: 'flex', alignItems: 'center', justifyContent: 'center',
+   269→      }}>
+   270→        {children}
+   271→      </div>
+   272→    </div>
+   273→  );
+   274→}
+   275→
+   276→/** Streak flame dots — gamified row of 7 day indicators */
+   277→function StreakDots({ streak, maxDots = 7 }: { streak: number; maxDots?: number }) {
+   278→  return (
+   279→    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 6 }}>
+   280→      {Array.from({ length: maxDots }).map((_, i) => {
+   281→        const filled = i < streak;
+   282→        const isToday = i === streak;
+   283→        return (
+   284→          <motion.div
+   285→            key={i}
+   286→            initial={{ scale: 0 }}
+   287→            animate={{ scale: 1 }}
+   288→            transition={{ delay: 0.1 * i + 0.5, type: 'spring', stiffness: 400, damping: 15 }}
+   289→            style={{
+   290→              width: filled ? 18 : 14,
+   291→              height: filled ? 18 : 14,
+   292→              borderRadius: '50%',
+   293→              background: filled
+   294→                ? `linear-gradient(135deg, #FF9500 0%, #FF3B30 100%)`
+   295→                : isToday
+   296→                  ? 'rgba(255,149,0,0.25)'
+   297→                  : 'rgba(255,255,255,0.06)',
+   298→              border: isToday ? '2px solid rgba(255,149,0,0.5)' : 'none',
+   299→              display: 'flex', alignItems: 'center', justifyContent: 'center',
+   300→              boxShadow: filled ? '0 2px 8px rgba(255,69,58,0.3)' : 'none',
+   301→            }}
+   302→          >
+   303→            {filled && (
+   304→              <motion.span
+   305→                initial={{ opacity: 0 }}
+   306→                animate={{ opacity: 1 }}
+   307→                transition={{ delay: 0.1 * i + 0.7 }}
+   308→                style={{ fontSize: 9, lineHeight: 1 }}
+   309→              >
+   310→                🔥
+   311→              </motion.span>
+   312→            )}
+   313→          </motion.div>
+   314→        );
+   315→      })}
+   316→    </div>
+   317→  );
+   318→}
+   319→
+   320→/** Main metrics dashboard with 3 cards: Focus, Progress, Streak */
+   321→function MetricsDashboard({
+   322→  focusScore,
+   323→  totalCompleted,
+   324→  totalTopics,
+   325→  streak,
+   326→  tasksCompleted,
+   327→  tasksTotal,
+   328→}: {
+   329→  focusScore: number;
+   330→  totalCompleted: number;
+   331→  totalTopics: number;
+   332→  streak: number;
+   333→  tasksCompleted: number;
+   334→  tasksTotal: number;
+   335→}) {
+   336→  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+   337→
+   338→  const progressPct = totalTopics > 0 ? Math.round((totalCompleted / totalTopics) * 100) : 0;
+   339→
+   340→  // Motivational messages based on state
+   341→  const focusMessage = useMemo(() => {
+   342→    if (tasksTotal === 0) return 'No tasks yet';
+   343→    if (focusScore === 0) return 'Start your first task!';
+   344→    if (focusScore < 50) return 'Getting warmer…';
+   345→    if (focusScore < 100) return 'Keep going!';
+   346→    return 'Perfect day! 🎉';
+   347→  }, [focusScore, tasksTotal]);
+   348→
+   349→  const progressMessage = useMemo(() => {
+   350→    if (totalCompleted === 0) return 'Your journey begins today';
+   351→    if (progressPct < 10) return 'Great start!';
+   352→    if (progressPct < 50) return 'Solid progress!';
+   353→    return 'You\'re crushing it!';
+   354→  }, [totalCompleted, progressPct]);
+   355→
+   356→  const streakMessage = useMemo(() => {
+   357→    if (streak === 0) return 'Start your streak today';
+   358→    if (streak === 1) return 'Day one — keep it up!';
+   359→    if (streak < 7) return `${7 - streak} days until a week!`;
+   360→    return 'On fire! 🔥';
+   361→  }, [streak]);
+   362→
+   363→  const cards = [
+   364→    {
+   365→      id: 'focus',
+   366→      label: 'Focus',
+   367→      icon: <Target width={14} height={14} />,
+   368→      color: '#FF3B30',
+   369→      colorDim: 'rgba(255,59,48,0.12)',
+   370→      ringProgress: focusScore,
+   371→      ringColor: focusScore >= 100 ? '#22C55E' : focusScore >= 50 ? '#FF9500' : '#FF3B30',
+   372→      mainValue: `${focusScore}%`,
+   373→      subLabel: focusMessage,
+   374→      detail: `Today: ${tasksCompleted}/${tasksTotal} tasks`,
+   375→    },
+   376→    {
+   377→      id: 'progress',
+   378→      label: 'Progress',
+   379→      icon: <TrendingUp width={14} height={14} />,
+   380→      color: '#3B82F6',
+   381→      colorDim: 'rgba(59,130,246,0.12)',
+   382→      ringProgress: progressPct,
+   383→      ringColor: progressPct >= 50 ? '#22C55E' : '#3B82F6',
+   384→      mainValue: `${totalCompleted}`,
+   385→      subLabel: progressMessage,
+   386→      detail: `of ${totalTopics} topics · ${progressPct}%`,
+   387→    },
+   388→    {
+   389→      id: 'streak',
+   390→      label: 'Streak',
+   391→      icon: <Flame width={14} height={14} />,
+   392→      color: '#FF9500',
+   393→      colorDim: 'rgba(255,149,0,0.12)',
+   394→      ringProgress: Math.min(streak * (100 / 7), 100),
+   395→      ringColor: streak >= 7 ? '#FF3B30' : '#FF9500',
+   396→      mainValue: `${streak}`,
+   397→      subLabel: streakMessage,
+   398→      detail: 'days in a row',
+   399→      hasDots: true,
+   400→    },
+   401→  ];
+   402→
+   403→  return (
+   404→    <div className="metrics-dashboard">
+   405→      {cards.map((card, idx) => (
+   406→        <motion.button
+   407→          key={card.id}
+   408→          className={`metric-card ${expandedCard === card.id ? 'expanded' : ''}`}
+   409→          onClick={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
+   410→          initial={{ opacity: 0, y: 20 }}
+   411→          animate={{ opacity: 1, y: 0 }}
+   412→          transition={{ delay: 0.15 * idx, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+   413→          whileTap={{ scale: 0.97 }}
+   414→          style={{ '--card-color': card.color, '--card-color-dim': card.colorDim } as React.CSSProperties}
+   415→        >
+   416→          {/* Card header */}
+   417→          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+   418→            <span style={{ color: card.color, display: 'flex', alignItems: 'center' }}>{card.icon}</span>
+   419→            <span style={{
+   420→              fontSize: 10, fontWeight: 600, color: card.color,
+   421→              textTransform: 'uppercase', letterSpacing: '1px',
+   422→            }}>
+   423→              {card.label}
+   424→            </span>
+   425→          </div>
+   426→
+   427→          {/* Ring + Value */}
+   428→          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+   429→            <ProgressRing
+   430→              size={62}
+   431→              strokeWidth={5}
+   432→              progress={card.ringProgress}
+   433→              color={card.ringColor}
+   434→            >
+   435→              <span style={{
+   436→                fontSize: 15, fontWeight: 700, color: '#fff',
+   437→                fontFamily: 'var(--font-plus-jakarta), sans-serif',
+   438→              }}>
+   439→                {card.mainValue}
+   440→              </span>
+   441→            </ProgressRing>
+   442→            <div style={{ flex: 1, minWidth: 0 }}>
+   443→              <div style={{
+   444→                fontSize: 12, fontWeight: 500, color: '#fff',
+   445→                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+   446→              }}>
+   447→                {card.subLabel}
+   448→              </div>
+   449→              <div style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>
+   450→                {card.detail}
+   451→              </div>
+   452→            </div>
+   453→          </div>
+   454→
+   455→          {/* Streak dots — only for streak card */}
+   456→          {card.hasDots && <StreakDots streak={streak} />}
+   457→
+   458→          {/* Mini progress bar for focus/progress cards */}
+   459→          {!card.hasDots && (
+   460→            <div style={{ marginTop: 10 }}>
+   461→              <div style={{
+   462→                height: 3, borderRadius: 2,
+   463→                background: 'rgba(255,255,255,0.06)',
+   464→                overflow: 'hidden',
+   465→              }}>
+   466→                <motion.div
+   467→                  initial={{ width: 0 }}
+   468→                  animate={{ width: `${Math.max(card.ringProgress, 2)}%` }}
+   469→                  transition={{ duration: 1, ease: [0.4, 0, 0.2, 1], delay: 0.5 + 0.15 * idx }}
+   470→                  style={{
+   471→                    height: '100%', borderRadius: 2,
+   472→                    background: `linear-gradient(90deg, ${card.color}, ${card.ringColor})`,
+   473→                  }}
+   474→                />
+   475→              </div>
+   476→            </div>
+   477→          )}
+   478→
+   479→          {/* Expanded detail */}
+   480→          <AnimatePresence>
+   481→            {expandedCard === card.id && (
+   482→              <motion.div
+   483→                initial={{ height: 0, opacity: 0 }}
+   484→                animate={{ height: 'auto', opacity: 1 }}
+   485→                exit={{ height: 0, opacity: 0 }}
+   486→                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+   487→                style={{ overflow: 'hidden' }}
+   488→              >
+   489→                <div style={{
+   490→                  marginTop: 12, paddingTop: 10,
+   491→                  borderTop: '1px solid rgba(255,255,255,0.06)',
+   492→                  fontSize: 12, color: '#8E8E93',
+   493→                }}>
+   494→                  {card.id === 'focus' && (
+   495→                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+   496→                      <span>Today&apos;s completion</span>
+   497→                      <span style={{ color: '#fff', fontWeight: 600 }}>{tasksCompleted}/{tasksTotal}</span>
+   498→                    </div>
+   499→                  )}
+   500→                  {card.id === 'progress' && (
+   501→                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+   502→                      <span>Remaining</span>
+   503→                      <span style={{ color: '#fff', fontWeight: 600 }}>{totalTopics - totalCompleted} topics</span>
+   504→                    </div>
+   505→                  )}
+   506→                  {card.id === 'streak' && (
+   507→                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+   508→                      <span>Best streak</span>
+   509→                      <span style={{ color: '#fff', fontWeight: 600 }}>{Math.max(streak, 1)} days</span>
+   510→                    </div>
+   511→                  )}
+   512→                </div>
+   513→              </motion.div>
+   514→            )}
+   515→          </AnimatePresence>
+   516→        </motion.button>
+   517→      ))}
+   518→    </div>
+   519→  );
+   520→}
+   521→
+   522→// ============================================
+   523→// TODAY VIEW
+   524→// ============================================
+   525→function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocusTimer: () => void }) {
+   526→  const store = useStudyOS();
+   527→  const tasks = store.todayTasks;
+   528→  const student = store.student;
+   529→  const toggleTask = store.toggleTaskComplete;
+   530→
+   531→  const completedCount = tasks.filter(t => t.completed).length;
+   532→  const focusScore = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : store.focusScore;
+   533→
+   534→  const nextTask = tasks.find(t => !t.completed);
+   535→
+   536→  // Format lastSynced time
+   537→  const lastSynced = store.lastSynced;
+   538→  const isOnline = store.isOnline;
+   539→  const pendingSyncCount = store.pendingSyncCount;
+   540→  const syncLabel = lastSynced
+   541→    ? `Synced ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+   542→    : 'Not synced';
+   543→
+   544→  const handleManualSync = () => {
+   545→    if (isOnline) store.syncNow();
+   546→  };
+   547→
+   548→  return (
+   549→    <div className="view active">
+   550→      {/* Hero Card */}
+   551→      <div className="hero-card">
+   552→        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+   553→          <div className="hero-date">{getDateLine()}</div>
+   554→          <span 
+   555→            style={{ fontSize: 11, color: isOnline ? '#8E8E93' : '#FF9500', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+   556→            onClick={handleManualSync}
+   557→            title={isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending syncs — tap to sync` : 'Tap to sync') : 'Offline — changes saved locally'}
+   558→          >
+   559→            {isOnline ? (
+   560→              pendingSyncCount > 0 ? (
+   561→                <RefreshCw width={10} height={10} style={{ color: '#FF9500' }} />
+   562→              ) : (
+   563→                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+   564→              )
+   565→            ) : (
+   566→              <WifiOff width={10} height={10} style={{ color: '#FF9500' }} />
+   567→            )}
+   568→            {isOnline ? (pendingSyncCount > 0 ? `${pendingSyncCount} pending` : syncLabel) : 'Offline'}
+   569→          </span>
+   570→        </div>
+   571→        <div className="hero-greeting">{getGreeting()}, <span style={{ color: '#FF3B30' }}>{student?.name || 'Student'}</span>.</div>
+   572→        <div className="hero-message">
+   573→          {nextTask
+   574→            ? `Your next move is ${nextTask.topicName} in ${nextTask.subjectName}.`
+   575→            : tasks.length > 0
+   576→              ? 'All today\'s tasks are done! Great work.'
+   577→              : 'No tasks scheduled for today. Enjoy your break!'
+   578→          }
+   579→        </div>
+   580→        <div className="hero-actions">
+   581→          {nextTask && (
+   582→            <button className="btn btn-accent" onClick={onNewTask}>
+   583→              <Star width={15} height={15} /> Start next best task
+   584→            </button>
+   585→          )}
+   586→          <button className="btn btn-secondary" onClick={onFocusTimer}>
+   587→            <Clock width={15} height={15} /> Focus 25m
+   588→          </button>
+   589→          <button className="btn btn-ghost" style={{ padding: '9px 12px' }} onClick={onNewTask}>
+   590→            <Plus width={15} height={15} />
+   591→          </button>
+   592→        </div>
+   593→      </div>
+   594→
+   595→      {/* Metrics Dashboard */}
+   596→      <MetricsDashboard
+   597→        focusScore={focusScore}
+   598→        totalCompleted={store.totalCompleted}
+   599→        totalTopics={store.totalTopics}
+   600→        streak={store.streak}
+   601→        tasksCompleted={completedCount}
+   602→        tasksTotal={tasks.length}
+   603→      />
+   604→
+   605→      {/* Mission Section */}
+   606→      <div className="mission-section">
+   607→        <div className="mission-header">
+   608→          <div>
+   609→            <div className="mission-title">Today&apos;s mission</div>
+   610→            <div className="mission-hint">{completedCount} of {tasks.length} topics done · {store.topicsPerDay} topics/day pace</div>
+   611→          </div>
+   612→        </div>
+   613→        <div style={{ marginTop: 14 }}>
+   614→          {tasks.map(task => (
+   615→            <div key={task.topicId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+   616→              <div
+   617→                className={`task-checkbox ${task.completed ? 'checked' : ''}`}
+   618→                onClick={() => toggleTask(task.topicId)}
+   619→              >
+   620→                {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
+   621→              </div>
+   622→              <div style={{ flex: 1, minWidth: 0 }}>
+   623→                <div style={{ fontSize: 14, fontWeight: 500, color: task.completed ? '#666' : '#fff', textDecoration: task.completed ? 'line-through' : 'none' }}>
+   624→                  {task.topicName}
+   625→                </div>
+   626→                <div style={{ fontSize: 12, color: '#8E8E93' }}>{task.subjectName} · {task.chapterName}</div>
+   627→              </div>
+   628→              <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor, flexShrink: 0 }}>
+   629→                {task.subjectName} · D{task.dayNumber}
+   630→              </span>
+   631→            </div>
+   632→          ))}
+   633→          {tasks.length === 0 && (
+   634→            <div style={{ textAlign: 'center', color: '#666', padding: 20 }}>
+   635→              No tasks for today. Check your pacing goal or enjoy the day off!
+   636→            </div>
+   637→          )}
+   638→          <button className="mission-add" style={{ marginTop: 14 }} onClick={onNewTask}>
+   639→            <Plus width={14} height={14} /> Add mission
+   640→          </button>
+   641→        </div>
+   642→      </div>
+   643→    </div>
+   644→  );
+   645→}
+   646→
+   647→// ============================================
+   648→// TASKS VIEW
+   649→// ============================================
+   650→function TasksView({ onNewTask }: { onNewTask: () => void }) {
+   651→  const store = useStudyOS();
+   652→  const tasks = store.todayTasks;
+   653→  const toggleTask = store.toggleTaskComplete;
+   654→  const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('today');
+   655→
+   656→  const filteredTasks = activeTab === 'today'
+   657→    ? tasks
+   658→    : activeTab === 'completed'
+   659→      ? tasks.filter(t => t.completed)
+   660→      : tasks.filter(t => !t.completed);
+   661→
+   662→  return (
+   663→    <div className="view active">
+   664→      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+   665→        <div>
+   666→          <h2 className="heading" style={{ fontSize: 28, color: '#fff' }}>Tasks</h2>
+   667→          <p style={{ fontSize: 14, color: '#8E8E93', marginTop: 4 }}>
+   668→            {tasks.filter(t => t.completed).length} of {tasks.length} tasks completed
+   669→          </p>
+   670→        </div>
+   671→        <button className="btn btn-accent" onClick={onNewTask}>
+   672→          <Plus width={15} height={15} /> New task
+   673→        </button>
+   674→      </div>
+   675→
+   676→      {/* Tabs */}
+   677→      <div style={{ display: 'flex', gap: 8, marginTop: 20, marginBottom: 20 }}>
+   678→        {(['today', 'upcoming', 'completed'] as const).map(tab => (
+   679→          <button
+   680→            key={tab}
+   681→            className={`filter-btn ${activeTab === tab ? 'active' : ''}`}
+   682→            onClick={() => setActiveTab(tab)}
+   683→          >
+   684→            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+   685→          </button>
+   686→        ))}
+   687→      </div>
+   688→
+   689→      {/* Task Cards */}
+   690→      {filteredTasks.map(task => (
+   691→        <div key={task.topicId} className="task-card">
+   692→          <div className="task-card-top">
+   693→            <div
+   694→              className={`task-checkbox ${task.completed ? 'checked' : ''}`}
+   695→              onClick={() => toggleTask(task.topicId)}
+   696→            >
+   697→              {task.completed && <Check width={14} height={14} style={{ color: '#fff' }} />}
+   698→            </div>
+   699→            <div className="task-priority-dot" style={{ background: PRIORITY_COLORS[task.priority] }} />
+   700→            <div className="task-info">
+   701→              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+   702→                <span className="task-priority-label" style={{ color: PRIORITY_COLORS[task.priority] }}>
+   703→                  {PRIORITY_LABELS[task.priority]}
+   704→                </span>
+   705→                <FileText width={14} height={14} style={{ color: '#666' }} />
+   706→              </div>
+   707→              <div className="task-title" style={{ textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? '#666' : '#fff' }}>
+   708→                {task.topicName}
+   709→              </div>
+   710→              <div className="task-meta">
+   711→                <span>{task.subjectName} · {task.chapterName}</span>
+   712→                <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor }}>
+   713→                  D{task.dayNumber}
+   714→                </span>
+   715→              </div>
+   716→            </div>
+   717→          </div>
+   718→          <div className="task-card-bottom">
+   719→            <div className="task-duration">
+   720→              <Clock width={14} height={14} />
+   721→              {task.duration}m
+   722→            </div>
+   723→            <div style={{ display: 'flex', gap: 8 }}>
+   724→              {task.videoLink && (
+   725→                <a href={task.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+   726→                  <button className="watch-btn">
+   727→                    <Play width={13} height={13} /> Watch
+   728→                  </button>
+   729→                </a>
+   730→              )}
+   731→              {task.pdfLink && (
+   732→                <a href={task.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+   733→                  <button className="watch-btn" style={{ background: '#FF3B30' }}>
+   734→                    <FileText width={13} height={13} /> Notes
+   735→                  </button>
+   736→                </a>
+   737→              )}
+   738→            </div>
+   739→          </div>
+   740→        </div>
+   741→      ))}
+   742→
+   743→      {filteredTasks.length === 0 && (
+   744→        <div style={{ textAlign: 'center', color: '#666', padding: 40 }}>
+   745→          No tasks in this category.
+   746→        </div>
+   747→      )}
+   748→    </div>
+   749→  );
+   750→}
+   751→
+   752→// ============================================
+   753→// COURSES VIEW
+   754→// ============================================
+   755→function CoursesView({ onCourseClick }: { onCourseClick: (subjectId: string) => void }) {
+   756→  const store = useStudyOS();
+   757→  const subjects = store.subjects;
+   758→  const isFreeUser = store.isFreeUser;
+   759→
+   760→  const totalTopics = subjects.reduce((sum, s) => sum + s.totalTopics, 0);
+   761→  const completedTopics = subjects.reduce((sum, s) => sum + s.completedTopics, 0);
+   762→  const totalPremium = subjects.reduce((sum, s) => sum + (s.premiumTopicCount || 0), 0);
+   763→  const totalPct = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+   764→
+   765→  return (
+   766→    <div className="view active">
+   767→      <div className="courses-header">
+   768→        <h2 className="heading" style={{ fontSize: 28, color: '#fff' }}>Subjects</h2>
+   769→      </div>
+   770→      <div className="courses-subtitle">
+   771→        {completedTopics} of {totalTopics} topics · {totalPct}% complete
+   772→        {isFreeUser && totalPremium > 0 && (
+   773→          <span style={{ color: '#F59E0B', marginLeft: 8 }}>
+   774→            · {totalPremium} premium
+   775→          </span>
+   776→        )}
+   777→      </div>
+   778→      <div className="courses-progress-bar">
+   779→        <div className="courses-progress-fill" style={{ width: `${totalPct}%` }} />
+   780→      </div>
+   781→
+   782→      {/* Free user upgrade banner */}
+   783→      {isFreeUser && totalPremium > 0 && (
+   784→        <div style={{
+   785→          background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
+   786→          border: '1px solid rgba(245,158,11,0.3)',
+   787→          borderRadius: 12,
+   788→          padding: '14px 18px',
+   789→          marginTop: 14,
+   790→          marginBottom: 18,
+   791→          display: 'flex',
+   792→          alignItems: 'center',
+   793→          gap: 12,
+   794→        }}>
+   795→          <Lock width={20} height={20} style={{ color: '#F59E0B', flexShrink: 0 }} />
+   796→          <div>
+   797→            <div style={{ fontSize: 14, fontWeight: 600, color: '#F59E0B' }}>
+   798→              Unlock Premium Content
+   799→            </div>
+   800→            <div style={{ fontSize: 12, color: '#8E8E93', marginTop: 2 }}>
+   801→              {totalPremium} topics are available with a premium subscription
+   802→            </div>
+   803→          </div>
+   804→        </div>
+   805→      )}
+   806→
+   807→      <div className="courses-grid">
+   808→        {subjects.map(subject => {
+   809→          const pct = subject.progressPct;
+   810→          const hasPremium = (subject.premiumTopicCount || 0) > 0;
+   811→          return (
+   812→            <div key={subject.subjectId} className="course-card" onClick={() => onCourseClick(subject.subjectId)}>
+   813→              <div className="course-icon" style={{ background: subject.color }}>
+   814→                {getIcon(subject.icon)}
+   815→              </div>
+   816→              <div className="course-name">
+   817→                {subject.subjectName}
+   818→                {isFreeUser && hasPremium && (
+   819→                  <span style={{
+   820→                    fontSize: 10,
+   821→                    fontWeight: 700,
+   822→                    background: 'rgba(245,158,11,0.2)',
+   823→                    color: '#F59E0B',
+   824→                    padding: '2px 6px',
+   825→                    borderRadius: 4,
+   826→                    marginLeft: 6,
+   827→                    verticalAlign: 'middle',
+   828→                    letterSpacing: '0.5px',
+   829→                  }}>
+   830→                    PREMIUM
+   831→                  </span>
+   832→                )}
+   833→              </div>
+   834→              <div className="course-instructor">
+   835→                {subject.chapterCount} chapters{isFreeUser && hasPremium ? ` · ${subject.freeTopicCount || 0} free of ${subject.totalTopics}` : ` · ${subject.totalTopics} topics`}
+   836→              </div>
+   837→              <div className="course-progress-row">
+   838→                <div className="course-progress-pct" style={{ color: subject.color }}>{pct}%</div>
+   839→                <div className="course-lecture-count">{subject.completedTopics}/{isFreeUser && hasPremium ? subject.freeTopicCount : subject.totalTopics}</div>
+   840→              </div>
+   841→              <div className="course-progress-bar">
+   842→                <div className="course-progress-fill" style={{ width: `${pct}%`, background: subject.color }} />
+   843→              </div>
+   844→            </div>
+   845→          );
+   846→        })}
+   847→      </div>
+   848→
+   849→      {subjects.length === 0 && (
+   850→        <div style={{ textAlign: 'center', color: '#666', padding: 40 }}>
+   851→          No subjects available for your grade and field.
+   852→        </div>
+   853→      )}
+   854→    </div>
+   855→  );
+   856→}
+   857→
+   858→
+   859→
+   860→// ============================================
+   861→// FOCUS TIMER VIEW
+   862→// ============================================
+   863→function FocusTimerView() {
+   864→  const [mode, setMode] = useState<'focus' | 'short' | 'long'>('focus');
+   865→  const [totalSeconds, setTotalSeconds] = useState(25 * 60);
+   866→  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+   867→  const [isRunning, setIsRunning] = useState(false);
+   868→  const [sessionsCompleted, setSessionsCompleted] = useState(0);
+   869→
+   870→  const modes = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 };
+   871→  const modeLabels = { focus: 'Focus 25m', short: 'Short 5m', long: 'Long 15m' };
+   872→  const circumference = 2 * Math.PI * 120;
+   873→  const progressPct = totalSeconds > 0 ? ((totalSeconds - secondsLeft) / totalSeconds) * 100 : 0;
+   874→  const strokeDashoffset = circumference * (1 - progressPct / 100);
+   875→
+   876→  useEffect(() => {
+   877→    if (!isRunning) return;
+   878→    const interval = setInterval(() => {
+   879→      setSecondsLeft(prev => {
+   880→        if (prev <= 1) {
+   881→          setIsRunning(false);
+   882→          setSessionsCompleted(p => p + 1);
+   883→          return 0;
+   884→        }
+   885→        return prev - 1;
+   886→      });
+   887→    }, 1000);
+   888→    return () => clearInterval(interval);
+   889→  }, [isRunning]);
+   890→
+   891→  const switchMode = (m: 'focus' | 'short' | 'long') => {
+   892→    setMode(m);
+   893→    setTotalSeconds(modes[m]);
+   894→    setSecondsLeft(modes[m]);
+   895→    setIsRunning(false);
+   896→  };
+   897→
+   898→  const handleReset = () => {
+   899→    setSecondsLeft(totalSeconds);
+   900→    setIsRunning(false);
+   901→  };
+   902→
+   903→  return (
+   904→    <div className="view active">
+   905→      <div className="focus-timer-container">
+   906→        <div className="focus-mode-tabs">
+   907→          {(Object.keys(modes) as Array<'focus' | 'short' | 'long'>).map(m => (
+   908→            <button
+   909→              key={m}
+   910→              className={`focus-mode-tab ${mode === m ? 'active' : ''}`}
+   911→              onClick={() => switchMode(m)}
+   912→            >
+   913→              {modeLabels[m]}
+   914→            </button>
+   915→          ))}
+   916→        </div>
+   917→
+   918→        <div className="focus-session-label">
+   919→          {mode === 'focus' ? 'FOCUS SESSION' : mode === 'short' ? 'SHORT BREAK' : 'LONG BREAK'}
+   920→        </div>
+   921→
+   922→        <div className="focus-timer-circle">
+   923→          <svg viewBox="0 0 260 260">
+   924→            <circle className="track" cx="130" cy="130" r="120" />
+   925→            <circle
+   926→              className="progress"
+   927→              cx="130" cy="130" r="120"
+   928→              strokeDasharray={circumference}
+   929→              strokeDashoffset={strokeDashoffset}
+   930→            />
+   931→          </svg>
+   932→          <div className="focus-timer-display">
+   933→            <div className="focus-timer-time">{formatTimer(secondsLeft)}</div>
+   934→          </div>
+   935→        </div>
+   936→
+   937→        <div className="focus-session-dots">
+   938→          {[0, 1, 2, 3].map(i => (
+   939→            <div
+   940→              key={i}
+   941→              className={`focus-dot ${i < sessionsCompleted ? 'completed' : ''} ${i === sessionsCompleted ? 'current' : ''}`}
+   942→            />
+   943→          ))}
+   944→        </div>
+   945→        <div className="focus-session-count">{sessionsCompleted} total</div>
+   946→
+   947→        <div className="focus-timer-controls">
+   948→          <button
+   949→            className="btn btn-accent"
+   950→            onClick={() => setIsRunning(!isRunning)}
+   951→          >
+   952→            {isRunning ? <X width={15} height={15} /> : <Play width={15} height={15} />}
+   953→            {isRunning ? 'Pause' : 'Start'}
+   954→          </button>
+   955→          <button className="btn btn-ghost" onClick={handleReset}>
+   956→            <RotateCcw width={15} height={15} /> Reset
+   957→          </button>
+   958→        </div>
+   959→      </div>
+   960→    </div>
+   961→  );
+   962→}
+   963→
+   964→// ============================================
+   965→// SUBJECT DETAIL VIEW
+   966→// ============================================
+   967→function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: () => void }) {
+   968→  const store = useStudyOS();
+   969→  const subject = store.subjects.find(s => s.subjectId === subjectId);
+   970→  const detail = store.subjectDetail;
+   971→  const loading = store.subjectDetailLoading;
+   972→  // Use isFreeUser from both store (global) and API response (per-request) for consistency
+   973→  const isFreeUser = store.isFreeUser || detail?.isFreeUser === true;
+   974→
+   975→  // Fetch detail on mount
+   976→  const openSubjectDetail = store.openSubjectDetail;
+   977→  useEffect(() => {
+   978→    if (subjectId) {
+   979→      openSubjectDetail(subjectId);
+   980→    }
+   981→  }, [subjectId, openSubjectDetail]);
+   982→
+   983→  const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
+   984→
+   985→  // Mini timer state
+   986→  const [timerSeconds, setTimerSeconds] = useState(25 * 60);
+   987→  const [timerRunning, setTimerRunning] = useState(false);
+   988→
+   989→  useEffect(() => {
+   990→    if (!timerRunning || timerSeconds <= 0) return;
+   991→    const interval = setInterval(() => {
+   992→      setTimerSeconds(prev => {
+   993→        if (prev <= 1) {
+   994→          setTimerRunning(false);
+   995→          return 0;
+   996→        }
+   997→        return prev - 1;
+   998→      });
+   999→    }, 1000);
+  1000→    return () => clearInterval(interval);
+  1001→  }, [timerRunning, timerSeconds]);
+  1002→
+  1003→  if (loading || !detail) {
+  1004→    return (
+  1005→      <div className="view active">
+  1006→        <button className="back-btn" onClick={onBack}>
+  1007→          <ArrowLeft width={16} height={16} /> Back to subjects
+  1008→        </button>
+  1009→        <div style={{ textAlign: 'center', padding: 60, color: '#8E8E93' }}>
+  1010→          Loading subject details...
+  1011→        </div>
+  1012→      </div>
+  1013→    );
+  1014→  }
+  1015→
+  1016→  const allTopics = detail.chapters.flatMap(ch => ch.topics);
+  1017→  const completedCount = allTopics.filter(t => t.completed).length;
+  1018→  const remainingHours = Math.round((allTopics.length - completedCount) * 1.1);
+  1019→  const premiumCount = allTopics.filter(t => t.isFree === false).length;
+  1020→  const freeCount = allTopics.filter(t => t.isFree !== false).length;
+  1021→
+  1022→  const filteredChapters = detail.chapters.map(ch => ({
+  1023→    ...ch,
+  1024→    topics: filter === 'all' ? ch.topics
+  1025→      : filter === 'todo' ? ch.topics.filter(t => !t.completed)
+  1026→        : ch.topics.filter(t => t.completed),
+  1027→  })).filter(ch => ch.topics.length > 0);
+  1028→
+  1029→  const pct = detail.totalTopics > 0 ? Math.round((detail.completedTopics / detail.totalTopics) * 100) : 0;
+  1030→
+  1031→  return (
+  1032→    <div className="view active">
+  1033→      <button className="back-btn" onClick={onBack}>
+  1034→        <ArrowLeft width={16} height={16} /> Back to subjects
+  1035→      </button>
+  1036→
+  1037→      <div className="course-detail-header">
+  1038→        <div>
+  1039→          <div className="course-detail-title">{detail.name}</div>
+  1040→          <div className="course-detail-subtitle">
+  1041→            {pct}% complete · {detail.completedTopics}/{detail.totalTopics} topics · ~{remainingHours}h remaining
+  1042→            {isFreeUser && premiumCount > 0 && (
+  1043→              <span style={{ color: '#F59E0B', marginLeft: 6 }}>
+  1044→                · {premiumCount} premium
+  1045→              </span>
+  1046→            )}
+  1047→          </div>
+  1048→        </div>
+  1049→        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+  1050→          <div className="course-detail-timer">
+  1051→            <span className="timer-display">{formatTimer(timerSeconds)}</span>
+  1052→            <button
+  1053→              className="btn btn-accent btn-sm"
+  1054→              onClick={() => setTimerRunning(!timerRunning)}
+  1055→            >
+  1056→              {timerRunning ? <X width={14} height={14} /> : <Play width={14} height={14} />}
+  1057→            </button>
+  1058→            <button
+  1059→              className="btn btn-ghost btn-sm"
+  1060→              onClick={() => { setTimerSeconds(25 * 60); setTimerRunning(false); }}
+  1061→            >
+  1062→              <RotateCcw width={14} height={14} />
+  1063→            </button>
+  1064→          </div>
+  1065→          <button className="modal-close" onClick={onBack}>
+  1066→            <X width={18} height={18} />
+  1067→          </button>
+  1068→        </div>
+  1069→      </div>
+  1070→
+  1071→      {/* Free user upgrade banner in subject detail */}
+  1072→      {isFreeUser && premiumCount > 0 && (
+  1073→        <div style={{
+  1074→          background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
+  1075→          border: '1px solid rgba(245,158,11,0.3)',
+  1076→          borderRadius: 12,
+  1077→          padding: '12px 16px',
+  1078→          marginBottom: 14,
+  1079→          display: 'flex',
+  1080→          alignItems: 'center',
+  1081→          gap: 10,
+  1082→        }}>
+  1083→          <Lock width={18} height={18} style={{ color: '#F59E0B', flexShrink: 0 }} />
+  1084→          <div>
+  1085→            <span style={{ fontSize: 13, fontWeight: 600, color: '#F59E0B' }}>
+  1086→              {freeCount} free topics · {premiumCount} premium
+  1087→            </span>
+  1088→            <span style={{ fontSize: 12, color: '#8E8E93', marginLeft: 8 }}>
+  1089→              Upgrade to unlock all content
+  1090→            </span>
+  1091→          </div>
+  1092→        </div>
+  1093→      )}
+  1094→
+  1095→      <div className="course-detail-filters">
+  1096→        {(['all', 'todo', 'done'] as const).map(f => (
+  1097→          <button
+  1098→            key={f}
+  1099→            className={`filter-btn ${filter === f ? 'active' : ''}`}
+  1100→            onClick={() => setFilter(f)}
+  1101→          >
+  1102→            {f === 'all' ? 'All' : f === 'todo' ? 'To Do' : 'Done'}
+  1103→          </button>
+  1104→        ))}
+  1105→      </div>
+  1106→
+  1107→      <div style={{ background: 'var(--surface-solid)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+  1108→        {filteredChapters.map(chapter => (
+  1109→          <div key={chapter.id}>
+  1110→            <div style={{ padding: '12px 16px', background: '#1A1A1A', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  1111→              <span style={{ fontSize: 13, fontWeight: 600, color: '#ccc' }}>
+  1112→                Ch {chapter.number}: {chapter.name}
+  1113→              </span>
+  1114→              <span style={{ fontSize: 11, color: '#8E8E93' }}>
+  1115→                {chapter.completedTopics}/{chapter.totalTopics}
+  1116→              </span>
+  1117→            </div>
+  1118→            {chapter.topics.map(topic => {
+  1119→              const isPremium = topic.isFree === false;
+  1120→              const isLockedForUser = isFreeUser && isPremium;
+  1121→              return (
+  1122→                <div key={topic.id} className={`lecture-item ${isLockedForUser ? 'premium-locked' : ''}`}>
+  1123→                  <div
+  1124→                    className={`lecture-checkbox ${topic.completed ? 'checked' : ''} ${isLockedForUser ? 'disabled' : ''}`}
+  1125→                    onClick={() => !isLockedForUser && store.toggleSubjectDetailTopic(topic.id)}
+  1126→                    style={isLockedForUser ? { opacity: 0.3, cursor: 'not-allowed' } : {}}
+  1127→                  >
+  1128→                    {topic.completed && !isLockedForUser && <Check width={14} height={14} style={{ color: '#fff' }} />}
+  1129→                    {isLockedForUser && <Lock width={12} height={12} style={{ color: '#8E8E93' }} />}
+  1130→                  </div>
+  1131→                  <div className="lecture-info" style={isLockedForUser ? { opacity: 0.5 } : {}}>
+  1132→                    <div className="lecture-name">
+  1133→                      <span style={{ color: '#666', marginRight: 8 }}>{topic.number}.</span>
+  1134→                      {topic.name}
+  1135→                    </div>
+  1136→                    <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+  1137→                      {topic.dayNumber > 0 && (
+  1138→                        <span className="difficulty-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>
+  1139→                          Day {topic.dayNumber}
+  1140→                        </span>
+  1141→                      )}
+  1142→                      {isLockedForUser && (
+  1143→                        <span style={{
+  1144→                          fontSize: 10,
+  1145→                          fontWeight: 700,
+  1146→                          background: 'rgba(245,158,11,0.2)',
+  1147→                          color: '#F59E0B',
+  1148→                          padding: '2px 8px',
+  1149→                          borderRadius: 4,
+  1150→                          letterSpacing: '0.5px',
+  1151→                          display: 'inline-flex',
+  1152→                          alignItems: 'center',
+  1153→                          gap: 4,
+  1154→                        }}>
+  1155→                          <Lock width={10} height={10} /> PREMIUM
+  1156→                        </span>
+  1157→                      )}
+  1158→                    </div>
+  1159→                  </div>
+  1160→                  <div className="lecture-actions" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+  1161→                    {topic.hasVideo && (
+  1162→                      <a href={topic.videoLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+  1163→                        <button className="watch-btn" style={{ padding: '7px 14px' }}>
+  1164→                          <Play width={13} height={13} /> Watch
+  1165→                        </button>
+  1166→                      </a>
+  1167→                    )}
+  1168→                    {topic.hasPdf && (
+  1169→                      <a href={topic.pdfLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+  1170→                        <button className="watch-btn" style={{ padding: '7px 14px', background: '#FF3B30' }}>
+  1171→                          <FileText width={13} height={13} /> Notes
+  1172→                        </button>
+  1173→                      </a>
+  1174→                    )}
+  1175→                    {isLockedForUser && (
+  1176→                      <span style={{ fontSize: 11, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+  1177→                        <Lock width={12} height={12} /> Locked
+  1178→                      </span>
+  1179→                    )}
+  1180→                  </div>
+  1181→                </div>
+  1182→              );
+  1183→            })}
+  1184→          </div>
+  1185→        ))}
+  1186→        {filteredChapters.length === 0 && (
+  1187→          <div style={{ padding: 32, textAlign: 'center', color: '#666' }}>
+  1188→            No topics in this category.
+  1189→          </div>
+  1190→        )}
+  1191→      </div>
+  1192→    </div>
+  1193→  );
+  1194→}
+  1195→
+  1196→// ============================================
+  1197→// QUICK ADD TASK MODAL
+  1198→// ============================================
+  1199→function QuickAddModal({ onClose }: { onClose: () => void }) {
+  1200→  const store = useStudyOS();
+  1201→  const [taskName, setTaskName] = useState('');
+  1202→  const [when, setWhen] = useState<'today' | 'tomorrow'>('today');
+  1203→  const [estimate, setEstimate] = useState(30);
+  1204→  const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  1205→  const [course, setCourse] = useState('');
+  1206→
+  1207→  const handleSubmit = () => {
+  1208→    onClose();
+  1209→  };
+  1210→
+  1211→  return (
+  1212→    <div className="modal-overlay" onClick={onClose}>
+  1213→      <div className="modal-content" onClick={e => e.stopPropagation()}>
+  1214→        <div className="modal-header">
+  1215→          <div className="modal-title">Quick add task</div>
+  1216→          <button className="modal-close" onClick={onClose}>
+  1217→            <X width={18} height={18} />
+  1218→          </button>
+  1219→        </div>
+  1220→
+  1221→        <input
+  1222→          className="modal-input"
+  1223→          placeholder="What do you want to do?"
+  1224→          value={taskName}
+  1225→          onChange={e => setTaskName(e.target.value)}
+  1226→          autoFocus
+  1227→        />
+  1228→
+  1229→        <div className="modal-section">
+  1230→          <div className="modal-section-label">When</div>
+  1231→          <div className="modal-options">
+  1232→            <button
+  1233→              className={`modal-option ${when === 'today' ? 'selected' : ''}`}
+  1234→              onClick={() => setWhen('today')}
+  1235→            >
+  1236→              Today
+  1237→            </button>
+  1238→            <button
+  1239→              className={`modal-option ${when === 'tomorrow' ? 'selected' : ''}`}
+  1240→              onClick={() => setWhen('tomorrow')}
+  1241→            >
+  1242→              Tomorrow
+  1243→            </button>
+  1244→          </div>
+  1245→        </div>
+  1246→
+  1247→        <div className="modal-section">
+  1248→          <div className="modal-section-label">Estimate</div>
+  1249→          <div className="modal-estimate">
+  1250→            <input
+  1251→              type="range"
+  1252→              className="modal-estimate-slider"
+  1253→              min={15}
+  1254→              max={120}
+  1255→              step={15}
+  1256→              value={estimate}
+  1257→              onChange={e => setEstimate(Number(e.target.value))}
+  1258→            />
+  1259→            <div className="modal-estimate-value">{estimate}M</div>
+  1260→          </div>
+  1261→        </div>
+  1262→
+  1263→        <div className="modal-section">
+  1264→          <div className="modal-section-label">Priority</div>
+  1265→          <div className="modal-options">
+  1266→            {(['low', 'medium', 'high', 'urgent'] as const).map(p => (
+  1267→              <button
+  1268→                key={p}
+  1269→                className={`modal-option ${priority === p ? 'selected' : ''}`}
+  1270→                onClick={() => setPriority(p)}
+  1271→                style={priority === p ? { borderColor: PRIORITY_COLORS[p === 'urgent' ? 'high' : p], color: PRIORITY_COLORS[p === 'urgent' ? 'high' : p] } : {}}
+  1272→              >
+  1273→                {p.charAt(0).toUpperCase() + p.slice(1)}
+  1274→              </button>
+  1275→            ))}
+  1276→          </div>
+  1277→        </div>
+  1278→
+  1279→        <div className="modal-section">
+  1280→          <div className="modal-section-label">Subject (Optional)</div>
+  1281→          <select
+  1282→            className="modal-select"
+  1283→            value={course}
+  1284→            onChange={e => setCourse(e.target.value)}
+  1285→          >
+  1286→            <option value="">— None —</option>
+  1287→            {store.subjects.map(s => (
+  1288→              <option key={s.subjectId} value={s.subjectId}>{s.subjectName}</option>
+  1289→            ))}
+  1290→          </select>
+  1291→        </div>
+  1292→
+  1293→        <button className="modal-submit" onClick={handleSubmit}>
+  1294→          Add task
+  1295→        </button>
+  1296→      </div>
+  1297→    </div>
+  1298→  );
+  1299→}
+  1300→
+  1301→// ============================================
+  1302→// TOPBAR COMPONENT
+  1303→// ============================================
+  1304→function Topbar({ onNewTask, onHamburger }: { onNewTask: () => void; onHamburger: () => void }) {
+  1305→  const [searchQuery, setSearchQuery] = useState('');
+  1306→
+  1307→  return (
+  1308→    <div className="topbar">
+  1309→      <button className="hamburger-btn" onClick={onHamburger}>
+  1310→        <Menu width={20} height={20} />
+  1311→      </button>
+  1312→      <div className="search-box">
+  1313→        <Search width={16} height={16} style={{ color: '#666' }} />
+  1314→        <input
+  1315→          placeholder="Search lectures..."
+  1316→          value={searchQuery}
+  1317→          onChange={e => setSearchQuery(e.target.value)}
+  1318→        />
+  1319→        <span className="kbd">⌘K</span>
+  1320→      </div>
+  1321→      <button className="btn btn-accent" onClick={onNewTask}>
+  1322→        <Plus width={15} height={15} /> <span className="desktop-only">New task</span>
+  1323→      </button>
+  1324→    </div>
+  1325→  );
+  1326→}
+  1327→
+  1328→// ============================================
+  1329→// MAIN HOME COMPONENT
+  1330→// ============================================
+  1331→export default function Home() {
+  1332→  const sessionResult = useSession();
+  1333→  const status = sessionResult?.status ?? 'loading';
+  1334→  const session = sessionResult?.data ?? null;
+  1335→  const store = useStudyOS();
+  1336→  const [currentView, setCurrentView] = useState<ViewId>('today');
+  1337→  const [showModal, setShowModal] = useState(false);
+  1338→  const [subjectDetailId, setSubjectDetailId] = useState<string | null>(null);
+  1339→  const [initialFetchDone, setInitialFetchDone] = useState(false);
+  1340→  const [showLoginFromLanding, setShowLoginFromLanding] = useState(false);
+  1341→
+  1342→  // All hooks must be called before any conditional returns
+  1343→  const handleNewTask = useCallback(() => setShowModal(true), []);
+  1344→
+  1345→  // Combined view change handler — always clears subject detail so tabs work
+  1346→  const handleViewChange = useCallback((v: ViewId) => {
+  1347→    setCurrentView(v);
+  1348→    setSubjectDetailId(null);
+  1349→  }, []);
+  1350→
+  1351→  const handleFocusTimer = useCallback(() => handleViewChange('focus-timer'), [handleViewChange]);
+  1352→
+  1353→  const handleCourseClick = useCallback((subjectId: string) => {
+  1354→    setSubjectDetailId(subjectId);
+  1355→  }, []);
+  1356→
+  1357→  const closeSubjectDetail = store.closeSubjectDetail;
+  1358→  const handleBackFromCourse = useCallback(() => {
+  1359→    closeSubjectDetail();
+  1360→    setSubjectDetailId(null);
+  1361→  }, [closeSubjectDetail]);
+  1362→
+  1363→  // Fetch data when session is available
+  1364→  const fetchData = store.fetchData;
+  1365→  const initNetwork = store._initNetworkListeners;
+  1366→  useEffect(() => {
+  1367→    if (status === 'authenticated' && session?.user && !initialFetchDone) {
+  1368→      const phone = (session.user as Record<string, unknown>).phone as string;
+  1369→      if (phone) {
+  1370→        fetchData(phone).then(() => setInitialFetchDone(true));
+  1371→      }
+  1372→    }
+  1373→  }, [status, session, initialFetchDone, fetchData]);
+  1374→
+  1375→  // Initialize network listeners for offline/online detection
+  1376→  useEffect(() => {
+  1377→    const cleanup = initNetwork();
+  1378→    return () => { cleanup?.(); };
+  1379→  }, [initNetwork]);
+  1380→
+  1381→  // Show landing page if not authenticated
+  1382→  // Also show landing page if session exists but has no user data (edge case)
+  1383→  const hasValidSession = status === 'authenticated' && session?.user;
+  1384→  if (!hasValidSession) {
+  1385→    if (showLoginFromLanding) {
+  1386→      return <LoginPage />;
+  1387→    }
+  1388→    return <LandingPage onGetStarted={() => setShowLoginFromLanding(true)} />;
+  1389→  }
+  1390→
+  1391→  // Loading while checking auth
+  1392→  if (status === 'loading') {
+  1393→    return (
+  1394→      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#121212' }}>
+  1395→        <div style={{ textAlign: 'center', color: '#8E8E93' }}>
+  1396→          <BookOpenText width={32} height={32} style={{ color: '#FF3B30', margin: '0 auto 12px' }} />
+  1397→          <p>Loading...</p>
+  1398→        </div>
+  1399→      </div>
+  1400→    );
+  1401→  }
+  1402→
+  1403→  const studentName = store.student?.name || (session?.user?.name as string) || 'Student';
+  1404→  const totalLecs = store.totalTopics;
+  1405→
+  1406→  const renderContent = () => {
+  1407→    if (store.isLoading) {
+  1408→      return <LoadingSkeleton />;
+  1409→    }
+  1410→
+  1411→    // If a subject detail is open, show it
+  1412→    if (subjectDetailId) {
+  1413→      return <SubjectDetailView subjectId={subjectDetailId} onBack={handleBackFromCourse} />;
+  1414→    }
+  1415→
+  1416→    switch (currentView) {
+  1417→      case 'today':
+  1418→        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
+  1419→      case 'tasks':
+  1420→        return <TasksView onNewTask={handleNewTask} />;
+  1421→      case 'courses':
+  1422→        return <CoursesView onCourseClick={handleCourseClick} />;
+  1423→      case 'focus-timer':
+  1424→        return <FocusTimerView />;
+  1425→      default:
+  1426→        return <TodayView onNewTask={handleNewTask} onFocusTimer={handleFocusTimer} />;
+  1427→    }
+  1428→  };
+  1429→
+  1430→  return (
+  1431→    <div className="app-shell">
+  1432→      {/* Desktop Sidebar */}
+  1433→      <Sidebar
+  1434→        currentView={currentView}
+  1435→        setCurrentView={handleViewChange}
+  1436→        studentName={studentName}
+  1437→        totalLecs={totalLecs}
+  1438→      />
+  1439→
+  1440→      {/* Main Content */}
+  1441→      <div className="main-content">
+  1442→        <Topbar
+  1443→          onNewTask={handleNewTask}
+  1444→          onHamburger={() => {}}
+  1445→        />
+  1446→        <div className="content-area">
+  1447→          {renderContent()}
+  1448→        </div>
+  1449→      </div>
+  1450→
+  1451→      {/* Mobile Bottom Nav */}
+  1452→      <MobileNav
+  1453→        currentView={currentView}
+  1454→        setCurrentView={handleViewChange}
+  1455→      />
+  1456→
+  1457→      {/* Quick Add Modal */}
+  1458→      {showModal && <QuickAddModal onClose={() => setShowModal(false)} />}
+  1459→
+  1460→
+  1461→    </div>
+  1462→  );
+  1463→}
+  1464→

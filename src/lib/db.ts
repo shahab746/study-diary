@@ -1,29 +1,23 @@
 /**
- * Database stub — all database operations now go through Supabase.
+ * Database Client — Prisma + SQLite
  *
- * This file exists for backward compatibility with legacy route handlers
- * that import from '@/lib/db'. New code should use '@/lib/supabase' instead.
+ * Single source of truth for Users & Progress data.
+ * Curriculum data still comes from Google Sheets (read-only via CSV).
  *
- * @see src/lib/supabase.ts for the active database layer
+ * Previously used Supabase, now uses local SQLite for reliability
+ * and zero-configuration setup.
  */
 
-// Stub: the old db object is no longer used
-// All user + progress operations → Supabase
-// All curriculum reads → Google Sheets CSV
+import { PrismaClient } from '@prisma/client';
 
-export const db = new Proxy({} as any, {
-  get(_target, model) {
-    return new Proxy({} as any, {
-      get(_target, method) {
-        return async (..._args: any[]) => {
-          console.warn(`⚠️ db.${String(model)}.${String(method)} called — use Supabase instead`);
-          return null;
-        };
-      },
-    });
-  },
-});
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
-export function getDb(): any {
-  return db;
+export const db = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = db;
 }
+
+export default db;

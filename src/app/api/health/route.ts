@@ -1,51 +1,42 @@
 import { NextResponse } from 'next/server';
 import { testSheetConnection, buildCurriculumHierarchy, fetchSpecialCoursesFromSheet } from '@/lib/sheet-sync';
-import { getRegisteredUserCount } from '@/lib/registered-users';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { getUserCount } from '@/lib/user-service';
 
 /**
  * Health check endpoint — tests all data sources.
  * GET /api/health
  */
 export async function GET() {
-  const supabaseReady = isSupabaseConfigured();
-
   const diagnostics: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
-    architecture: supabaseReady
-      ? 'Supabase (users + progress) + Google Sheets (curriculum read-only)'
-      : 'Google Sheets CSV + File Store (fallback — configure Supabase for best experience)',
+    architecture: 'Prisma/SQLite (users + progress) + Google Sheets (curriculum read-only)',
     environment: {
       NODE_ENV: process.env.NODE_ENV,
       VERCEL: !!process.env.VERCEL,
       GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID ? `set (${process.env.GOOGLE_SHEET_ID.substring(0, 8)}...)` : 'using default',
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ? 'set' : 'not set',
-      SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('.supabase.co') ? 'configured' : 'not configured',
     },
     storage: {
-      primary: supabaseReady ? 'supabase' : 'file-store',
+      primary: 'prisma-sqlite',
       curriculum: 'google-sheets-csv',
-      progress: supabaseReady ? 'supabase' : 'in-memory-cache',
+      progress: 'prisma-sqlite',
     },
   };
 
-  // Test 1: Supabase connectivity
-  if (supabaseReady) {
-    try {
-      const { getSupabase } = await import('@/lib/supabase');
-      const sb = getSupabase();
-      const { count, error } = await sb
-        .from('users')
-        .select('*', { count: 'exact', head: true });
-
-      diagnostics.supabase = error
-        ? { connected: false, error: error.message }
-        : { connected: true, userCount: count || 0 };
-    } catch (err) {
-      diagnostics.supabase = { connected: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  } else {
-    diagnostics.supabase = { connected: false, note: 'Not configured — using file store fallback' };
+  // Test 1: Prisma/SQLite connectivity
+  try {
+    const userCount = await getUserCount();
+    diagnostics.database = {
+      connected: true,
+      userCount,
+      type: 'prisma-sqlite',
+    };
+  } catch (err) {
+    diagnostics.database = {
+      connected: false,
+      error: err instanceof Error ? err.message : String(err),
+      type: 'prisma-sqlite',
+    };
   }
 
   // Test 2: Google Sheets connectivity (curriculum)
@@ -79,19 +70,8 @@ export async function GET() {
     diagnostics.specialCourses = { status: 'failed', error: err instanceof Error ? err.message : String(err) };
   }
 
-  // Test 5: Registration (file store count)
-  try {
-    diagnostics.registration = {
-      status: 'ok',
-      serverCacheUsers: getRegisteredUserCount(),
-      storage: supabaseReady ? 'supabase' : 'file-store',
-    };
-  } catch (err) {
-    diagnostics.registration = { status: 'failed', error: err instanceof Error ? err.message : String(err) };
-  }
-
-  const hasErrors = (diagnostics.sheetConnection as any)?.connected === false ||
-                    (diagnostics.curriculumData as any)?.status === 'failed';
+  const hasErrors = (diagnostics.sheetConnection as Record<string, unknown>)?.connected === false ||
+                    (diagnostics.curriculumData as Record<string, unknown>)?.status === 'failed';
 
   return NextResponse.json(diagnostics, {
     status: hasErrors ? 500 : 200,

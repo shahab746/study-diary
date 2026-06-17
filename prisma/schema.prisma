@@ -14,16 +14,17 @@ model Student {
   grade          Int
   board          String
   field          String
-  status         String   @default("paid")
+  status         String   @default("free")
   startDate      DateTime
   targetDate     DateTime
   currentDay     Int      @default(1)
-  totalDays      Int
+  totalDays      Int      @default(438)
   topicsDone     Int      @default(0)
-  daysLeft       Int
+  daysLeft       Int      @default(438)
   pacingGoal     String   @default("5M")
   pin            String   @default("1234")
-  academicGroup  String   @default("")
+  academicGroup  String   @default("Pre-Medical")
+  topicsPerDay   Int      @default(4)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

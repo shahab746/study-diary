@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import {
   findUserByPhone,
-  dbUserToSheetUser,
   getUserProgress,
-  isSupabaseConfigured,
-} from '@/lib/supabase';
+  normalizeStatus,
+} from '@/lib/user-service';
 import {
   fetchSpecialCoursesFromSheet,
   buildCurriculumHierarchy,
@@ -34,15 +33,6 @@ function mapIcon(icon: string, subjectName?: string): string {
   return 'book';
 }
 
-function normalizeStatus(status: string): string {
-  if (!status) return 'free';
-  const s = status.toLowerCase().trim();
-  if (s === 'true' || s === 'paid') return 'paid';
-  if (s === 'false' || s === 'free') return 'free';
-  if (s === 'blocked' || s === 'disabled') return s;
-  return s;
-}
-
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
@@ -51,31 +41,30 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // ─── STEP 1: Fetch student profile from Supabase ──────────────
-    let student: Record<string, any> | null = null;
+    // ─── STEP 1: Fetch student profile from Prisma/SQLite ──────────────
+    let student: Record<string, unknown> | null = null;
     let academicGroup = '';
 
-    if (phone && isSupabaseConfigured()) {
-      const dbUser = await findUserByPhone(phone);
-      if (dbUser) {
-        const su = dbUserToSheetUser(dbUser);
-        academicGroup = su.academicGroup || '';
+    if (phone) {
+      const user = await findUserByPhone(phone);
+      if (user) {
+        academicGroup = user.academicGroup || '';
         student = {
-          name: su.name,
-          phone: su.phone,
-          grade: su.grade,
-          board: su.board,
-          field: su.field,
-          status: normalizeStatus(su.status),
-          startDate: su.startDate,
-          targetDate: su.targetDate,
-          currentDay: su.currentDay,
-          totalDays: su.totalDays,
-          topicsDone: su.topicsDone,
-          daysLeft: su.daysLeft,
-          pacingGoal: su.pacingGoal || '5M',
-          academicGroup: su.academicGroup,
-          pin: su.pin,
+          name: user.name,
+          phone: user.phone,
+          grade: user.grade,
+          board: user.board,
+          field: user.field,
+          status: normalizeStatus(user.status),
+          startDate: user.startDate,
+          targetDate: user.targetDate,
+          currentDay: user.currentDay,
+          totalDays: user.totalDays,
+          topicsDone: user.topicsDone,
+          daysLeft: user.daysLeft,
+          pacingGoal: user.pacingGoal || '5M',
+          academicGroup: user.academicGroup,
+          pin: user.pin,
         };
       }
     }
@@ -84,21 +73,21 @@ export async function GET(request: Request) {
       console.warn(`⚠️ /api/data: No user found for phone="${phone}"`);
     }
 
-    const studentGrade = String(student?.grade || '10');
+    const studentGrade = String((student as Record<string, unknown>)?.grade || '10');
 
-    // ─── STEP 2: Fetch curriculum from Google Sheets + progress from Supabase ──
+    // ─── STEP 2: Fetch curriculum from Google Sheets + progress from Prisma ──
     const [subjects, specialCourses, dbProgress] = await Promise.all([
       buildCurriculumHierarchy(),
       fetchSpecialCoursesFromSheet(),
-      phone && isSupabaseConfigured() ? getUserProgress(phone) : Promise.resolve([]),
+      phone ? getUserProgress(phone) : Promise.resolve([]),
     ]);
 
-    // ─── STEP 3: Build progress rows from Supabase ──
+    // ─── STEP 3: Build progress rows from Prisma ──
     const progressRows = dbProgress.map(p => ({
       phone: p.phone,
-      topicId: p.topic_id,
+      topicId: p.topicId,
       completed: p.completed,
-      dateCompleted: p.date_completed || '',
+      dateCompleted: p.dateCompleted || '',
     }));
 
     // ─── STEP 4: Filter subjects by grade ──────────────────────────────
@@ -118,10 +107,10 @@ export async function GET(request: Request) {
 
     // ─── STEP 6: Build progress lookup ─────────────────────────────────
     const progressSet = new Set(
-      progressRows.filter(p => p.phone === (student?.phone || '') && p.completed).map(p => p.topicId)
+      progressRows.filter(p => p.phone === ((student as Record<string, unknown>)?.phone || '') && p.completed).map(p => p.topicId)
     );
 
-    const isFreeUser = normalizeStatus(student?.status || '') === 'free';
+    const isFreeUser = normalizeStatus(String((student as Record<string, unknown>)?.status || '')) === 'free';
 
     // ─── STEP 7: Compute per-subject progress ──────────────────────────
     const subjectProgress = eligibleSubjects.map(subject => {
@@ -158,17 +147,17 @@ export async function GET(request: Request) {
     });
 
     // ─── STEP 8: Build today's tasks ───────────────────────────────────
-    const pacingGoal = (student as any)?.pacingGoal || '5M';
+    const pacingGoal = ((student as Record<string, unknown>)?.pacingGoal as string) || '5M';
     const pacingMonths: Record<string, number> = { '3M': 3, '5M': 5, '6M': 6 };
     const months = pacingMonths[pacingGoal] || 5;
     const totalDaysInPlan = months * 30;
 
     const allTopicsFlat = eligibleSubjects.flatMap(s => s.chapters.flatMap(ch => ch.topics));
     const totalTopicsCount = allTopicsFlat.length;
-    const totalCompleted = progressRows.filter(p => p.phone === (student?.phone || '') && p.completed).length;
+    const totalCompleted = progressRows.filter(p => p.phone === ((student as Record<string, unknown>)?.phone || '') && p.completed).length;
     const totalRemaining = totalTopicsCount - totalCompleted;
 
-    const currentDay = student?.currentDay || 1;
+    const currentDay = ((student as Record<string, unknown>)?.currentDay as number) || 1;
     const daysLeft = Math.max(1, totalDaysInPlan - currentDay);
     const topicsPerDay = totalRemaining > 0 ? Math.ceil(totalRemaining / daysLeft) : 0;
 
@@ -300,9 +289,9 @@ export async function GET(request: Request) {
 
     // Performance data
     const performanceData = [
-      { month: 'May', lectures: completedCountForMonth(progressRows, student?.phone || '', 5) },
-      { month: 'Jun', lectures: completedCountForMonth(progressRows, student?.phone || '', 6) },
-      { month: 'Jul', lectures: completedCountForMonth(progressRows, student?.phone || '', 7) },
+      { month: 'May', lectures: completedCountForMonth(progressRows, ((student as Record<string, unknown>)?.phone as string) || '', 5) },
+      { month: 'Jun', lectures: completedCountForMonth(progressRows, ((student as Record<string, unknown>)?.phone as string) || '', 6) },
+      { month: 'Jul', lectures: completedCountForMonth(progressRows, ((student as Record<string, unknown>)?.phone as string) || '', 7) },
     ];
 
     // Focus score
@@ -311,7 +300,7 @@ export async function GET(request: Request) {
       : 0;
 
     // Streak
-    const streak = calculateStreak(progressRows, student?.phone || '');
+    const streak = calculateStreak(progressRows, ((student as Record<string, unknown>)?.phone as string) || '');
 
     // Program week
     const programWeek = Math.ceil(currentDay / 7);

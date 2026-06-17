@@ -1,25 +1,18 @@
 import { NextResponse } from 'next/server';
-import { migrateSheetsToSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { migrateUsersFromSheets } from '@/lib/user-service';
 
 /**
  * POST /api/migrate
- * One-time migration: copies all users from Google Sheets → Supabase
+ * One-time migration: copies all users from Google Sheets → SQLite (Prisma)
  *
- * Call this once after setting up Supabase to migrate existing users.
+ * Call this once to migrate existing users from Google Sheets into the local database.
  */
 export async function POST() {
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json(
-      { success: false, error: 'Supabase not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env' },
-      { status: 400 }
-    );
-  }
-
   try {
-    const result = await migrateSheetsToSupabase();
+    const result = await migrateUsersFromSheets();
     return NextResponse.json({
       success: true,
-      message: `Migrated ${result.migrated} users from Google Sheets to Supabase (${result.errors} errors)`,
+      message: `Migrated ${result.migrated} users from Google Sheets to SQLite (${result.errors} errors, ${result.skipped} already existed)`,
       ...result,
     });
   } catch (error) {
