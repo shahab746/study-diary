@@ -1,21 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  syncProgress,
+  syncProgressToSupabase,
   getUserProgress,
-} from '@/lib/user-service';
+  isSupabaseConfigured,
+} from '@/lib/supabase';
 
 /**
- * Progress Sync Endpoint — Prisma/SQLite
+ * Progress Sync Endpoint — Supabase
  *
  * POST /api/sync-progress
  * Body: { phone: string, records: Array<{ topicId, completed, dateCompleted }> }
  *
  * GET /api/sync-progress?phone=XXX
- * Returns the progress data for a user from SQLite
+ * Returns the progress data for a user from Supabase
  */
 
 export async function POST(request: NextRequest) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { error: 'Supabase not configured' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { phone, records } = body;
 
@@ -26,12 +34,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await syncProgress(phone, records);
+    const result = await syncProgressToSupabase(phone, records);
     return NextResponse.json({
       success: true,
       synced: result.synced,
       merged: result.merged,
-      storage: 'prisma-sqlite',
+      storage: 'supabase',
     });
   } catch (error) {
     console.error('Sync progress error:', error);
@@ -44,10 +52,17 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/sync-progress?phone=XXX
- * Returns the progress data for a user from SQLite
+ * Returns the progress data for a user from Supabase
  */
 export async function GET(request: NextRequest) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { error: 'Supabase not configured' },
+        { status: 503 }
+      );
+    }
+
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
     const format = url.searchParams.get('format');
@@ -61,9 +76,9 @@ export async function GET(request: NextRequest) {
 
     const progress = await getUserProgress(phone);
     const records = progress.map(p => ({
-      topicId: p.topicId,
+      topicId: p.topic_id,
       completed: p.completed,
-      dateCompleted: p.dateCompleted || '',
+      dateCompleted: p.date_completed || '',
     }));
 
     if (format === 'csv') {
@@ -81,7 +96,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       phone,
-      source: 'prisma-sqlite',
+      source: 'supabase',
       totalRecords: records.length,
       records,
     });

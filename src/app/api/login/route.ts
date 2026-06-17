@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
-import { findUserByPhone, normalizeStatus } from '@/lib/user-service';
+import {
+  findUserByPhone,
+  isSupabaseConfigured,
+} from '@/lib/supabase';
 
-/**
- * Login API — Prisma/SQLite
- *
- * POST /api/login
- * Body: { phone: string, pin: string }
- */
+function normalizeStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -24,9 +30,17 @@ export async function POST(request: Request) {
 
     console.log(`🔐 Login API: Looking up phone="${cleanPhone}"`);
 
-    const user = await findUserByPhone(cleanPhone);
+    if (!isSupabaseConfigured()) {
+      console.error('🔐 Login API: Supabase is not configured');
+      return NextResponse.json(
+        { success: false, error: 'Service unavailable. Please try again later.' },
+        { status: 503 }
+      );
+    }
 
-    if (!user) {
+    const dbUser = await findUserByPhone(cleanPhone);
+
+    if (!dbUser) {
       console.warn(`🔐 Login API: No user found for phone="${cleanPhone}"`);
       return NextResponse.json(
         { success: false, error: 'No account found with this phone number. Please register first.' },
@@ -34,7 +48,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (user.pin !== cleanPin) {
+    if (dbUser.pin !== cleanPin) {
       console.warn(`🔐 Login API: Wrong PIN for phone="${cleanPhone}"`);
       return NextResponse.json(
         { success: false, error: 'Incorrect PIN. Please try again.' },
@@ -42,26 +56,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const status = normalizeStatus(user.status);
-    if (status === 'blocked') {
+    const status = normalizeStatus(dbUser.status);
+    if (status === 'blocked' || status === 'disabled') {
       return NextResponse.json(
         { success: false, error: 'Your account has been disabled. Please contact support.' },
         { status: 403 }
       );
     }
 
-    console.log(`🔐 Login API: Success for "${user.name}" (${status})`);
+    console.log(`🔐 Login API: Success for "${dbUser.name}" (${status})`);
 
     return NextResponse.json({
       success: true,
       user: {
-        name: user.name,
-        phone: user.phone,
-        grade: user.grade,
-        board: user.board,
-        field: user.field,
+        name: dbUser.name,
+        phone: dbUser.phone,
+        grade: dbUser.grade,
+        board: dbUser.board,
+        field: dbUser.field,
         status,
-        academicGroup: user.academicGroup,
+        academicGroup: dbUser.academic_group,
       },
     });
   } catch (error) {

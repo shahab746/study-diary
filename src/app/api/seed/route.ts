@@ -1,22 +1,29 @@
 import { NextResponse } from 'next/server';
-import { migrateUsersFromSheets } from '@/lib/user-service';
+import { migrateSheetsToSupabase, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
- * Seed / Migrate endpoint — syncs Google Sheets users into SQLite (Prisma).
+ * Seed / Migrate endpoint — syncs Google Sheets users into Supabase.
  *
- * GET /api/seed              — Migrates users from Sheets to SQLite
+ * GET /api/seed              — Migrates users from Sheets to Supabase
  * GET /api/seed?type=users   — Migrates users only
  * GET /api/seed?type=curriculum — Info only (curriculum reads from Sheets live)
  */
 export async function GET(request: Request) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { success: false, error: 'Supabase not configured' },
+        { status: 503 }
+      );
+    }
+
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'full';
 
     const results: Record<string, unknown> = { timestamp: new Date().toISOString() };
 
     if (type === 'users' || type === 'full') {
-      results.users = await migrateUsersFromSheets();
+      results.users = await migrateSheetsToSupabase();
     }
 
     if (type === 'curriculum' || type === 'full') {

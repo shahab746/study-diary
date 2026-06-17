@@ -1,47 +1,58 @@
 import { NextResponse } from 'next/server';
 import {
-  buildCurriculumHierarchy,
-  fetchSpecialCoursesFromSheet,
-} from '@/lib/sheet-sync';
+  buildCurriculumHierarchyFromDb,
+  fetchSpecialCoursesFromDb,
+} from '@/lib/curriculum-service';
 import {
   findUserByPhone,
+  dbUserToSheetUser,
   getUserProgress,
-  getUserCount,
-  normalizeStatus,
-} from '@/lib/user-service';
+  isSupabaseConfigured,
+  getSupabase,
+} from '@/lib/supabase';
+
+function normalizeStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Debug endpoint — user lookup + stats.
  * GET /api/debug              → general stats
- * GET /api/debug?phone=03XXX  → detailed user lookup in Prisma/SQLite
+ * GET /api/debug?phone=03XXX  → detailed user lookup in Supabase
  */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // ── Phone-based user lookup (Prisma/SQLite) ──
+    // ── Phone-based user lookup (Supabase) ──
     if (phone) {
       const cleanPhone = phone.trim();
       const lookup: Record<string, unknown> = { phone: cleanPhone };
 
-      const user = await findUserByPhone(cleanPhone);
-      if (user) {
-        const status = normalizeStatus(user.status);
+      const dbUser = await findUserByPhone(cleanPhone);
+      if (dbUser) {
+        const su = dbUserToSheetUser(dbUser);
+        const status = normalizeStatus(su.status);
         const progress = await getUserProgress(cleanPhone);
 
         lookup.database = {
           found: true,
-          name: user.name,
-          status: user.status,
+          name: su.name,
+          status: su.status,
           normalizedStatus: status,
-          grade: user.grade,
-          board: user.board,
-          academicGroup: user.academicGroup,
-          pin: user.pin,
-          topicsDone: user.topicsDone,
+          grade: su.grade,
+          board: su.board,
+          academicGroup: su.academicGroup,
+          pin: su.pin,
+          topicsDone: su.topicsDone,
           progressCount: progress.length,
           completedCount: progress.filter(p => p.completed).length,
         };
@@ -68,10 +79,9 @@ export async function GET(request: Request) {
     // ── General stats ──
     const results: Record<string, unknown> = {};
 
-    const [subjects, courses, userCount] = await Promise.all([
-      buildCurriculumHierarchy(),
-      fetchSpecialCoursesFromSheet(),
-      getUserCount(),
+    const [subjects, courses] = await Promise.all([
+      buildCurriculumHierarchyFromDb(),
+      fetchSpecialCoursesFromDb(),
     ]);
 
     results.curriculum = {
@@ -85,8 +95,22 @@ export async function GET(request: Request) {
       totalTopics: s.totalTopics, groupEligibility: s.groupEligibility,
     }));
 
-    results.userCount = userCount;
-    results.userSource = 'prisma-sqlite';
+    // Supabase user count
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        const { count } = await sb
+          .from('users')
+          .select('*', { count: 'exact', head: true });
+        results.userCount = count || 0;
+      } catch {
+        results.userCount = 'error';
+      }
+    } else {
+      results.userCount = 'supabase_not_configured';
+    }
+
+    results.userSource = 'supabase';
     results.timestamp = new Date().toISOString();
     return NextResponse.json(results);
   } catch (error) {

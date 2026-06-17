@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server';
 import {
-  registerUser,
-  getAllUsers,
-  normalizeStatus,
-} from '@/lib/user-service';
+  registerUserInSupabase,
+  isSupabaseConfigured,
+  getSupabase,
+  findUserByPhone,
+  dbUserToSheetUser,
+} from '@/lib/supabase';
+
+function normalizeStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
 
 /**
- * Registration API — Prisma/SQLite
+ * Registration API — Supabase
  *
  * POST /api/register
  * Body: { name, phone, pin, grade, board, field, academicGroup, confirmPin }
@@ -15,6 +26,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { name, phone, pin, grade, board, field, academicGroup, confirmPin } = body;
+
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { success: false, error: 'Service unavailable. Please try again later.' },
+        { status: 503 }
+      );
+    }
 
     // Extra validation: confirm PIN match
     if (pin !== confirmPin) {
@@ -34,7 +52,7 @@ export async function POST(request: Request) {
       academicGroup: String(academicGroup || 'Pre-Medical').trim(),
     };
 
-    const result = await registerUser(input);
+    const result = await registerUserInSupabase(input);
 
     if (!result.success) {
       return NextResponse.json(
@@ -43,18 +61,19 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`🎉 Registration successful: "${result.user!.name}" (${result.user!.phone})`);
+    const dbUser = result.user!;
+    console.log(`🎉 Registration successful: "${dbUser.name}" (${dbUser.phone})`);
 
     return NextResponse.json({
       success: true,
       user: {
-        name: result.user!.name,
-        phone: result.user!.phone,
-        grade: result.user!.grade,
-        board: result.user!.board,
-        field: result.user!.field,
-        status: result.user!.status,
-        academicGroup: result.user!.academicGroup,
+        name: dbUser.name,
+        phone: dbUser.phone,
+        grade: dbUser.grade,
+        board: dbUser.board,
+        field: dbUser.field,
+        status: normalizeStatus(dbUser.status),
+        academicGroup: dbUser.academic_group,
       },
     });
   } catch (error) {
@@ -72,25 +91,46 @@ export async function POST(request: Request) {
  */
 export async function GET() {
   try {
-    const users = await getAllUsers();
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { source: 'supabase', error: 'Supabase not configured' },
+        { status: 503 }
+      );
+    }
+
+    const sb = getSupabase();
+    const { data, error } = await sb
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json(
+        { source: 'supabase', error: error.message },
+        { status: 500 }
+      );
+    }
+
+    const users = (data || []).map((u: Record<string, unknown>) => ({
+      name: u.name,
+      phone: u.phone,
+      grade: u.grade,
+      board: u.board,
+      field: u.field,
+      academicGroup: u.academic_group,
+      status: normalizeStatus(String(u.status || '')),
+      registeredAt: u.created_at,
+    }));
+
     return NextResponse.json({
-      source: 'prisma-sqlite',
+      source: 'supabase',
       count: users.length,
-      users: users.map(u => ({
-        name: u.name,
-        phone: u.phone,
-        grade: u.grade,
-        board: u.board,
-        field: u.field,
-        academicGroup: u.academicGroup,
-        status: normalizeStatus(u.status),
-        registeredAt: u.createdAt,
-      })),
+      users,
     });
   } catch (error) {
     console.error('Get users error:', error);
     return NextResponse.json(
-      { source: 'prisma-sqlite', error: error instanceof Error ? error.message : String(error) },
+      { source: 'supabase', error: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

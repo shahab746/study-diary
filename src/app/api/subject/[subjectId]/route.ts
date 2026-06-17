@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  buildCurriculumHierarchy,
-} from '@/lib/sheet-sync';
-import { findUserByPhone, getUserProgress, normalizeStatus } from '@/lib/user-service';
+  buildCurriculumHierarchyFromDb,
+} from '@/lib/curriculum-service';
+import { findUserByPhone, dbUserToSheetUser, getUserProgress } from '@/lib/supabase';
+
+function normalizeStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 const COLOR_MAP: Record<string, string> = {
@@ -33,8 +42,8 @@ export async function GET(
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone') || '';
 
-    // Fetch curriculum hierarchy from Google Sheets
-    const subjects = await buildCurriculumHierarchy();
+    // Fetch curriculum hierarchy from Prisma/SQLite database
+    const subjects = await buildCurriculumHierarchyFromDb();
 
     // Find the subject by ID
     const subject = subjects.find(s => s.id === subjectId);
@@ -42,22 +51,23 @@ export async function GET(
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
 
-    // ─── Get user status + progress from Prisma/SQLite ───
+    // ─── Get user status + progress from Supabase ───
     let userStatus = 'free';
     let userGroup = '';
     let progressRows: Array<{ phone: string; topicId: string; completed: boolean }> = [];
 
     if (phone) {
-      const user = await findUserByPhone(phone);
-      if (user) {
-        userStatus = normalizeStatus(user.status);
-        userGroup = user.academicGroup || '';
+      const dbUser = await findUserByPhone(phone);
+      if (dbUser) {
+        const su = dbUserToSheetUser(dbUser);
+        userStatus = normalizeStatus(su.status);
+        userGroup = su.academicGroup || '';
 
-        // Get progress from Prisma
+        // Get progress from Supabase
         const dbProgress = await getUserProgress(phone);
         progressRows = dbProgress.map(p => ({
           phone: p.phone,
-          topicId: p.topicId,
+          topicId: p.topic_id,
           completed: p.completed,
         }));
       }
@@ -65,9 +75,19 @@ export async function GET(
 
     const isFreeUser = userStatus === 'free';
 
-    // Check Group_Eligibility
+    // Check Group_Eligibility (with group name mapping)
+    const groupMap: Record<string, string> = {
+      'Pre-Medical': 'Biology',
+      'Pre-Engineering': 'Mathematics',
+      'ICS': 'Computer Science',
+      'Computer Science': 'Computer Science',
+      'Biology': 'Biology',
+      'Mathematics': 'Mathematics',
+    };
+    const resolvedGroup = groupMap[userGroup] || userGroup;
+
     if (subject.groupEligibility && subject.groupEligibility !== 'Both' && phone) {
-      if (userGroup && subject.groupEligibility !== userGroup) {
+      if (resolvedGroup && subject.groupEligibility !== resolvedGroup) {
         return NextResponse.json({ error: 'Not eligible for this subject' }, { status: 403 });
       }
     }

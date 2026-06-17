@@ -80,3 +80,79 @@ Stage Summary:
 - All Supabase dependencies removed from active code paths
 - Status normalization handles all legacy formats (true/false, Paid/Free, etc.)
 - Clean lint, all endpoints verified working
+
+---
+Task ID: 2
+Agent: Revert Agent
+Task: Revert all API routes from Prisma/SQLite (user-service.ts) back to Supabase
+
+Work Log:
+- Read worklog.md to understand Task 2 changes by previous agent
+- Read all affected files: db.ts, user-service.ts, supabase.ts, and all 10 API route files
+- Identified all Prisma/user-service imports across the codebase
+- Reverted src/lib/db.ts — replaced PrismaClient import with Supabase proxy stub (backward-compatible Proxy that warns on use)
+- Reverted src/app/api/login/route.ts — replaced user-service imports with findUserByPhone + isSupabaseConfigured from @/lib/supabase; added local normalizeStatus(); uses dbUser snake_case fields directly
+- Reverted src/app/api/data/route.ts — replaced user-service imports with findUserByPhone + dbUserToSheetUser + getUserProgress + isSupabaseConfigured from @/lib/supabase; key pattern: dbUser → dbUserToSheetUser() → access camelCase compat fields; progress rows use p.topic_id (snake_case from DbProgress)
+- Reverted src/app/api/subject/[subjectId]/route.ts — replaced user-service with findUserByPhone + dbUserToSheetUser + getUserProgress from @/lib/supabase
+- Reverted src/app/api/register/route.ts — replaced user-service with registerUserInSupabase + isSupabaseConfigured + getSupabase + findUserByPhone + dbUserToSheetUser from @/lib/supabase; GET handler uses getSupabase() directly
+- Reverted src/app/api/debug/route.ts — replaced user-service with findUserByPhone + dbUserToSheetUser + getUserProgress + isSupabaseConfigured + getSupabase from @/lib/supabase; user count uses Supabase count query
+- Reverted src/app/api/migrate/route.ts — replaced user-service with migrateSheetsToSupabase + isSupabaseConfigured from @/lib/supabase
+- Reverted src/app/api/health/route.ts — replaced user-service with isSupabaseConfigured + getSupabase from @/lib/supabase; database test uses Supabase count query
+- Reverted src/app/api/sync-progress/route.ts — replaced user-service with syncProgressToSupabase + getUserProgress + isSupabaseConfigured from @/lib/supabase; GET response uses p.topic_id (snake_case)
+- Reverted src/app/api/sync/route.ts — replaced user-service with migrateSheetsToSupabase + isSupabaseConfigured from @/lib/supabase
+- Reverted src/app/api/seed/route.ts — replaced user-service with migrateSheetsToSupabase + isSupabaseConfigured from @/lib/supabase
+- Deleted src/lib/user-service.ts — no longer needed
+- Fixed unused import: removed isSupabaseConfigured from subject/[subjectId] route (imported but not used)
+- Verified no remaining references to user-service or prisma in src/app/api
+- Lint check passes clean (0 errors)
+- Dev server running without errors
+
+Stage Summary:
+- Complete revert of data layer from Prisma/SQLite back to Supabase
+- 1 file deleted: src/lib/user-service.ts
+- 1 file reverted to stub: src/lib/db.ts
+- 10 API route files reverted to use @/lib/supabase instead of @/lib/user-service
+- All API response shapes preserved — frontend requires NO changes
+- Key pattern: findUserByPhone() → DbUser (snake_case) → dbUserToSheetUser() → SheetUserCompat (camelCase)
+- Google Sheets remains the source for curriculum data (via sheet-sync.ts)
+- Supabase credentials properly configured in .env
+- Clean lint, no errors
+
+---
+Task ID: 3
+Agent: Curriculum Fix Agent
+Task: Replace broken Google Sheets curriculum source with Prisma/SQLite-based curriculum service
+
+Work Log:
+- Read worklog.md, db.ts, schema.prisma, sheet-sync.ts, and all 3 API route files
+- Identified the problem: Google Sheets "Curriculum" tab returns Users data instead, causing 0 subjects
+- Re-enabled Prisma Client in src/lib/db.ts (replaced Proxy stub with real PrismaClient singleton)
+- Created src/lib/curriculum-service.ts — Prisma-based curriculum hierarchy builder:
+  - buildCurriculumHierarchyFromDb(): queries Subject/Chapter/Topic from Prisma, returns BuiltSubject[] format
+  - fetchSpecialCoursesFromDb(): queries SpecialCourse from Prisma
+  - Same SUBJECT_STYLING map as sheet-sync.ts for consistent color/icon/order
+  - Imports BuiltSubject/BuiltChapter/BuiltTopic types from @/lib/sheet-sync
+- Updated src/app/api/data/route.ts:
+  - Replaced `fetchSpecialCoursesFromSheet` + `buildCurriculumHierarchy` imports with `buildCurriculumHierarchyFromDb` + `fetchSpecialCoursesFromDb` from curriculum-service
+  - Updated function calls in the handler
+  - Updated comment to reference Prisma/SQLite instead of Google Sheets
+- Updated src/app/api/subject/[subjectId]/route.ts:
+  - Replaced `buildCurriculumHierarchy` import with `buildCurriculumHierarchyFromDb` from curriculum-service
+  - Updated function call in the handler
+- Updated src/app/api/debug/route.ts:
+  - Replaced `buildCurriculumHierarchy` + `fetchSpecialCoursesFromSheet` imports with `buildCurriculumHierarchyFromDb` + `fetchSpecialCoursesFromDb` from curriculum-service
+  - Updated function calls in the handler
+- Verified Prisma database has curriculum data: 9 subjects, 86 chapters, 1029 topics, 0 special courses
+- Tested /api/debug endpoint: returns 9 subjects with 1029 total topics ✓
+- Tested /api/data endpoint: returns student profile + subjects + today's tasks correctly ✓
+- Lint check passes clean (0 errors)
+
+Stage Summary:
+- Curriculum data source switched from broken Google Sheets to working Prisma/SQLite database
+- 1 file re-enabled: src/lib/db.ts (PrismaClient singleton)
+- 1 file created: src/lib/curriculum-service.ts (Prisma-based curriculum hierarchy builder)
+- 3 API route files updated to use curriculum-service instead of sheet-sync
+- User/progress data still uses Supabase (unchanged)
+- sheet-sync.ts preserved for backward compatibility (types still exported)
+- All API response shapes preserved — frontend requires NO changes
+- 9 subjects now display correctly instead of 0

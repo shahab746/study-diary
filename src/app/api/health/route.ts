@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { testSheetConnection, buildCurriculumHierarchy, fetchSpecialCoursesFromSheet } from '@/lib/sheet-sync';
-import { getUserCount } from '@/lib/user-service';
+import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 
 /**
  * Health check endpoint — tests all data sources.
@@ -9,33 +9,54 @@ import { getUserCount } from '@/lib/user-service';
 export async function GET() {
   const diagnostics: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
-    architecture: 'Prisma/SQLite (users + progress) + Google Sheets (curriculum read-only)',
+    architecture: 'Supabase (users + progress) + Google Sheets (curriculum read-only)',
     environment: {
       NODE_ENV: process.env.NODE_ENV,
       VERCEL: !!process.env.VERCEL,
       GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID ? `set (${process.env.GOOGLE_SHEET_ID.substring(0, 8)}...)` : 'using default',
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ? 'set' : 'not set',
+      SUPABASE_CONFIGURED: isSupabaseConfigured(),
     },
     storage: {
-      primary: 'prisma-sqlite',
+      primary: 'supabase',
       curriculum: 'google-sheets-csv',
-      progress: 'prisma-sqlite',
+      progress: 'supabase',
     },
   };
 
-  // Test 1: Prisma/SQLite connectivity
+  // Test 1: Supabase connectivity
   try {
-    const userCount = await getUserCount();
-    diagnostics.database = {
-      connected: true,
-      userCount,
-      type: 'prisma-sqlite',
-    };
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      const { count, error } = await sb
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) {
+        diagnostics.database = {
+          connected: false,
+          error: error.message,
+          type: 'supabase',
+        };
+      } else {
+        diagnostics.database = {
+          connected: true,
+          userCount: count || 0,
+          type: 'supabase',
+        };
+      }
+    } else {
+      diagnostics.database = {
+        connected: false,
+        error: 'Supabase not configured — set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY',
+        type: 'supabase',
+      };
+    }
   } catch (err) {
     diagnostics.database = {
       connected: false,
       error: err instanceof Error ? err.message : String(err),
-      type: 'prisma-sqlite',
+      type: 'supabase',
     };
   }
 

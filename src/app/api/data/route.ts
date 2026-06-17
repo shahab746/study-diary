@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import {
   findUserByPhone,
+  dbUserToSheetUser,
   getUserProgress,
-  normalizeStatus,
-} from '@/lib/user-service';
+  isSupabaseConfigured,
+} from '@/lib/supabase';
 import {
-  fetchSpecialCoursesFromSheet,
-  buildCurriculumHierarchy,
-} from '@/lib/sheet-sync';
+  buildCurriculumHierarchyFromDb,
+  fetchSpecialCoursesFromDb,
+} from '@/lib/curriculum-service';
 
 // ─── Color & Icon Mapping ───────────────────────────────────────────────────────
 
@@ -33,6 +34,15 @@ function mapIcon(icon: string, subjectName?: string): string {
   return 'book';
 }
 
+function normalizeStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
+
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
@@ -41,30 +51,31 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const phone = url.searchParams.get('phone');
 
-    // ─── STEP 1: Fetch student profile from Prisma/SQLite ──────────────
+    // ─── STEP 1: Fetch student profile from Supabase ──────────────
     let student: Record<string, unknown> | null = null;
     let academicGroup = '';
 
     if (phone) {
-      const user = await findUserByPhone(phone);
-      if (user) {
-        academicGroup = user.academicGroup || '';
+      const dbUser = await findUserByPhone(phone);
+      if (dbUser) {
+        const su = dbUserToSheetUser(dbUser);
+        academicGroup = su.academicGroup || '';
         student = {
-          name: user.name,
-          phone: user.phone,
-          grade: user.grade,
-          board: user.board,
-          field: user.field,
-          status: normalizeStatus(user.status),
-          startDate: user.startDate,
-          targetDate: user.targetDate,
-          currentDay: user.currentDay,
-          totalDays: user.totalDays,
-          topicsDone: user.topicsDone,
-          daysLeft: user.daysLeft,
-          pacingGoal: user.pacingGoal || '5M',
-          academicGroup: user.academicGroup,
-          pin: user.pin,
+          name: su.name,
+          phone: su.phone,
+          grade: su.grade,
+          board: su.board,
+          field: su.field,
+          status: normalizeStatus(su.status),
+          startDate: su.startDate,
+          targetDate: su.targetDate,
+          currentDay: su.currentDay,
+          totalDays: su.totalDays,
+          topicsDone: su.topicsDone,
+          daysLeft: su.daysLeft,
+          pacingGoal: su.pacingGoal || '5M',
+          academicGroup: su.academicGroup,
+          pin: su.pin,
         };
       }
     }
@@ -75,19 +86,19 @@ export async function GET(request: Request) {
 
     const studentGrade = String((student as Record<string, unknown>)?.grade || '10');
 
-    // ─── STEP 2: Fetch curriculum from Google Sheets + progress from Prisma ──
+    // ─── STEP 2: Fetch curriculum from Prisma/SQLite + progress from Supabase ──
     const [subjects, specialCourses, dbProgress] = await Promise.all([
-      buildCurriculumHierarchy(),
-      fetchSpecialCoursesFromSheet(),
+      buildCurriculumHierarchyFromDb(),
+      fetchSpecialCoursesFromDb(),
       phone ? getUserProgress(phone) : Promise.resolve([]),
     ]);
 
-    // ─── STEP 3: Build progress rows from Prisma ──
+    // ─── STEP 3: Build progress rows from Supabase ──
     const progressRows = dbProgress.map(p => ({
       phone: p.phone,
-      topicId: p.topicId,
+      topicId: p.topic_id,
       completed: p.completed,
-      dateCompleted: p.dateCompleted || '',
+      dateCompleted: p.date_completed || '',
     }));
 
     // ─── STEP 4: Filter subjects by grade ──────────────────────────────
@@ -97,11 +108,22 @@ export async function GET(request: Request) {
     const filteredSubjects = subjects.filter(s => gradeSet.has(s.grade));
 
     // ─── STEP 5: Filter by Group_Eligibility ───────────────────────────
+    // Map academic group names: "Pre-Medical" → "Biology", "Pre-Engineering" → "Mathematics"
+    const groupMap: Record<string, string> = {
+      'Pre-Medical': 'Biology',
+      'Pre-Engineering': 'Mathematics',
+      'ICS': 'Computer Science',
+      'Computer Science': 'Computer Science',
+      'Biology': 'Biology',
+      'Mathematics': 'Mathematics',
+    };
+    const resolvedGroup = groupMap[academicGroup] || academicGroup;
+
     const eligibleSubjects = filteredSubjects.filter(subject => {
       const eligibility = subject.groupEligibility || 'Both';
       if (eligibility === 'Both') return true;
-      if (academicGroup && eligibility === academicGroup) return true;
-      if (!academicGroup) return true;
+      if (resolvedGroup && eligibility === resolvedGroup) return true;
+      if (!resolvedGroup) return true;
       return false;
     });
 
