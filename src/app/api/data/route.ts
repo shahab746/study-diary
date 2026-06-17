@@ -58,113 +58,112 @@ export async function GET(request: Request) {
     const phone = url.searchParams.get('phone');
 
     // ─── STEP 1: Fetch student profile ─────────────────────────────
+    // Check ALL sources and take the highest access level (paid > free).
+    // This prevents bad migrations or stale Supabase data from locking out paid users.
     let student: Record<string, any> | null = null;
     let academicGroup = '';
     let progressSource: 'supabase' | 'sheets' = 'sheets';
 
     if (phone) {
-      // Try Supabase first
+      // Collect user data from all sources, then pick the one with highest access
+      let supabaseUser: Record<string, any> | null = null;
+      let sheetUser: Record<string, any> | null = null;
+      let cachedUser: Record<string, any> | null = null;
+
+      // 1. Try Supabase
       if (isSupabaseConfigured()) {
         const dbUser = await findUserByPhone(phone);
         if (dbUser) {
-          const sheetUser = dbUserToSheetUser(dbUser);
-          academicGroup = sheetUser.academicGroup || '';
-          student = {
-            name: sheetUser.name,
-            phone: sheetUser.phone,
-            grade: sheetUser.grade,
-            board: sheetUser.board,
-            field: sheetUser.field,
-            status: normalizeStatus(sheetUser.status),
-            startDate: sheetUser.startDate,
-            targetDate: sheetUser.targetDate,
-            currentDay: sheetUser.currentDay,
-            totalDays: sheetUser.totalDays,
-            topicsDone: sheetUser.topicsDone,
-            daysLeft: sheetUser.daysLeft,
-            pacingGoal: sheetUser.pacingGoal || '5M',
-            academicGroup: sheetUser.academicGroup,
-            pin: sheetUser.pin,
+          const su = dbUserToSheetUser(dbUser);
+          supabaseUser = {
+            name: su.name, phone: su.phone, grade: su.grade,
+            board: su.board, field: su.field,
+            status: normalizeStatus(su.status),
+            startDate: su.startDate, targetDate: su.targetDate,
+            currentDay: su.currentDay, totalDays: su.totalDays,
+            topicsDone: su.topicsDone, daysLeft: su.daysLeft,
+            pacingGoal: su.pacingGoal || '5M',
+            academicGroup: su.academicGroup, pin: su.pin,
           };
+        }
+      }
+
+      // 2. Try Google Sheets
+      try {
+        const su = await findUserByPhoneSheet(phone, true);
+        if (su) {
+          sheetUser = {
+            name: su.name, phone: su.phone, grade: su.grade,
+            board: su.board, field: su.field,
+            status: normalizeStatus(su.status),
+            startDate: su.startDate, targetDate: su.targetDate,
+            currentDay: su.currentDay, totalDays: su.totalDays,
+            topicsDone: su.topicsDone, daysLeft: su.daysLeft,
+            pacingGoal: su.pacingGoal || '5M',
+            academicGroup: su.academicGroup, pin: su.pin,
+          };
+        }
+      } catch { /* Sheets may be down */ }
+
+      // 3. Try registered-users cache
+      try {
+        const cu = await findRegisteredUserByPhone(phone, false);
+        if (cu) {
+          cachedUser = {
+            name: cu.name, phone: cu.phone, grade: cu.grade,
+            board: cu.board, field: cu.field,
+            status: normalizeStatus(cu.status),
+            startDate: cu.startDate, targetDate: cu.targetDate,
+            currentDay: cu.currentDay, totalDays: cu.totalDays,
+            topicsDone: cu.topicsDone, daysLeft: cu.daysLeft,
+            pacingGoal: cu.pacingGoal || '5M',
+            academicGroup: cu.academicGroup, pin: cu.pin,
+          };
+        }
+      } catch { /* Cache unavailable */ }
+
+      // Pick the best source: paid > free, prefer Supabase for progress data
+      if (supabaseUser && supabaseUser.status === 'paid') {
+        student = supabaseUser;
+        progressSource = 'supabase';
+      } else if (sheetUser && sheetUser.status === 'paid') {
+        student = sheetUser;
+        // If also found in Supabase, upgrade their status and use Supabase progress
+        if (supabaseUser) {
+          student = { ...supabaseUser, status: 'paid' };
           progressSource = 'supabase';
+          // Sync the paid status back to Supabase
+          const { getSupabase } = await import('@/lib/supabase');
+          getSupabase().from('users').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('phone', phone).then(() => {
+            console.log(`✅ Synced paid status to Supabase for ${phone} (found paid in Sheets)`);
+          }).catch(() => {});
         }
+      } else if (cachedUser && cachedUser.status === 'paid') {
+        student = cachedUser;
+        if (supabaseUser) {
+          student = { ...supabaseUser, status: 'paid' };
+          progressSource = 'supabase';
+          const { getSupabase } = await import('@/lib/supabase');
+          getSupabase().from('users').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('phone', phone).then(() => {
+            console.log(`✅ Synced paid status to Supabase for ${phone} (found paid in cache)`);
+          }).catch(() => {});
+        }
+      } else if (supabaseUser) {
+        student = supabaseUser;
+        progressSource = 'supabase';
+      } else if (sheetUser) {
+        student = sheetUser;
+      } else if (cachedUser) {
+        student = cachedUser;
       }
 
-      // Fallback: Google Sheets
-      if (!student) {
-        const sheetUser = await findUserByPhoneSheet(phone, true);
-        if (sheetUser) {
-          academicGroup = sheetUser.academicGroup || '';
-          student = {
-            name: sheetUser.name,
-            phone: sheetUser.phone,
-            grade: sheetUser.grade,
-            board: sheetUser.board,
-            field: sheetUser.field,
-            status: normalizeStatus(sheetUser.status),
-            startDate: sheetUser.startDate,
-            targetDate: sheetUser.targetDate,
-            currentDay: sheetUser.currentDay,
-            totalDays: sheetUser.totalDays,
-            topicsDone: sheetUser.topicsDone,
-            daysLeft: sheetUser.daysLeft,
-            pacingGoal: sheetUser.pacingGoal || '5M',
-            academicGroup: sheetUser.academicGroup,
-            pin: sheetUser.pin,
-          };
-        }
-      }
-
-      // Fallback: registered-users cache
-      if (!student) {
-        const cachedUser = await findRegisteredUserByPhone(phone, false);
-        if (cachedUser) {
-          academicGroup = cachedUser.academicGroup || '';
-          student = {
-            name: cachedUser.name,
-            phone: cachedUser.phone,
-            grade: cachedUser.grade,
-            board: cachedUser.board,
-            field: cachedUser.field,
-            status: normalizeStatus(cachedUser.status),
-            startDate: cachedUser.startDate,
-            targetDate: cachedUser.targetDate,
-            currentDay: cachedUser.currentDay,
-            totalDays: cachedUser.totalDays,
-            topicsDone: cachedUser.topicsDone,
-            daysLeft: cachedUser.daysLeft,
-            pacingGoal: cachedUser.pacingGoal || '5M',
-            academicGroup: cachedUser.academicGroup,
-            pin: cachedUser.pin,
-          };
-        }
+      if (student) {
+        academicGroup = student.academicGroup || '';
       }
     }
 
-    // Last resort: first user from Sheets
     if (!student) {
-      const allUsers = await fetchUsersFromSheet(false);
-      const firstUser = allUsers[0];
-      if (firstUser) {
-        academicGroup = firstUser.academicGroup || '';
-        student = {
-          name: firstUser.name,
-          phone: firstUser.phone,
-          grade: firstUser.grade,
-          board: firstUser.board,
-          field: firstUser.field,
-          status: normalizeStatus(firstUser.status),
-          startDate: firstUser.startDate,
-          targetDate: firstUser.targetDate,
-          currentDay: firstUser.currentDay,
-          totalDays: firstUser.totalDays,
-          topicsDone: firstUser.topicsDone,
-          daysLeft: firstUser.daysLeft,
-          pacingGoal: firstUser.pacingGoal || '5M',
-          academicGroup: firstUser.academicGroup,
-          pin: firstUser.pin,
-        };
-      }
+      console.warn(`⚠️ /api/data: No user found for phone="${phone}" — returning empty curriculum`);
     }
 
     const studentGrade = String(student?.grade || '10');

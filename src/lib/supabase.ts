@@ -445,6 +445,16 @@ export function dbUserToSheetUser(user: DbUser): SheetUserCompat {
   };
 }
 
+/** Normalize status during migration — handles all Google Sheet value formats */
+function normalizeMigrationStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
+
 /**
  * Migrate existing users from Google Sheets → Supabase
  * Call this once from the /api/migrate endpoint
@@ -489,7 +499,7 @@ export async function migrateSheetsToSupabase(): Promise<{ migrated: number; err
       grade: su.grade,
       board: su.board,
       field: su.field,
-      status: su.status === 'true' ? 'paid' : su.status === 'false' ? 'free' : su.status,
+      status: normalizeMigrationStatus(su.status),
       academic_group: su.academicGroup,
       start_date: sanitizeDate(su.startDate),
       target_date: sanitizeDate(su.targetDate),

@@ -81,33 +81,46 @@ export async function GET(
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
 
-    // ─── Determine user status with same multi-source lookup as data API ───
+    // ─── Determine user status — check ALL sources, take the highest access ───
+    // A user found as 'paid' in ANY source should get paid access.
+    // This prevents bad migrations or stale data from locking out paid users.
     let userStatus = 'free'; // default
+    let userFound = false;
 
     if (phone) {
       // 1. Try Supabase first
       if (isSupabaseConfigured()) {
         const dbUser = await findUserByPhoneDB(phone);
         if (dbUser) {
-          const sheetUser = dbUserToSheetUser(dbUser);
-          userStatus = normalizeStatus(sheetUser.status);
+          userFound = true;
+          const normalized = normalizeStatus(dbUserToSheetUser(dbUser).status);
+          if (normalized === 'paid') userStatus = 'paid';
+          else if (normalized !== 'free') userStatus = normalized; // blocked, etc.
         }
       }
 
-      // 2. Fallback: Google Sheets
-      if (userStatus === 'free') {
-        const sheetUser = await findUserByPhone(phone, false);
-        if (sheetUser) {
-          userStatus = normalizeStatus(sheetUser.status);
-        }
+      // 2. Check Google Sheets — upgrade to 'paid' if found as paid there
+      if (userStatus !== 'paid') {
+        try {
+          const sheetUser = await findUserByPhone(phone, false);
+          if (sheetUser) {
+            userFound = true;
+            const normalized = normalizeStatus(sheetUser.status);
+            if (normalized === 'paid') userStatus = 'paid';
+          }
+        } catch { /* Sheets may be down */ }
       }
 
-      // 3. Fallback: registered-users cache
-      if (userStatus === 'free') {
-        const cachedUser = await findRegisteredUserByPhone(phone, false);
-        if (cachedUser) {
-          userStatus = normalizeStatus(cachedUser.status);
-        }
+      // 3. Check registered-users cache — upgrade to 'paid' if found as paid there
+      if (userStatus !== 'paid') {
+        try {
+          const cachedUser = await findRegisteredUserByPhone(phone, false);
+          if (cachedUser) {
+            userFound = true;
+            const normalized = normalizeStatus(cachedUser.status);
+            if (normalized === 'paid') userStatus = 'paid';
+          }
+        } catch { /* Cache may be unavailable */ }
       }
     }
 

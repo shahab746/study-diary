@@ -6,6 +6,16 @@ import {
 } from '@/lib/supabase';
 import { findRegisteredUserByPhone } from '@/lib/registered-users';
 
+// Normalize status from Google Sheet values — same logic as data route
+function normalizeLoginStatus(status: string): string {
+  if (!status) return 'free';
+  const s = status.toLowerCase().trim();
+  if (s === 'true' || s === 'paid') return 'paid';
+  if (s === 'false' || s === 'free') return 'free';
+  if (s === 'blocked' || s === 'disabled') return s;
+  return s;
+}
+
 /**
  * Custom login API endpoint
  *
@@ -44,7 +54,7 @@ export async function POST(request: Request) {
           );
         }
 
-        const normalizedStatus = dbUser.status?.toLowerCase().trim();
+        const normalizedStatus = normalizeLoginStatus(dbUser.status);
         if (normalizedStatus === 'blocked' || normalizedStatus === 'disabled') {
           return NextResponse.json(
             { success: false, error: 'Your account has been disabled. Please contact support.' },
@@ -52,7 +62,27 @@ export async function POST(request: Request) {
           );
         }
 
-        console.log(`🔐 Login API: Success for "${dbUser.name}" (${dbUser.status}) [Supabase]`);
+        // Cross-check with Google Sheets — if user is 'paid' in Sheets but 'free' in Supabase, upgrade
+        let effectiveStatus = normalizedStatus;
+        if (effectiveStatus === 'free') {
+          try {
+            const sheetCheck = await findRegisteredUserByPhone(cleanPhone, true);
+            if (sheetCheck) {
+              const sheetStatus = normalizeLoginStatus(sheetCheck.status);
+              if (sheetStatus === 'paid') {
+                effectiveStatus = 'paid';
+                console.log(`🔐 Login API: Upgraded ${cleanPhone} to paid (found in Sheets/cache as paid)`);
+                // Sync back to Supabase
+                const { getSupabase } = await import('@/lib/supabase');
+                getSupabase().from('users').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('phone', cleanPhone).then(() => {
+                  console.log(`✅ Synced paid status to Supabase for ${cleanPhone} during login`);
+                }).catch(() => {});
+              }
+            }
+          } catch { /* Sheets down — use Supabase status */ }
+        }
+
+        console.log(`🔐 Login API: Success for "${dbUser.name}" (${effectiveStatus}) [Supabase]`);
         return NextResponse.json({
           success: true,
           user: {
@@ -61,7 +91,7 @@ export async function POST(request: Request) {
             grade: dbUser.grade,
             board: dbUser.board,
             field: dbUser.field,
-            status: dbUser.status,
+            status: effectiveStatus,
             academicGroup: dbUser.academic_group,
           },
         });
@@ -87,7 +117,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalizedStatus = sheetUser.status?.toLowerCase().trim();
+    const normalizedStatus = normalizeLoginStatus(sheetUser.status);
     if (normalizedStatus === 'blocked' || normalizedStatus === 'disabled') {
       return NextResponse.json(
         { success: false, error: 'Your account has been disabled. Please contact support.' },
@@ -95,7 +125,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`🔐 Login API: Success for "${sheetUser.name}" (${sheetUser.status}) [Sheets fallback]`);
+    console.log(`🔐 Login API: Success for "${sheetUser.name}" (${normalizedStatus}) [Sheets fallback]`);
 
     // If user found in Sheets but not in Supabase, auto-migrate them
     if (isSupabaseConfigured()) {
@@ -114,7 +144,7 @@ export async function POST(request: Request) {
         grade: sheetUser.grade,
         board: sheetUser.board,
         field: sheetUser.field,
-        status: sheetUser.status === 'true' ? 'paid' : sheetUser.status === 'false' ? 'free' : sheetUser.status,
+        status: normalizeLoginStatus(sheetUser.status),
         academic_group: sheetUser.academicGroup,
         start_date: safeDate(sheetUser.startDate),
         target_date: safeDate(sheetUser.targetDate),
@@ -142,7 +172,7 @@ export async function POST(request: Request) {
         grade: sheetUser.grade,
         board: sheetUser.board,
         field: sheetUser.field,
-        status: sheetUser.status,
+        status: normalizedStatus,
         academicGroup: sheetUser.academicGroup,
       },
     });
