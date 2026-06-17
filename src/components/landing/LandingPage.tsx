@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import {
   BookOpenText,
@@ -25,7 +25,6 @@ import {
   Users,
   Crown,
   Rocket,
-  MessageCircle,
   Shield,
   Smartphone,
   ChevronDown,
@@ -69,32 +68,6 @@ const fadeInScale = {
     transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] },
   },
 };
-
-// ============================================
-// ANIMATED COUNTER HOOK
-// ============================================
-function useAnimatedCounter(target: number, duration: number = 2000) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-50px' });
-  const hasAnimated = useRef(false);
-
-  useEffect(() => {
-    if (!isInView || hasAnimated.current) return;
-    hasAnimated.current = true;
-    const startTime = Date.now();
-    const step = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(eased * target));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [isInView, target, duration]);
-
-  return { count, ref };
-}
 
 // ============================================
 // FLOATING CARDS COMPONENT
@@ -188,22 +161,6 @@ function FloatingCards() {
         </motion.div>
       </motion.div>
     </div>
-  );
-}
-
-// ============================================
-// ANIMATED STAT ITEM COMPONENT
-// ============================================
-function AnimatedStatItem({ value, suffix, label }: { value: number; suffix: string; label: string }) {
-  const { count, ref } = useAnimatedCounter(value);
-  return (
-    <motion.div variants={staggerItem} ref={ref} className="text-center">
-      <p className="text-4xl font-extrabold text-white sm:text-5xl">
-        {count}
-        <span className="text-[#FF3B30]">{suffix}</span>
-      </p>
-      <p className="mt-2 text-sm font-medium text-zinc-500">{label}</p>
-    </motion.div>
   );
 }
 
@@ -369,44 +326,6 @@ function DashboardMockup() {
         </div>
       </motion.div>
     </div>
-  );
-}
-
-// ============================================
-// TESTIMONIAL COMPONENT
-// ============================================
-function TestimonialCard({
-  name,
-  grade,
-  text,
-  avatar,
-}: {
-  name: string;
-  grade: string;
-  text: string;
-  avatar: string;
-}) {
-  return (
-    <motion.div
-      variants={staggerItem}
-      className="rounded-2xl border border-white/5 bg-zinc-900/50 p-6 transition-all hover:border-white/10"
-    >
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#FF3B30] to-[#FF6B60] text-sm font-bold text-white">
-          {avatar}
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-white">{name}</p>
-          <p className="text-xs text-zinc-500">{grade}</p>
-        </div>
-      </div>
-      <div className="mb-3 flex gap-1">
-        {[1, 2, 3, 4, 5].map((s) => (
-          <Star key={s} className="h-3.5 w-3.5 fill-[#F59E0B] text-[#F59E0B]" />
-        ))}
-      </div>
-      <p className="text-sm leading-relaxed text-zinc-400">&ldquo;{text}&rdquo;</p>
-    </motion.div>
   );
 }
 
@@ -605,43 +524,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          3. TRUSTED BY / SOCIAL BADGES
-          ============================================ */}
-      <section className="border-y border-white/5 bg-zinc-950/30 py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <motion.div
-            variants={sectionVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="text-center"
-          >
-            <p className="mb-8 text-sm font-medium uppercase tracking-widest text-zinc-600">
-              Trusted by students across Pakistan
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-8 text-zinc-600">
-              {[
-                'FBISE Islamabad',
-                'BISE Lahore',
-                'BISE Karachi',
-                'BISE Rawalpindi',
-                'BISE Peshawar',
-              ].map((board) => (
-                <div
-                  key={board}
-                  className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2 text-sm font-medium text-zinc-500"
-                >
-                  <GraduationCap className="h-4 w-4" />
-                  {board}
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ============================================
-          4. PROBLEM SECTION
+          3. PROBLEM SECTION
           ============================================ */}
       <section className="scroll-mt-20 bg-zinc-950 py-20 sm:py-28" id="problem">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -701,7 +584,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          5. FEATURES SECTION
+          4. FEATURES SECTION
           ============================================ */}
       <section className="scroll-mt-20 py-20 sm:py-28" id="features">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -798,7 +681,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          6. HOW IT WORKS
+          5. HOW IT WORKS
           ============================================ */}
       <section
         className="scroll-mt-20 border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28"
@@ -879,7 +762,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          7. DASHBOARD PREVIEW
+          6. DASHBOARD PREVIEW
           ============================================ */}
       <section className="scroll-mt-20 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -955,93 +838,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          8. TESTIMONIALS
-          ============================================ */}
-      <section className="border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <motion.div
-            variants={sectionVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-100px' }}
-            className="text-center"
-          >
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
-              <MessageCircle className="h-3.5 w-3.5 text-[#FF3B30]" />
-              <span className="text-xs font-medium text-zinc-300">Student Stories</span>
-            </div>
-            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
-              Loved by students{' '}
-              <span className="bg-gradient-to-r from-[#FF3B30] to-[#FF6B60] bg-clip-text text-transparent">
-                across Pakistan
-              </span>
-            </h2>
-          </motion.div>
-
-          <motion.div
-            variants={staggerContainer}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-100px' }}
-            className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {[
-              {
-                name: 'Ahmed Raza',
-                grade: 'Grade 10, FBISE',
-                text: "Study Diary completely changed how I prepare for exams. The daily plan keeps me on track and I've maintained a 15-day streak!",
-                avatar: 'AR',
-              },
-              {
-                name: 'Fatima Noor',
-                grade: 'Grade 9, BISE Lahore',
-                text: "I used to waste hours finding the right YouTube lectures. Now every topic has one ready. My focus score went from 40% to 90%!",
-                avatar: 'FN',
-              },
-              {
-                name: 'Hassan Ali',
-                grade: 'Grade 11, FBISE',
-                text: "The offline feature is a lifesaver. I study on the bus ride to school and it syncs when I get home. Best study app for Pakistani students.",
-                avatar: 'HA',
-              },
-            ].map((testimonial) => (
-              <TestimonialCard key={testimonial.name} {...testimonial} />
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ============================================
-          9. STATISTICS / SOCIAL PROOF
-          ============================================ */}
-      <section className="border-y border-white/5 bg-zinc-950/50 py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <motion.div
-            variants={staggerContainer}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-100px' }}
-            className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            {[
-              { value: 500, suffix: '+', label: 'Active Students' },
-              { value: 389, suffix: '+', label: 'Curriculum Topics' },
-              { value: 5, suffix: '+', label: 'Subjects Covered' },
-              { value: 3, suffix: '', label: 'Pacing Plans' },
-            ].map((stat) => (
-              <AnimatedStatItem
-                key={stat.label}
-                value={stat.value}
-                suffix={stat.suffix}
-                label={stat.label}
-              />
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ============================================
-          10. PRICING SECTION
+          7. PRICING SECTION
           ============================================ */}
       <section className="scroll-mt-20 py-20 sm:py-28" id="pricing">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -1080,7 +877,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               <p className="mt-2 text-sm text-zinc-400">Get started with essential features</p>
               <div className="mt-6">
                 <span className="text-4xl font-extrabold text-white">
-                  {'\u20A8'}0
+                  $0
                 </span>
                 <span className="text-zinc-500">/forever</span>
               </div>
@@ -1121,9 +918,9 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               <p className="mt-2 text-sm text-zinc-400">Unlock everything for your exam prep</p>
               <div className="mt-6">
                 <span className="text-4xl font-extrabold text-white">
-                  {'\u20A8'}499
+                  $15
                 </span>
-                <span className="text-zinc-500">/month</span>
+                <span className="text-zinc-500">/full year</span>
               </div>
               <ul className="mt-8 space-y-4">
                 {[
@@ -1154,7 +951,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          11. FAQ SECTION
+          8. FAQ SECTION
           ============================================ */}
       <section className="scroll-mt-20 border-t border-white/5 bg-zinc-950/50 py-20 sm:py-28" id="faq">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -1214,7 +1011,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          12. FINAL CTA SECTION
+          9. FINAL CTA SECTION
           ============================================ */}
       <section className="relative overflow-hidden py-20 sm:py-28">
         {/* Background glow */}
@@ -1258,7 +1055,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* ============================================
-          13. FOOTER
+          10. FOOTER
           ============================================ */}
       <footer className="border-t border-white/5 bg-zinc-950 py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

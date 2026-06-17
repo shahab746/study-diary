@@ -1,0 +1,1347 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useState, useEffect, useRef } from 'react';
+     4→     4→import { motion, AnimatePresence, useInView } from 'framer-motion';
+     5→     5→import {
+     6→     6→  BookOpenText,
+     7→     7→  Menu,
+     8→     8→  X,
+     9→     9→  CalendarCheck,
+    10→    10→  Play,
+    11→    11→  Timer,
+    12→    12→  BarChart3,
+    13→    13→  WifiOff,
+    14→    14→  GraduationCap,
+    15→    15→  Check,
+    16→    16→  Plus,
+    17→    17→  Sparkles,
+    18→    18→  Flame,
+    19→    19→  Target,
+    20→    20→  TrendingUp,
+    21→    21→  ArrowRight,
+    22→    22→  Star,
+    23→    23→  Zap,
+    24→    24→  Lock,
+    25→    25→  Users,
+    26→    26→  Crown,
+    27→    27→  Rocket,
+    28→    28→  MessageCircle,
+    29→    29→  Shield,
+    30→    30→  Smartphone,
+    31→    31→  ChevronDown,
+    32→    32→  Heart,
+    33→    33→} from 'lucide-react';
+    34→    34→
+    35→    35→// ============================================
+    36→    36→// ANIMATION VARIANTS
+    37→    37→// ============================================
+    38→    38→const sectionVariants = {
+    39→    39→  hidden: { opacity: 0, y: 40 },
+    40→    40→  visible: {
+    41→    41→    opacity: 1,
+    42→    42→    y: 0,
+    43→    43→    transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+    44→    44→  },
+    45→    45→};
+    46→    46→
+    47→    47→const staggerContainer = {
+    48→    48→  hidden: { opacity: 0 },
+    49→    49→  visible: {
+    50→    50→    opacity: 1,
+    51→    51→    transition: { staggerChildren: 0.1 },
+    52→    52→  },
+    53→    53→};
+    54→    54→
+    55→    55→const staggerItem = {
+    56→    56→  hidden: { opacity: 0, y: 30 },
+    57→    57→  visible: {
+    58→    58→    opacity: 1,
+    59→    59→    y: 0,
+    60→    60→    transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] },
+    61→    61→  },
+    62→    62→};
+    63→    63→
+    64→    64→const fadeInScale = {
+    65→    65→  hidden: { opacity: 0, scale: 0.9 },
+    66→    66→  visible: {
+    67→    67→    opacity: 1,
+    68→    68→    scale: 1,
+    69→    69→    transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] },
+    70→    70→  },
+    71→    71→};
+    72→    72→
+    73→    73→// ============================================
+    74→    74→// ANIMATED COUNTER HOOK
+    75→    75→// ============================================
+    76→    76→function useAnimatedCounter(target: number, duration: number = 2000) {
+    77→    77→  const [count, setCount] = useState(0);
+    78→    78→  const ref = useRef<HTMLDivElement>(null);
+    79→    79→  const isInView = useInView(ref, { once: true, margin: '-50px' });
+    80→    80→  const hasAnimated = useRef(false);
+    81→    81→
+    82→    82→  useEffect(() => {
+    83→    83→    if (!isInView || hasAnimated.current) return;
+    84→    84→    hasAnimated.current = true;
+    85→    85→    const startTime = Date.now();
+    86→    86→    const step = () => {
+    87→    87→      const elapsed = Date.now() - startTime;
+    88→    88→      const progress = Math.min(elapsed / duration, 1);
+    89→    89→      const eased = 1 - Math.pow(1 - progress, 3);
+    90→    90→      setCount(Math.floor(eased * target));
+    91→    91→      if (progress < 1) requestAnimationFrame(step);
+    92→    92→    };
+    93→    93→    requestAnimationFrame(step);
+    94→    94→  }, [isInView, target, duration]);
+    95→    95→
+    96→    96→  return { count, ref };
+    97→    97→}
+    98→    98→
+    99→    99→// ============================================
+   100→   100→// FLOATING CARDS COMPONENT
+   101→   101→// ============================================
+   102→   102→function FloatingCards() {
+   103→   103→  return (
+   104→   104→    <div className="relative h-[400px] w-full md:h-[500px]">
+   105→   105→      {/* Main hero image */}
+   106→   106→      <motion.div
+   107→   107→        initial={{ opacity: 0, scale: 0.95 }}
+   108→   108→        animate={{ opacity: 1, scale: 1 }}
+   109→   109→        transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+   110→   110→        className="relative z-10 mx-auto h-full max-w-md md:max-w-lg"
+   111→   111→      >
+   112→   112→        <img
+   113→   113→          src="/hero-student.png"
+   114→   114→          alt="Student using Study Diary app"
+   115→   115→          className="h-full w-full object-contain drop-shadow-2xl"
+   116→   116→        />
+   117→   117→      </motion.div>
+   118→   118→
+   119→   119→      {/* Floating metric card - Focus Score */}
+   120→   120→      <motion.div
+   121→   121→        initial={{ opacity: 0, x: -30, y: 20 }}
+   122→   122→        animate={{ opacity: 1, x: 0, y: 0 }}
+   123→   123→        transition={{ delay: 0.5, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+   124→   124→        className="absolute top-8 left-0 z-20 hidden md:block"
+   125→   125→      >
+   126→   126→        <motion.div
+   127→   127→          animate={{ y: [0, -8, 0] }}
+   128→   128→          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+   129→   129→          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl"
+   130→   130→        >
+   131→   131→          <div className="flex items-center gap-3">
+   132→   132→            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF3B30]/20">
+   133→   133→              <Target className="h-5 w-5 text-[#FF3B30]" />
+   134→   134→            </div>
+   135→   135→            <div>
+   136→   136→              <p className="text-xs font-medium text-zinc-400">Focus Score</p>
+   137→   137→              <p className="text-xl font-bold text-white">87%</p>
+   138→   138→            </div>
+   139→   139→          </div>
+   140→   140→        </motion.div>
+   141→   141→      </motion.div>
+   142→   142→
+   143→   143→      {/* Floating metric card - Streak */}
+   144→   144→      <motion.div
+   145→   145→        initial={{ opacity: 0, x: 30, y: -20 }}
+   146→   146→        animate={{ opacity: 1, x: 0, y: 0 }}
+   147→   147→        transition={{ delay: 0.7, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+   148→   148→        className="absolute right-0 top-16 z-20 hidden md:block"
+   149→   149→      >
+   150→   150→        <motion.div
+   151→   151→          animate={{ y: [0, 8, 0] }}
+   152→   152→          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+   153→   153→          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl"
+   154→   154→        >
+   155→   155→          <div className="flex items-center gap-3">
+   156→   156→            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20">
+   157→   157→              <Flame className="h-5 w-5 text-orange-500" />
+   158→   158→            </div>
+   159→   159→            <div>
+   160→   160→              <p className="text-xs font-medium text-zinc-400">Streak</p>
+   161→   161→              <p className="text-xl font-bold text-white">12 days</p>
+   162→   162→            </div>
+   163→   163→          </div>
+   164→   164→        </motion.div>
+   165→   165→      </motion.div>
+   166→   166→
+   167→   167→      {/* Floating metric card - Progress */}
+   168→   168→      <motion.div
+   169→   169→        initial={{ opacity: 0, x: -20, y: 30 }}
+   170→   170→        animate={{ opacity: 1, x: 0, y: 0 }}
+   171→   171→        transition={{ delay: 0.9, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+   172→   172→        className="absolute bottom-16 left-4 z-20 hidden md:block"
+   173→   173→      >
+   174→   174→        <motion.div
+   175→   175→          animate={{ y: [0, -6, 0] }}
+   176→   176→          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+   177→   177→          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl"
+   178→   178→        >
+   179→   179→          <div className="flex items-center gap-3">
+   180→   180→            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
+   181→   181→              <TrendingUp className="h-5 w-5 text-emerald-500" />
+   182→   182→            </div>
+   183→   183→            <div>
+   184→   184→              <p className="text-xs font-medium text-zinc-400">Progress</p>
+   185→   185→              <p className="text-xl font-bold text-white">234/389</p>
+   186→   186→            </div>
+   187→   187→          </div>
+   188→   188→        </motion.div>
+   189→   189→      </motion.div>
+   190→   190→    </div>
+   191→   191→  );
+   192→   192→}
+   193→   193→
+   194→   194→// ============================================
+   195→   195→// ANIMATED STAT ITEM COMPONENT
+   196→   196→// ============================================
+   197→   197→function AnimatedStatItem({ value, suffix, label }: { value: number; suffix: string; label: string }) {
+   198→   198→  const { count, ref } = useAnimatedCounter(value);
+   199→   199→  return (
+   200→   200→    <motion.div variants={staggerItem} ref={ref} className="text-center">
+   201→   201→      <p className="text-4xl font-extrabold text-white sm:text-5xl">
+   202→   202→        {count}
+   203→   203→        <span className="text-[#FF3B30]">{suffix}</span>
+   204→   204→      </p>
+   205→   205→      <p className="mt-2 text-sm font-medium text-zinc-500">{label}</p>
+   206→   206→    </motion.div>
+   207→   207→  );
+   208→   208→}
+   209→   209→
+   210→   210→// ============================================
+   211→   211→// FAQ ITEM COMPONENT
+   212→   212→// ============================================
+   213→   213→function FAQItem({ question, answer }: { question: string; answer: string }) {
+   214→   214→  const [isOpen, setIsOpen] = useState(false);
+   215→   215→
+   216→   216→  return (
+   217→   217→    <motion.div variants={staggerItem} className="border-b border-white/5">
+   218→   218→      <button
+   219→   219→        onClick={() => setIsOpen(!isOpen)}
+   220→   220→        className="flex w-full items-center justify-between py-6 text-left transition-colors hover:text-white"
+   221→   221→      >
+   222→   222→        <span className="pr-8 text-lg font-medium text-zinc-200">{question}</span>
+   223→   223→        <motion.div
+   224→   224→          animate={{ rotate: isOpen ? 45 : 0 }}
+   225→   225→          transition={{ duration: 0.2 }}
+   226→   226→          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/5"
+   227→   227→        >
+   228→   228→          <Plus className="h-4 w-4 text-zinc-400" />
+   229→   229→        </motion.div>
+   230→   230→      </button>
+   231→   231→      <AnimatePresence>
+   232→   232→        {isOpen && (
+   233→   233→          <motion.div
+   234→   234→            initial={{ height: 0, opacity: 0 }}
+   235→   235→            animate={{ height: 'auto', opacity: 1 }}
+   236→   236→            exit={{ height: 0, opacity: 0 }}
+   237→   237→            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+   238→   238→            className="overflow-hidden"
+   239→   239→          >
+   240→   240→            <p className="pb-6 text-base leading-relaxed text-zinc-400">{answer}</p>
+   241→   241→          </motion.div>
+   242→   242→        )}
+   243→   243→      </AnimatePresence>
+   244→   244→    </motion.div>
+   245→   245→  );
+   246→   246→}
+   247→   247→
+   248→   248→// ============================================
+   249→   249→// DASHBOARD MOCKUP COMPONENT
+   250→   250→// ============================================
+   251→   251→function DashboardMockup() {
+   252→   252→  return (
+   253→   253→    <div className="relative mx-auto max-w-4xl">
+   254→   254→      <motion.div
+   255→   255→        initial={{ opacity: 0, y: 40 }}
+   256→   256→        whileInView={{ opacity: 1, y: 0 }}
+   257→   257→        viewport={{ once: true, margin: '-100px' }}
+   258→   258→        transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+   259→   259→        className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/80 shadow-2xl backdrop-blur-xl"
+   260→   260→      >
+   261→   261→        {/* Mockup top bar */}
+   262→   262→        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+   263→   263→          <div className="h-3 w-3 rounded-full bg-red-500/60" />
+   264→   264→          <div className="h-3 w-3 rounded-full bg-yellow-500/60" />
+   265→   265→          <div className="h-3 w-3 rounded-full bg-green-500/60" />
+   266→   266→          <div className="ml-4 flex-1 rounded-md bg-white/5 px-3 py-1">
+   267→   267→            <span className="text-xs text-zinc-500">studydiary.app/dashboard</span>
+   268→   268→          </div>
+   269→   269→        </div>
+   270→   270→
+   271→   271→        {/* Mockup content */}
+   272→   272→        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-3">
+   273→   273→          {/* Sidebar mockup */}
+   274→   274→          <div className="hidden space-y-3 rounded-xl border border-white/5 bg-zinc-950/50 p-4 md:block">
+   275→   275→            <div className="flex items-center gap-2">
+   276→   276→              <BookOpenText className="h-4 w-4 text-[#FF3B30]" />
+   277→   277→              <span className="text-sm font-semibold text-white">Study Diary</span>
+   278→   278→            </div>
+   279→   279→            <div className="space-y-2 pt-4">
+   280→   280→              {['Today', 'Tasks', 'Courses', 'Focus Timer'].map((item, i) => (
+   281→   281→                <div
+   282→   282→                  key={item}
+   283→   283→                  className={`rounded-lg px-3 py-2 text-xs ${
+   284→   284→                    i === 0 ? 'bg-[#FF3B30]/20 text-[#FF3B30]' : 'text-zinc-500'
+   285→   285→                  }`}
+   286→   286→                >
+   287→   287→                  {item}
+   288→   288→                </div>
+   289→   289→              ))}
+   290→   290→            </div>
+   291→   291→          </div>
+   292→   292→
+   293→   293→          {/* Main content mockup */}
+   294→   294→          <div className="space-y-4 md:col-span-2">
+   295→   295→            {/* Greeting */}
+   296→   296→            <div className="rounded-xl border border-[#FF3B30]/10 bg-gradient-to-br from-zinc-900 to-zinc-900/50 p-5">
+   297→   297→              <p className="text-xs text-zinc-500">WEDNESDAY, MARCH 12</p>
+   298→   298→              <p className="mt-1 text-lg font-bold text-white">
+   299→   299→                Good morning, <span className="text-[#FF3B30]">Ahmed</span>.
+   300→   300→              </p>
+   301→   301→              <p className="mt-1 text-sm text-zinc-400">
+   302→   302→                Your next move is Kirchhoff&apos;s Laws in Physics.
+   303→   303→              </p>
+   304→   304→              <div className="mt-3 flex gap-2">
+   305→   305→                <div className="rounded-lg bg-[#FF3B30] px-3 py-1.5 text-xs font-semibold text-white">
+   306→   306→                  Start Next
+   307→   307→                </div>
+   308→   308→                <div className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300">
+   309→   309→                  Focus 25m
+   310→   310→                </div>
+   311→   311→              </div>
+   312→   312→            </div>
+   313→   313→
+   314→   314→            {/* Metrics row */}
+   315→   315→            <div className="grid grid-cols-3 gap-3">
+   316→   316→              {[
+   317→   317→                { label: 'Focus', value: '87%', color: '#FF3B30', icon: Target },
+   318→   318→                { label: 'Progress', value: '60%', color: '#10B981', icon: TrendingUp },
+   319→   319→                { label: 'Streak', value: '12', color: '#F59E0B', icon: Flame },
+   320→   320→              ].map((metric) => (
+   321→   321→                <div
+   322→   322→                  key={metric.label}
+   323→   323→                  className="rounded-xl border border-white/5 bg-zinc-900/50 p-3"
+   324→   324→                >
+   325→   325→                  <div className="flex items-center gap-1.5">
+   326→   326→                    <metric.icon className="h-3 w-3" style={{ color: metric.color }} />
+   327→   327→                    <span
+   328→   328→                      className="text-[10px] font-semibold uppercase tracking-wider"
+   329→   329→                      style={{ color: metric.color }}
+   330→   330→                    >
+   331→   331→                      {metric.label}
+   332→   332→                    </span>
+   333→   333→                  </div>
+   334→   334→                  <p className="mt-2 text-xl font-bold text-white">{metric.value}</p>
+   335→   335→                </div>
+   336→   336→              ))}
+   337→   337→            </div>
+   338→   338→
+   339→   339→            {/* Tasks */}
+   340→   340→            <div className="rounded-xl border border-white/5 bg-zinc-900/50 p-4">
+   341→   341→              <p className="text-xs font-semibold text-zinc-400">TODAY&apos;S MISSION</p>
+   342→   342→              <div className="mt-3 space-y-2">
+   343→   343→                {[
+   344→   344→                  { name: "Kirchhoff's Laws", subject: 'Physics', done: false },
+   345→   345→                  { name: 'Quadratic Equations', subject: 'Math', done: true },
+   346→   346→                  { name: 'Periodic Table Trends', subject: 'Chemistry', done: true },
+   347→   347→                ].map((task) => (
+   348→   348→                  <div key={task.name} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
+   349→   349→                    <div
+   350→   350→                      className={`flex h-5 w-5 items-center justify-center rounded-full ${
+   351→   351→                        task.done ? 'bg-emerald-500/20' : 'border border-zinc-600'
+   352→   352→                      }`}
+   353→   353→                    >
+   354→   354→                      {task.done && <Check className="h-3 w-3 text-emerald-400" />}
+   355→   355→                    </div>
+   356→   356→                    <span
+   357→   357→                      className={`text-xs ${
+   358→   358→                        task.done ? 'text-zinc-500 line-through' : 'text-white'
+   359→   359→                      }`}
+   360→   360→                    >
+   361→   361→                      {task.name}
+   362→   362→                    </span>
+   363→   363→                    <span className="ml-auto text-[10px] text-zinc-600">{task.subject}</span>
+   364→   364→                  </div>
+   365→   365→                ))}
+   366→   366→              </div>
+   367→   367→            </div>
+   368→   368→          </div>
+   369→   369→        </div>
+   370→   370→      </motion.div>
+   371→   371→    </div>
+   372→   372→  );
+   373→   373→}
+   374→   374→
+   375→   375→// ============================================
+   376→   376→// TESTIMONIAL COMPONENT
+   377→   377→// ============================================
+   378→   378→function TestimonialCard({
+   379→   379→  name,
+   380→   380→  grade,
+   381→   381→  text,
+   382→   382→  avatar,
+   383→   383→}: {
+   384→   384→  name: string;
+   385→   385→  grade: string;
+   386→   386→  text: string;
+   387→   387→  avatar: string;
+   388→   388→}) {
+   389→   389→  return (
+   390→   390→    <motion.div
+   391→   391→      variants={staggerItem}
+   392→   392→      className="rounded-2xl border border-white/5 bg-zinc-900/50 p-6 transition-all hover:border-white/10"
+   393→   393→    >
+   394→   394→      <div className="mb-4 flex items-center gap-3">
+   395→   395→        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#FF3B30] to-[#FF6B60] text-sm font-bold text-white">
+   396→   396→          {avatar}
+   397→   397→        </div>
+   398→   398→        <div>
+   399→   399→          <p className="text-sm font-semibold text-white">{name}</p>
+   400→   400→          <p className="text-xs text-zinc-500">{grade}</p>
+   401→   401→        </div>
+   402→   402→      </div>
+   403→   403→      <div className="mb-3 flex gap-1">
+   404→   404→        {[1, 2, 3, 4, 5].map((s) => (
+   405→   405→          <Star key={s} className="h-3.5 w-3.5 fill-[#F59E0B] text-[#F59E0B]" />
+   406→   406→        ))}
+   407→   407→      </div>
+   408→   408→      <p className="text-sm leading-relaxed text-zinc-400">&ldquo;{text}&rdquo;</p>
+   409→   409→    </motion.div>
+   410→   410→  );
+   411→   411→}
+   412→   412→
+   413→   413→// ============================================
+   414→   414→// MAIN LANDING PAGE COMPONENT
+   415→   415→// ============================================
+   416→   416→export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
+   417→   417→  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+   418→   418→  const [scrolled, setScrolled] = useState(false);
+   419→   419→
+   420→   420→  useEffect(() => {
+   421→   421→    const handleScroll = () => setScrolled(window.scrollY > 20);
+   422→   422→    window.addEventListener('scroll', handleScroll, { passive: true });
+   423→   423→    return () => window.removeEventListener('scroll', handleScroll);
+   424→   424→  }, []);
+   425→   425→
+   426→   426→  const navLinks = [
+   427→   427→    { label: 'Features', href: '#features' },
+   428→   428→    { label: 'How It Works', href: '#how-it-works' },
+   429→   429→    { label: 'Pricing', href: '#pricing' },
+   430→   430→    { label: 'FAQ', href: '#faq' },
+   431→   431→  ];
+   432→   432→
+   433→   433→  const handleNavClick = (href: string) => {
+   434→   434→    setMobileMenuOpen(false);
+   435→   435→    const el = document.querySelector(href);
+   436→   436→    if (el) {
+   437→   437→      el.scrollIntoView({ behavior: 'smooth' });
+   438→   438→    }
+   439→   439→  };
+   440→   440→
+   441→   441→  return (
+   442→   442→    <div className="min-h-screen bg-black text-white">
+   443→   443→      {/* ============================================
+   444→   444→          1. NAVBAR
+   445→   445→          ============================================ */}
+   446→   446→      <motion.nav
+   447→   447→        initial={{ y: -20, opacity: 0 }}
+   448→   448→        animate={{ y: 0, opacity: 1 }}
+   449→   449→        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+   450→   450→        className={`fixed top-0 right-0 left-0 z-50 transition-all duration-300 ${
+   451→   451→          scrolled ? 'border-b border-white/5 bg-black/70 backdrop-blur-xl' : 'bg-transparent'
+   452→   452→        }`}
+   453→   453→      >
+   454→   454→        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+   455→   455→          {/* Logo */}
+   456→   456→          <div className="flex items-center gap-2.5">
+   457→   457→            <BookOpenText className="h-7 w-7 text-[#FF3B30]" />
+   458→   458→            <span className="text-lg font-bold tracking-tight">Study Diary</span>
+   459→   459→          </div>
+   460→   460→
+   461→   461→          {/* Desktop Nav Links */}
+   462→   462→          <div className="hidden items-center gap-8 md:flex">
+   463→   463→            {navLinks.map((link) => (
+   464→   464→              <button
+   465→   465→                key={link.href}
+   466→   466→                onClick={() => handleNavClick(link.href)}
+   467→   467→                className="text-sm font-medium text-zinc-400 transition-colors hover:text-white"
+   468→   468→              >
+   469→   469→                {link.label}
+   470→   470→              </button>
+   471→   471→            ))}
+   472→   472→          </div>
+   473→   473→
+   474→   474→          {/* Desktop CTA */}
+   475→   475→          <div className="hidden md:block">
+   476→   476→            <button
+   477→   477→              onClick={onGetStarted}
+   478→   478→              className="rounded-xl bg-[#FF3B30] px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#E0342B] hover:shadow-lg hover:shadow-[#FF3B30]/25 active:scale-95"
+   479→   479→            >
+   480→   480→              Get Started Free
+   481→   481→            </button>
+   482→   482→          </div>
+   483→   483→
+   484→   484→          {/* Mobile hamburger */}
+   485→   485→          <button
+   486→   486→            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+   487→   487→            className="flex h-10 w-10 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-white/5 hover:text-white md:hidden"
+   488→   488→          >
+   489→   489→            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+   490→   490→          </button>
+   491→   491→        </div>
+   492→   492→
+   493→   493→        {/* Mobile Menu */}
+   494→   494→        <AnimatePresence>
+   495→   495→          {mobileMenuOpen && (
+   496→   496→            <motion.div
+   497→   497→              initial={{ opacity: 0, height: 0 }}
+   498→   498→              animate={{ opacity: 1, height: 'auto' }}
+   499→   499→              exit={{ opacity: 0, height: 0 }}
+   500→   500→              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+   501→   501→              className="overflow-hidden border-t border-white/5 bg-black/95 backdrop-blur-xl md:hidden"
+   502→   502→            >
+   503→   503→              <div className="space-y-1 px-4 py-4">
+   504→   504→                {navLinks.map((link) => (
+   505→   505→                  <button
+   506→   506→                    key={link.href}
+   507→   507→                    onClick={() => handleNavClick(link.href)}
+   508→   508→                    className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white"
+   509→   509→                  >
+   510→   510→                    {link.label}
+   511→   511→                  </button>
+   512→   512→                ))}
+   513→   513→                <button
+   514→   514→                  onClick={() => {
+   515→   515→                    setMobileMenuOpen(false);
+   516→   516→                    onGetStarted();
+   517→   517→                  }}
+   518→   518→                  className="mt-2 w-full rounded-xl bg-[#FF3B30] px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-[#E0342B]"
+   519→   519→                >
+   520→   520→                  Get Started Free
+   521→   521→                </button>
+   522→   522→              </div>
+   523→   523→            </motion.div>
+   524→   524→          )}
+   525→   525→        </AnimatePresence>
+   526→   526→      </motion.nav>
+   527→   527→
+   528→   528→      {/* ============================================
+   529→   529→          2. HERO SECTION
+   530→   530→          ============================================ */}
+   531→   531→      <section className="relative overflow-hidden pb-20 pt-28 sm:pt-32 md:pb-28 md:pt-36">
+   532→   532→        {/* Background glow effects */}
+   533→   533→        <div className="pointer-events-none absolute inset-0">
+   534→   534→          <div className="absolute top-0 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-[#FF3B30]/8 blur-[120px]" />
+   535→   535→          <div className="absolute top-40 right-0 h-[400px] w-[400px] rounded-full bg-purple-600/5 blur-[100px]" />
+   536→   536→        </div>
+   537→   537→
+   538→   538→        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   539→   539→          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+   540→   540→            {/* Left: Copy */}
+   541→   541→            <motion.div
+   542→   542→              initial={{ opacity: 0, y: 30 }}
+   543→   543→              animate={{ opacity: 1, y: 0 }}
+   544→   544→              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+   545→   545→            >
+   546→   546→              <motion.div
+   547→   547→                initial={{ opacity: 0, y: 10 }}
+   548→   548→                animate={{ opacity: 1, y: 0 }}
+   549→   549→                transition={{ delay: 0.2, duration: 0.5 }}
+   550→   550→                className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-sm"
+   551→   551→              >
+   552→   552→                <Sparkles className="h-3.5 w-3.5 text-[#FF3B30]" />
+   553→   553→                <span className="text-xs font-medium text-zinc-300">Track · Pace · Complete</span>
+   554→   554→              </motion.div>
+   555→   555→
+   556→   556→              <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
+   557→   557→                Stop Cramming.{' '}
+   558→   558→                <span className="bg-gradient-to-r from-[#FF3B30] to-[#FF6B60] bg-clip-text text-transparent">
+   559→   559→                  Start Tracking.
+   560→   560→                </span>
+   561→   561→              </h1>
+   562→   562→
+   563→   563→              <p className="mt-6 max-w-lg text-lg leading-relaxed text-zinc-400 sm:text-xl">
+   564→   564→                The smartest study planner for FBISE board exam prep. Get a personalized daily
+   565→   565→                plan, track every topic, and build unstoppable momentum — from Chapter 1 to exam
+   566→   566→                day.
+   567→   567→              </p>
+   568→   568→
+   569→   569→              <div className="mt-8 flex flex-wrap items-center gap-4">
+   570→   570→                <button
+   571→   571→                  onClick={onGetStarted}
+   572→   572→                  className="group flex items-center gap-2 rounded-xl bg-[#FF3B30] px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#FF3B30]/25 transition-all hover:bg-[#E0342B] hover:shadow-xl hover:shadow-[#FF3B30]/30 active:scale-95"
+   573→   573→                >
+   574→   574→                  Start Free
+   575→   575→                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+   576→   576→                </button>
+   577→   577→                <button
+   578→   578→                  onClick={() => handleNavClick('#how-it-works')}
+   579→   579→                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-7 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/10 active:scale-95"
+   580→   580→                >
+   581→   581→                  See How It Works
+   582→   582→                </button>
+   583→   583→              </div>
+   584→   584→
+   585→   585→              <div className="mt-8 flex flex-wrap items-center gap-6 text-sm text-zinc-500">
+   586→   586→                <div className="flex items-center gap-1.5">
+   587→   587→                  <Check className="h-4 w-4 text-emerald-500" />
+   588→   588→                  <span>No credit card</span>
+   589→   589→                </div>
+   590→   590→                <div className="flex items-center gap-1.5">
+   591→   591→                  <Check className="h-4 w-4 text-emerald-500" />
+   592→   592→                  <span>FBISE aligned</span>
+   593→   593→                </div>
+   594→   594→                <div className="flex items-center gap-1.5">
+   595→   595→                  <Check className="h-4 w-4 text-emerald-500" />
+   596→   596→                  <span>Works offline</span>
+   597→   597→                </div>
+   598→   598→              </div>
+   599→   599→            </motion.div>
+   600→   600→
+   601→   601→            {/* Right: Hero Image with floating cards */}
+   602→   602→            <FloatingCards />
+   603→   603→          </div>
+   604→   604→        </div>
+   605→   605→      </section>
+   606→   606→
+   607→   607→      {/* ============================================
+   608→   608→          3. TRUSTED BY / SOCIAL BADGES
+   609→   609→          ============================================ */}
+   610→   610→      <section className="border-y border-white/5 bg-zinc-950/30 py-12">
+   611→   611→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   612→   612→          <motion.div
+   613→   613→            variants={sectionVariants}
+   614→   614→            initial="hidden"
+   615→   615→            whileInView="visible"
+   616→   616→            viewport={{ once: true }}
+   617→   617→            className="text-center"
+   618→   618→          >
+   619→   619→            <p className="mb-8 text-sm font-medium uppercase tracking-widest text-zinc-600">
+   620→   620→              Trusted by students across Pakistan
+   621→   621→            </p>
+   622→   622→            <div className="flex flex-wrap items-center justify-center gap-8 text-zinc-600">
+   623→   623→              {[
+   624→   624→                'FBISE Islamabad',
+   625→   625→                'BISE Lahore',
+   626→   626→                'BISE Karachi',
+   627→   627→                'BISE Rawalpindi',
+   628→   628→                'BISE Peshawar',
+   629→   629→              ].map((board) => (
+   630→   630→                <div
+   631→   631→                  key={board}
+   632→   632→                  className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2 text-sm font-medium text-zinc-500"
+   633→   633→                >
+   634→   634→                  <GraduationCap className="h-4 w-4" />
+   635→   635→                  {board}
+   636→   636→                </div>
+   637→   637→              ))}
+   638→   638→            </div>
+   639→   639→          </motion.div>
+   640→   640→        </div>
+   641→   641→      </section>
+   642→   642→
+   643→   643→      {/* ============================================
+   644→   644→          4. PROBLEM SECTION
+   645→   645→          ============================================ */}
+   646→   646→      <section className="scroll-mt-20 bg-zinc-950 py-20 sm:py-28" id="problem">
+   647→   647→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   648→   648→          <motion.div
+   649→   649→            variants={sectionVariants}
+   650→   650→            initial="hidden"
+   651→   651→            whileInView="visible"
+   652→   652→            viewport={{ once: true, margin: '-100px' }}
+   653→   653→          >
+   654→   654→            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/5 px-4 py-1.5">
+   655→   655→              <span className="text-xs font-semibold uppercase tracking-wider text-red-400">
+   656→   656→                The Problem
+   657→   657→              </span>
+   658→   658→            </div>
+   659→   659→            <h2 className="max-w-2xl text-3xl font-extrabold tracking-tight sm:text-4xl">
+   660→   660→              Board prep shouldn&apos;t feel like wandering in the dark.
+   661→   661→            </h2>
+   662→   662→          </motion.div>
+   663→   663→
+   664→   664→          <motion.div
+   665→   665→            variants={staggerContainer}
+   666→   666→            initial="hidden"
+   667→   667→            whileInView="visible"
+   668→   668→            viewport={{ once: true, margin: '-100px' }}
+   669→   669→            className="mt-12 grid gap-6 md:grid-cols-3"
+   670→   670→          >
+   671→   671→            {[
+   672→   672→              {
+   673→   673→                num: '01',
+   674→   674→                text: '389 topics, zero visibility on where you stand',
+   675→   675→                sub: "You don't know what you've covered and what's left. It's overwhelming.",
+   676→   676→              },
+   677→   677→              {
+   678→   678→                num: '02',
+   679→   679→                text: "Watching random YouTube videos isn't a study plan",
+   680→   680→                sub: 'Hours of screen time, no structured progress. Sound familiar?',
+   681→   681→              },
+   682→   682→              {
+   683→   683→                num: '03',
+   684→   684→                text: 'You start strong, lose track by week 2',
+   685→   685→                sub: 'Without a system, motivation fades. You need accountability, not just willpower.',
+   686→   686→              },
+   687→   687→            ].map((item) => (
+   688→   688→              <motion.div
+   689→   689→                key={item.num}
+   690→   690→                variants={staggerItem}
+   691→   691→                className="group relative overflow-hidden rounded-2xl border border-red-500/10 bg-gradient-to-b from-red-950/20 to-zinc-950 p-7 transition-all hover:border-red-500/20"
+   692→   692→              >
+   693→   693→                <div className="pointer-events-none absolute -top-6 -right-6 h-24 w-24 rounded-full bg-red-500/5 blur-2xl transition-all group-hover:bg-red-500/10" />
+   694→   694→                <span className="text-3xl font-black text-red-500/30">{item.num}</span>
+   695→   695→                <h3 className="mt-3 text-lg font-bold text-white">{item.text}</h3>
+   696→   696→                <p className="mt-2 text-sm leading-relaxed text-zinc-500">{item.sub}</p>
+   697→   697→              </motion.div>
+   698→   698→            ))}
+   699→   699→          </motion.div>
+   700→   700→        </div>
+   701→   701→      </section>
+   702→   702→
+   703→   703→      {/* ============================================
+   704→   704→          5. FEATURES SECTION
+   705→   705→          ============================================ */}
+   706→   706→      <section className="scroll-mt-20 py-20 sm:py-28" id="features">
+   707→   707→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   708→   708→          <motion.div
+   709→   709→            variants={sectionVariants}
+   710→   710→            initial="hidden"
+   711→   711→            whileInView="visible"
+   712→   712→            viewport={{ once: true, margin: '-100px' }}
+   713→   713→            className="text-center"
+   714→   714→          >
+   715→   715→            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+   716→   716→              <Zap className="h-3.5 w-3.5 text-[#FF3B30]" />
+   717→   717→              <span className="text-xs font-medium text-zinc-300">Features</span>
+   718→   718→            </div>
+   719→   719→            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+   720→   720→              Everything you need to{' '}
+   721→   721→              <span className="bg-gradient-to-r from-[#FF3B30] to-[#FF6B60] bg-clip-text text-transparent">
+   722→   722→                ace your boards
+   723→   723→              </span>
+   724→   724→            </h2>
+   725→   725→            <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-400">
+   726→   726→              Six powerful tools designed specifically for Pakistani students preparing for FBISE
+   727→   727→              exams.
+   728→   728→            </p>
+   729→   729→          </motion.div>
+   730→   730→
+   731→   731→          <motion.div
+   732→   732→            variants={staggerContainer}
+   733→   733→            initial="hidden"
+   734→   734→            whileInView="visible"
+   735→   735→            viewport={{ once: true, margin: '-100px' }}
+   736→   736→            className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+   737→   737→          >
+   738→   738→            {[
+   739→   739→              {
+   740→   740→                icon: CalendarCheck,
+   741→   741→                title: 'Smart Daily Planner',
+   742→   742→                desc: 'Auto-schedules topics based on your pace and goals. No more deciding what to study — just follow the plan.',
+   743→   743→                color: '#FF3B30',
+   744→   744→              },
+   745→   745→              {
+   746→   746→                icon: Play,
+   747→   747→                title: 'Video + Notes',
+   748→   748→                desc: 'Every topic has curated YouTube lectures and PDF notes. No more searching — everything is organized for you.',
+   749→   749→                color: '#3B82F6',
+   750→   750→              },
+   751→   751→              {
+   752→   752→                icon: Timer,
+   753→   753→                title: 'Focus Timer',
+   754→   754→                desc: 'Built-in Pomodoro timer with 25-minute sessions. Stay laser-focused and track your study hours.',
+   755→   755→                color: '#F59E0B',
+   756→   756→              },
+   757→   757→              {
+   758→   758→                icon: BarChart3,
+   759→   759→                title: 'Progress Tracking',
+   760→   760→                desc: 'Focus score, streaks, and real-time metrics. See exactly where you stand across all subjects.',
+   761→   761→                color: '#10B981',
+   762→   762→              },
+   763→   763→              {
+   764→   764→                icon: WifiOff,
+   765→   765→                title: 'Offline First',
+   766→   766→                desc: "Works without internet. Study on the bus, in the library, anywhere. Syncs when you're back online.",
+   767→   767→                color: '#8B5CF6',
+   768→   768→              },
+   769→   769→              {
+   770→   770→                icon: GraduationCap,
+   771→   771→                title: 'Board Aligned',
+   772→   772→                desc: 'FBISE curriculum for grades 9-12, all groups — Science, Arts, Commerce. Plus major BISE boards.',
+   773→   773→                color: '#EC4899',
+   774→   774→              },
+   775→   775→            ].map((feature) => (
+   776→   776→              <motion.div
+   777→   777→                key={feature.title}
+   778→   778→                variants={staggerItem}
+   779→   779→                className="group relative overflow-hidden rounded-2xl border border-white/5 bg-zinc-900/50 p-7 transition-all hover:border-white/10 hover:bg-zinc-900/80"
+   780→   780→              >
+   781→   781→                {/* Glow */}
+   782→   782→                <div
+   783→   783→                  className="pointer-events-none absolute -top-8 -left-8 h-32 w-32 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+   784→   784→                  style={{ backgroundColor: `${feature.color}15` }}
+   785→   785→                />
+   786→   786→                <div
+   787→   787→                  className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl"
+   788→   788→                  style={{ backgroundColor: `${feature.color}15` }}
+   789→   789→                >
+   790→   790→                  <feature.icon className="h-6 w-6" style={{ color: feature.color }} />
+   791→   791→                </div>
+   792→   792→                <h3 className="text-lg font-bold text-white">{feature.title}</h3>
+   793→   793→                <p className="mt-2 text-sm leading-relaxed text-zinc-400">{feature.desc}</p>
+   794→   794→              </motion.div>
+   795→   795→            ))}
+   796→   796→          </motion.div>
+   797→   797→        </div>
+   798→   798→      </section>
+   799→   799→
+   800→   800→      {/* ============================================
+   801→   801→          6. HOW IT WORKS
+   802→   802→          ============================================ */}
+   803→   803→      <section
+   804→   804→        className="scroll-mt-20 border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28"
+   805→   805→        id="how-it-works"
+   806→   806→      >
+   807→   807→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   808→   808→          <motion.div
+   809→   809→            variants={sectionVariants}
+   810→   810→            initial="hidden"
+   811→   811→            whileInView="visible"
+   812→   812→            viewport={{ once: true, margin: '-100px' }}
+   813→   813→            className="text-center"
+   814→   814→          >
+   815→   815→            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+   816→   816→              <Rocket className="h-3.5 w-3.5 text-[#FF3B30]" />
+   817→   817→              <span className="text-xs font-medium text-zinc-300">How It Works</span>
+   818→   818→            </div>
+   819→   819→            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+   820→   820→              Three steps to exam readiness
+   821→   821→            </h2>
+   822→   822→            <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">
+   823→   823→              From sign-up to study streak — it takes less than 2 minutes.
+   824→   824→            </p>
+   825→   825→          </motion.div>
+   826→   826→
+   827→   827→          <motion.div
+   828→   828→            variants={staggerContainer}
+   829→   829→            initial="hidden"
+   830→   830→            whileInView="visible"
+   831→   831→            viewport={{ once: true, margin: '-100px' }}
+   832→   832→            className="mt-16 grid gap-8 md:grid-cols-3"
+   833→   833→          >
+   834→   834→            {[
+   835→   835→              {
+   836→   836→                step: '1',
+   837→   837→                title: 'Sign Up',
+   838→   838→                desc: 'Enter your grade, board (FBISE, BISE Lahore, etc.), and field — Science, Arts, or Commerce.',
+   839→   839→                icon: Users,
+   840→   840→              },
+   841→   841→              {
+   842→   842→                step: '2',
+   843→   843→                title: 'Get Your Plan',
+   844→   844→                desc: 'An auto-generated daily study schedule appears, customized to your pacing goal — 3, 5, or 6 months.',
+   845→   845→                icon: CalendarCheck,
+   846→   846→              },
+   847→   847→              {
+   848→   848→                step: '3',
+   849→   849→                title: 'Track & Complete',
+   850→   850→                desc: 'Watch lectures, mark topics done, build your streak, and watch your focus score climb every day.',
+   851→   851→                icon: Flame,
+   852→   852→              },
+   853→   853→            ].map((item) => (
+   854→   854→              <motion.div key={item.step} variants={staggerItem} className="group relative text-center">
+   855→   855→                {/* Connector line (desktop) */}
+   856→   856→                {item.step !== '3' && (
+   857→   857→                  <div className="absolute top-12 right-0 hidden h-px w-1/2 bg-gradient-to-r from-white/10 to-transparent md:block" />
+   858→   858→                )}
+   859→   859→                {item.step !== '1' && (
+   860→   860→                  <div className="absolute top-12 left-0 hidden h-px w-1/2 bg-gradient-to-l from-white/10 to-transparent md:block" />
+   861→   861→                )}
+   862→   862→
+   863→   863→                <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-2xl border border-white/10 bg-zinc-900 backdrop-blur-sm transition-all group-hover:border-[#FF3B30]/30 group-hover:bg-[#FF3B30]/5">
+   864→   864→                  <item.icon className="h-10 w-10 text-[#FF3B30]" />
+   865→   865→                </div>
+   866→   866→
+   867→   867→                <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FF3B30]/10 text-sm font-bold text-[#FF3B30]">
+   868→   868→                  {item.step}
+   869→   869→                </div>
+   870→   870→
+   871→   871→                <h3 className="text-xl font-bold text-white">{item.title}</h3>
+   872→   872→                <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-zinc-400">
+   873→   873→                  {item.desc}
+   874→   874→                </p>
+   875→   875→              </motion.div>
+   876→   876→            ))}
+   877→   877→          </motion.div>
+   878→   878→        </div>
+   879→   879→      </section>
+   880→   880→
+   881→   881→      {/* ============================================
+   882→   882→          7. DASHBOARD PREVIEW
+   883→   883→          ============================================ */}
+   884→   884→      <section className="scroll-mt-20 py-20 sm:py-28">
+   885→   885→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   886→   886→          <motion.div
+   887→   887→            variants={sectionVariants}
+   888→   888→            initial="hidden"
+   889→   889→            whileInView="visible"
+   890→   890→            viewport={{ once: true, margin: '-100px' }}
+   891→   891→            className="text-center"
+   892→   892→          >
+   893→   893→            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+   894→   894→              <Star className="h-3.5 w-3.5 text-[#FF3B30]" />
+   895→   895→              <span className="text-xs font-medium text-zinc-300">App Preview</span>
+   896→   896→            </div>
+   897→   897→            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+   898→   898→              Your study command center
+   899→   899→            </h2>
+   900→   900→            <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-400">
+   901→   901→              See everything at a glance — your daily plan, focus metrics, streak, and progress
+   902→   902→              across every subject.
+   903→   903→            </p>
+   904→   904→          </motion.div>
+   905→   905→
+   906→   906→          <div className="mt-12">
+   907→   907→            <DashboardMockup />
+   908→   908→          </div>
+   909→   909→
+   910→   910→          {/* Highlighted metrics */}
+   911→   911→          <motion.div
+   912→   912→            variants={staggerContainer}
+   913→   913→            initial="hidden"
+   914→   914→            whileInView="visible"
+   915→   915→            viewport={{ once: true, margin: '-100px' }}
+   916→   916→            className="mt-12 grid gap-4 sm:grid-cols-3"
+   917→   917→          >
+   918→   918→            {[
+   919→   919→              {
+   920→   920→                icon: Target,
+   921→   921→                label: 'Focus Score',
+   922→   922→                desc: 'Daily completion percentage across all your scheduled tasks',
+   923→   923→                color: '#FF3B30',
+   924→   924→              },
+   925→   925→              {
+   926→   926→                icon: TrendingUp,
+   927→   927→                label: 'Progress Tracking',
+   928→   928→                desc: 'Real-time view of completed topics vs total across every subject',
+   929→   929→                color: '#10B981',
+   930→   930→              },
+   931→   931→              {
+   932→   932→                icon: Flame,
+   933→   933→                label: 'Streak Counter',
+   934→   934→                desc: 'Gamified daily streaks to keep you motivated and consistent',
+   935→   935→                color: '#F59E0B',
+   936→   936→              },
+   937→   937→            ].map((item) => (
+   938→   938→              <motion.div
+   939→   939→                key={item.label}
+   940→   940→                variants={staggerItem}
+   941→   941→                className="rounded-2xl border border-white/5 bg-zinc-900/50 p-6 text-center"
+   942→   942→              >
+   943→   943→                <div
+   944→   944→                  className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl"
+   945→   945→                  style={{ backgroundColor: `${item.color}15` }}
+   946→   946→                >
+   947→   947→                  <item.icon className="h-6 w-6" style={{ color: item.color }} />
+   948→   948→                </div>
+   949→   949→                <h3 className="text-lg font-bold text-white">{item.label}</h3>
+   950→   950→                <p className="mt-2 text-sm text-zinc-400">{item.desc}</p>
+   951→   951→              </motion.div>
+   952→   952→            ))}
+   953→   953→          </motion.div>
+   954→   954→        </div>
+   955→   955→      </section>
+   956→   956→
+   957→   957→      {/* ============================================
+   958→   958→          8. TESTIMONIALS
+   959→   959→          ============================================ */}
+   960→   960→      <section className="border-y border-white/5 bg-zinc-950/50 py-20 sm:py-28">
+   961→   961→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   962→   962→          <motion.div
+   963→   963→            variants={sectionVariants}
+   964→   964→            initial="hidden"
+   965→   965→            whileInView="visible"
+   966→   966→            viewport={{ once: true, margin: '-100px' }}
+   967→   967→            className="text-center"
+   968→   968→          >
+   969→   969→            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+   970→   970→              <MessageCircle className="h-3.5 w-3.5 text-[#FF3B30]" />
+   971→   971→              <span className="text-xs font-medium text-zinc-300">Student Stories</span>
+   972→   972→            </div>
+   973→   973→            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+   974→   974→              Loved by students{' '}
+   975→   975→              <span className="bg-gradient-to-r from-[#FF3B30] to-[#FF6B60] bg-clip-text text-transparent">
+   976→   976→                across Pakistan
+   977→   977→              </span>
+   978→   978→            </h2>
+   979→   979→          </motion.div>
+   980→   980→
+   981→   981→          <motion.div
+   982→   982→            variants={staggerContainer}
+   983→   983→            initial="hidden"
+   984→   984→            whileInView="visible"
+   985→   985→            viewport={{ once: true, margin: '-100px' }}
+   986→   986→            className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+   987→   987→          >
+   988→   988→            {[
+   989→   989→              {
+   990→   990→                name: 'Ahmed Raza',
+   991→   991→                grade: 'Grade 10, FBISE',
+   992→   992→                text: "Study Diary completely changed how I prepare for exams. The daily plan keeps me on track and I've maintained a 15-day streak!",
+   993→   993→                avatar: 'AR',
+   994→   994→              },
+   995→   995→              {
+   996→   996→                name: 'Fatima Noor',
+   997→   997→                grade: 'Grade 9, BISE Lahore',
+   998→   998→                text: "I used to waste hours finding the right YouTube lectures. Now every topic has one ready. My focus score went from 40% to 90%!",
+   999→   999→                avatar: 'FN',
+  1000→  1000→              },
+  1001→  1001→              {
+  1002→  1002→                name: 'Hassan Ali',
+  1003→  1003→                grade: 'Grade 11, FBISE',
+  1004→  1004→                text: "The offline feature is a lifesaver. I study on the bus ride to school and it syncs when I get home. Best study app for Pakistani students.",
+  1005→  1005→                avatar: 'HA',
+  1006→  1006→              },
+  1007→  1007→            ].map((testimonial) => (
+  1008→  1008→              <TestimonialCard key={testimonial.name} {...testimonial} />
+  1009→  1009→            ))}
+  1010→  1010→          </motion.div>
+  1011→  1011→        </div>
+  1012→  1012→      </section>
+  1013→  1013→
+  1014→  1014→      {/* ============================================
+  1015→  1015→          9. STATISTICS / SOCIAL PROOF
+  1016→  1016→          ============================================ */}
+  1017→  1017→      <section className="border-y border-white/5 bg-zinc-950/50 py-16 sm:py-20">
+  1018→  1018→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  1019→  1019→          <motion.div
+  1020→  1020→            variants={staggerContainer}
+  1021→  1021→            initial="hidden"
+  1022→  1022→            whileInView="visible"
+  1023→  1023→            viewport={{ once: true, margin: '-100px' }}
+  1024→  1024→            className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4"
+  1025→  1025→          >
+  1026→  1026→            {[
+  1027→  1027→              { value: 500, suffix: '+', label: 'Active Students' },
+  1028→  1028→              { value: 389, suffix: '+', label: 'Curriculum Topics' },
+  1029→  1029→              { value: 5, suffix: '+', label: 'Subjects Covered' },
+  1030→  1030→              { value: 3, suffix: '', label: 'Pacing Plans' },
+  1031→  1031→            ].map((stat) => (
+  1032→  1032→              <AnimatedStatItem
+  1033→  1033→                key={stat.label}
+  1034→  1034→                value={stat.value}
+  1035→  1035→                suffix={stat.suffix}
+  1036→  1036→                label={stat.label}
+  1037→  1037→              />
+  1038→  1038→            ))}
+  1039→  1039→          </motion.div>
+  1040→  1040→        </div>
+  1041→  1041→      </section>
+  1042→  1042→
+  1043→  1043→      {/* ============================================
+  1044→  1044→          10. PRICING SECTION
+  1045→  1045→          ============================================ */}
+  1046→  1046→      <section className="scroll-mt-20 py-20 sm:py-28" id="pricing">
+  1047→  1047→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  1048→  1048→          <motion.div
+  1049→  1049→            variants={sectionVariants}
+  1050→  1050→            initial="hidden"
+  1051→  1051→            whileInView="visible"
+  1052→  1052→            viewport={{ once: true, margin: '-100px' }}
+  1053→  1053→            className="text-center"
+  1054→  1054→          >
+  1055→  1055→            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+  1056→  1056→              <Crown className="h-3.5 w-3.5 text-[#FF3B30]" />
+  1057→  1057→              <span className="text-xs font-medium text-zinc-300">Pricing</span>
+  1058→  1058→            </div>
+  1059→  1059→            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+  1060→  1060→              Start free, go premium when ready
+  1061→  1061→            </h2>
+  1062→  1062→            <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">
+  1063→  1063→              Basic access is always free. Upgrade to unlock every topic, video, and feature.
+  1064→  1064→            </p>
+  1065→  1065→          </motion.div>
+  1066→  1066→
+  1067→  1067→          <motion.div
+  1068→  1068→            variants={staggerContainer}
+  1069→  1069→            initial="hidden"
+  1070→  1070→            whileInView="visible"
+  1071→  1071→            viewport={{ once: true, margin: '-100px' }}
+  1072→  1072→            className="mx-auto mt-16 grid max-w-4xl gap-6 lg:grid-cols-2"
+  1073→  1073→          >
+  1074→  1074→            {/* Free Plan */}
+  1075→  1075→            <motion.div
+  1076→  1076→              variants={fadeInScale}
+  1077→  1077→              className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 p-8"
+  1078→  1078→            >
+  1079→  1079→              <h3 className="text-xl font-bold text-white">Free</h3>
+  1080→  1080→              <p className="mt-2 text-sm text-zinc-400">Get started with essential features</p>
+  1081→  1081→              <div className="mt-6">
+  1082→  1082→                <span className="text-4xl font-extrabold text-white">
+  1083→  1083→                  {'\u20A8'}0
+  1084→  1084→                </span>
+  1085→  1085→                <span className="text-zinc-500">/forever</span>
+  1086→  1086→              </div>
+  1087→  1087→              <ul className="mt-8 space-y-4">
+  1088→  1088→                {[
+  1089→  1089→                  'Basic topic access',
+  1090→  1090→                  'Limited video lectures',
+  1091→  1091→                  'Limited PDF notes',
+  1092→  1092→                  'Progress tracking',
+  1093→  1093→                  'Focus timer',
+  1094→  1094→                  '1 board plan',
+  1095→  1095→                ].map((item) => (
+  1096→  1096→                  <li key={item} className="flex items-center gap-3 text-sm text-zinc-300">
+  1097→  1097→                    <Check className="h-4 w-4 flex-shrink-0 text-zinc-500" />
+  1098→  1098→                    {item}
+  1099→  1099→                  </li>
+  1100→  1100→                ))}
+  1101→  1101→              </ul>
+  1102→  1102→              <button
+  1103→  1103→                onClick={onGetStarted}
+  1104→  1104→                className="mt-8 w-full rounded-xl border border-white/10 bg-white/5 py-3.5 text-sm font-semibold text-white transition-all hover:bg-white/10 active:scale-[0.98]"
+  1105→  1105→              >
+  1106→  1106→                Get Started Free
+  1107→  1107→              </button>
+  1108→  1108→            </motion.div>
+  1109→  1109→
+  1110→  1110→            {/* Premium Plan */}
+  1111→  1111→            <motion.div
+  1112→  1112→              variants={fadeInScale}
+  1113→  1113→              className="relative overflow-hidden rounded-2xl border border-[#FF3B30]/20 bg-gradient-to-b from-[#FF3B30]/5 to-zinc-900/50 p-8"
+  1114→  1114→            >
+  1115→  1115→              {/* Popular badge */}
+  1116→  1116→              <div className="absolute top-4 right-4 rounded-full bg-[#FF3B30] px-3 py-1 text-xs font-bold text-white">
+  1117→  1117→                Popular
+  1118→  1118→              </div>
+  1119→  1119→
+  1120→  1120→              <h3 className="text-xl font-bold text-white">Premium</h3>
+  1121→  1121→              <p className="mt-2 text-sm text-zinc-400">Unlock everything for your exam prep</p>
+  1122→  1122→              <div className="mt-6">
+  1123→  1123→                <span className="text-4xl font-extrabold text-white">
+  1124→  1124→                  {'\u20A8'}499
+  1125→  1125→                </span>
+  1126→  1126→                <span className="text-zinc-500">/month</span>
+  1127→  1127→              </div>
+  1128→  1128→              <ul className="mt-8 space-y-4">
+  1129→  1129→                {[
+  1130→  1130→                  'All 389+ topics unlocked',
+  1131→  1131→                  'Unlimited video lectures',
+  1132→  1132→                  'Unlimited PDF notes',
+  1133→  1133→                  'Advanced progress analytics',
+  1134→  1134→                  'Focus timer + sessions',
+  1135→  1135→                  'All board plans',
+  1136→  1136→                  'Priority support',
+  1137→  1137→                  'Offline downloads',
+  1138→  1138→                ].map((item) => (
+  1139→  1139→                  <li key={item} className="flex items-center gap-3 text-sm text-zinc-300">
+  1140→  1140→                    <Check className="h-4 w-4 flex-shrink-0 text-[#FF3B30]" />
+  1141→  1141→                    {item}
+  1142→  1142→                  </li>
+  1143→  1143→                ))}
+  1144→  1144→              </ul>
+  1145→  1145→              <button
+  1146→  1146→                onClick={onGetStarted}
+  1147→  1147→                className="mt-8 w-full rounded-xl bg-[#FF3B30] py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#FF3B30]/25 transition-all hover:bg-[#E0342B] hover:shadow-xl hover:shadow-[#FF3B30]/30 active:scale-[0.98]"
+  1148→  1148→              >
+  1149→  1149→                Upgrade to Premium
+  1150→  1150→              </button>
+  1151→  1151→            </motion.div>
+  1152→  1152→          </motion.div>
+  1153→  1153→        </div>
+  1154→  1154→      </section>
+  1155→  1155→
+  1156→  1156→      {/* ============================================
+  1157→  1157→          11. FAQ SECTION
+  1158→  1158→          ============================================ */}
+  1159→  1159→      <section className="scroll-mt-20 border-t border-white/5 bg-zinc-950/50 py-20 sm:py-28" id="faq">
+  1160→  1160→        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+  1161→  1161→          <motion.div
+  1162→  1162→            variants={sectionVariants}
+  1163→  1163→            initial="hidden"
+  1164→  1164→            whileInView="visible"
+  1165→  1165→            viewport={{ once: true, margin: '-100px' }}
+  1166→  1166→            className="text-center"
+  1167→  1167→          >
+  1168→  1168→            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+  1169→  1169→              <Sparkles className="h-3.5 w-3.5 text-[#FF3B30]" />
+  1170→  1170→              <span className="text-xs font-medium text-zinc-300">FAQ</span>
+  1171→  1171→            </div>
+  1172→  1172→            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+  1173→  1173→              Frequently asked questions
+  1174→  1174→            </h2>
+  1175→  1175→          </motion.div>
+  1176→  1176→
+  1177→  1177→          <motion.div
+  1178→  1178→            variants={staggerContainer}
+  1179→  1179→            initial="hidden"
+  1180→  1180→            whileInView="visible"
+  1181→  1181→            viewport={{ once: true, margin: '-100px' }}
+  1182→  1182→            className="mt-12"
+  1183→  1183→          >
+  1184→  1184→            {[
+  1185→  1185→              {
+  1186→  1186→                q: 'Is Study Diary really free?',
+  1187→  1187→                a: 'Yes! The free plan gives you access to basic topics, progress tracking, and the focus timer forever. No credit card required. Upgrade to Premium only when you need full access to all videos and notes.',
+  1188→  1188→              },
+  1189→  1189→              {
+  1190→  1190→                q: 'Which boards and grades are supported?',
+  1191→  1191→                a: 'We support FBISE (Federal Board) and major BISE boards for grades 9-12, covering Science, Arts, and Commerce groups. More boards are being added regularly.',
+  1192→  1192→              },
+  1193→  1193→              {
+  1194→  1194→                q: 'Does it work without internet?',
+  1195→  1195→                a: 'Absolutely. Study Diary is designed to work offline. Your progress is saved locally and syncs automatically when you reconnect. Study anywhere — on the bus, in the library, or at home.',
+  1196→  1196→              },
+  1197→  1197→              {
+  1198→  1198→                q: 'How does the daily planner work?',
+  1199→  1199→                a: 'When you sign up, you choose a pacing goal (3, 5, or 6 months). The planner auto-generates a daily schedule that distributes all topics across your timeline. Just follow the plan — no more guessing what to study.',
+  1200→  1200→              },
+  1201→  1201→              {
+  1202→  1202→                q: 'What does Premium include?',
+  1203→  1203→                a: 'Premium unlocks all 389+ topics with full video lectures, PDF notes, advanced analytics, offline downloads, and priority support. Free users get limited access to videos and notes.',
+  1204→  1204→              },
+  1205→  1205→              {
+  1206→  1206→                q: 'Can I use it on my phone?',
+  1207→  1207→                a: 'Yes! Study Diary is a Progressive Web App (PWA). You can install it on any phone — Android or iPhone — directly from the browser. It works just like a native app with offline support.',
+  1208→  1208→              },
+  1209→  1209→            ].map((item) => (
+  1210→  1210→              <FAQItem key={item.q} question={item.q} answer={item.a} />
+  1211→  1211→            ))}
+  1212→  1212→          </motion.div>
+  1213→  1213→        </div>
+  1214→  1214→      </section>
+  1215→  1215→
+  1216→  1216→      {/* ============================================
+  1217→  1217→          12. FINAL CTA SECTION
+  1218→  1218→          ============================================ */}
+  1219→  1219→      <section className="relative overflow-hidden py-20 sm:py-28">
+  1220→  1220→        {/* Background glow */}
+  1221→  1221→        <div className="pointer-events-none absolute inset-0">
+  1222→  1222→          <div className="absolute top-1/2 left-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#FF3B30]/10 blur-[120px]" />
+  1223→  1223→        </div>
+  1224→  1224→
+  1225→  1225→        <div className="relative z-10 mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+  1226→  1226→          <motion.div
+  1227→  1227→            variants={sectionVariants}
+  1228→  1228→            initial="hidden"
+  1229→  1229→            whileInView="visible"
+  1230→  1230→            viewport={{ once: true, margin: '-100px' }}
+  1231→  1231→          >
+  1232→  1232→            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FF3B30]/20 bg-[#FF3B30]/5 px-4 py-1.5">
+  1233→  1233→              <Rocket className="h-3.5 w-3.5 text-[#FF3B30]" />
+  1234→  1234→              <span className="text-xs font-semibold text-[#FF3B30]">Start Today</span>
+  1235→  1235→            </div>
+  1236→  1236→            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+  1237→  1237→              Your board exam success{' '}
+  1238→  1238→              <span className="bg-gradient-to-r from-[#FF3B30] to-[#FF6B60] bg-clip-text text-transparent">
+  1239→  1239→                starts here
+  1240→  1240→              </span>
+  1241→  1241→            </h2>
+  1242→  1242→            <p className="mx-auto mt-6 max-w-xl text-lg text-zinc-400">
+  1243→  1243→              Join 500+ students who stopped cramming and started tracking. Your personalized
+  1244→  1244→              study plan is 2 minutes away.
+  1245→  1245→            </p>
+  1246→  1246→            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+  1247→  1247→              <button
+  1248→  1248→                onClick={onGetStarted}
+  1249→  1249→                className="group flex items-center gap-2 rounded-xl bg-[#FF3B30] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-[#FF3B30]/25 transition-all hover:bg-[#E0342B] hover:shadow-xl hover:shadow-[#FF3B30]/30 active:scale-95"
+  1250→  1250→              >
+  1251→  1251→                Get Started Free
+  1252→  1252→                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+  1253→  1253→              </button>
+  1254→  1254→            </div>
+  1255→  1255→            <p className="mt-4 text-sm text-zinc-600">No credit card · Free forever plan · 2 min setup</p>
+  1256→  1256→          </motion.div>
+  1257→  1257→        </div>
+  1258→  1258→      </section>
+  1259→  1259→
+  1260→  1260→      {/* ============================================
+  1261→  1261→          13. FOOTER
+  1262→  1262→          ============================================ */}
+  1263→  1263→      <footer className="border-t border-white/5 bg-zinc-950 py-12">
+  1264→  1264→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  1265→  1265→          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+  1266→  1266→            {/* Brand */}
+  1267→  1267→            <div>
+  1268→  1268→              <div className="flex items-center gap-2.5">
+  1269→  1269→                <BookOpenText className="h-6 w-6 text-[#FF3B30]" />
+  1270→  1270→                <span className="text-lg font-bold">Study Diary</span>
+  1271→  1271→              </div>
+  1272→  1272→              <p className="mt-4 text-sm leading-relaxed text-zinc-500">
+  1273→  1273→                The smartest study planner for Pakistani students. Track your curriculum, build
+  1274→  1274→                streaks, and ace your board exams.
+  1275→  1275→              </p>
+  1276→  1276→            </div>
+  1277→  1277→
+  1278→  1278→            {/* Product */}
+  1279→  1279→            <div>
+  1280→  1280→              <h4 className="text-sm font-semibold text-white">Product</h4>
+  1281→  1281→              <ul className="mt-4 space-y-3">
+  1282→  1282→                {['Features', 'Pricing', 'How It Works', 'FAQ'].map((item) => (
+  1283→  1283→                  <li key={item}>
+  1284→  1284→                    <button
+  1285→  1285→                      onClick={() => {
+  1286→  1286→                        const href =
+  1287→  1287→                          item === 'Features'
+  1288→  1288→                            ? '#features'
+  1289→  1289→                            : item === 'Pricing'
+  1290→  1290→                              ? '#pricing'
+  1291→  1291→                              : item === 'How It Works'
+  1292→  1292→                                ? '#how-it-works'
+  1293→  1293→                                : '#faq';
+  1294→  1294→                        handleNavClick(href);
+  1295→  1295→                      }}
+  1296→  1296→                      className="text-sm text-zinc-500 transition-colors hover:text-white"
+  1297→  1297→                    >
+  1298→  1298→                      {item}
+  1299→  1299→                    </button>
+  1300→  1300→                  </li>
+  1301→  1301→                ))}
+  1302→  1302→              </ul>
+  1303→  1303→            </div>
+  1304→  1304→
+  1305→  1305→            {/* Boards */}
+  1306→  1306→            <div>
+  1307→  1307→              <h4 className="text-sm font-semibold text-white">Boards</h4>
+  1308→  1308→              <ul className="mt-4 space-y-3">
+  1309→  1309→                {['FBISE Islamabad', 'BISE Lahore', 'BISE Karachi', 'BISE Rawalpindi'].map(
+  1310→  1310→                  (item) => (
+  1311→  1311→                    <li key={item}>
+  1312→  1312→                      <span className="text-sm text-zinc-500">{item}</span>
+  1313→  1313→                    </li>
+  1314→  1314→                  )
+  1315→  1315→                )}
+  1316→  1316→              </ul>
+  1317→  1317→            </div>
+  1318→  1318→
+  1319→  1319→            {/* Support */}
+  1320→  1320→            <div>
+  1321→  1321→              <h4 className="text-sm font-semibold text-white">Support</h4>
+  1322→  1322→              <ul className="mt-4 space-y-3">
+  1323→  1323→                {['Contact Us', 'Privacy Policy', 'Terms of Service', 'Help Center'].map(
+  1324→  1324→                  (item) => (
+  1325→  1325→                    <li key={item}>
+  1326→  1326→                      <span className="text-sm text-zinc-500">{item}</span>
+  1327→  1327→                    </li>
+  1328→  1328→                  )
+  1329→  1329→                )}
+  1330→  1330→              </ul>
+  1331→  1331→            </div>
+  1332→  1332→          </div>
+  1333→  1333→
+  1334→  1334→          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 sm:flex-row">
+  1335→  1335→            <p className="text-sm text-zinc-600">
+  1336→  1336→              &copy; {new Date().getFullYear()} Study Diary. Built for Pakistani students.
+  1337→  1337→            </p>
+  1338→  1338→            <div className="flex items-center gap-1 text-sm text-zinc-600">
+  1339→  1339→              Made with <Heart className="h-3.5 w-3.5 fill-[#FF3B30] text-[#FF3B30]" /> in Pakistan
+  1340→  1340→            </div>
+  1341→  1341→          </div>
+  1342→  1342→        </div>
+  1343→  1343→      </footer>
+  1344→  1344→    </div>
+  1345→  1345→  );
+  1346→  1346→}
+  1347→  1347→
