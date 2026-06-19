@@ -447,7 +447,7 @@ export async function fetchCurriculumFromSheet(forceRefresh = false): Promise<Sh
         topicName: String(row[7] || '').trim(),
         videoLink: String(row[8] || '').trim(),
         pdfLink: String(row[9] || '').trim(),
-        isFree: String(row[10] || 'FALSE').trim().toLowerCase() !== 'true', // is_paid=TRUE means NOT free
+        isFree: String(row[10] || 'FALSE').trim().toLowerCase() === 'true', // is_paid=TRUE = free preview (accessible to all)
         totalDays: parseInt(String(row[11] || '0'), 10) || 0,
         subjectColor: String(row[12] || '').trim(),
         groupEligibility: String(row[13] || 'Both').trim(),
