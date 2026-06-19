@@ -92,3 +92,25 @@ Stage Summary:
 - User 03335041266 verified: status=paid, can access all premium content
 - is_paid column properly inverted to isFree in curriculum parsing
 - Special Courses now fetched via gviz API (was failing with GID-based CSV)
+
+---
+Task ID: 1
+Agent: main
+Task: Fix FBISE students seeing 18-25 chapters instead of 8-9
+
+Work Log:
+- Investigated the root cause: buildCurriculumHierarchy() grouped by subject+grade only, ignoring board
+- Google Sheets has 1029 rows for "BISE Abbottabad" and 422 rows for "FBISE" — same grade/subject but different boards
+- When merged, FBISE Grade 9 Biology showed 18 chapters (10 FBISE + 9 BISE Abbottabad), Chemistry showed 25 (17 + 8), etc.
+- Fixed sheet-sync.ts: Changed grouping key from subject|||grade to subject|||grade|||board
+- Fixed makeSubjectId() to include board in the ID (e.g., subj_physics_grade9_fbise)
+- Fixed /api/data/route.ts to filter subjects by board when student has a board set
+- Verified fix with real data: FBISE Grade 9 now shows correct chapter counts (10, 17, 11, 9)
+- Pushed to both GitHub remotes for Vercel auto-deployment
+
+Stage Summary:
+- Root cause: curriculum grouping ignored board column, merging chapters from different boards
+- Fix: Include board in grouping key, subjectId, and API filtering
+- FBISE Grade 9 before: Biology 18ch, Chemistry 25ch, Maths 27ch, Physics 16ch
+- FBISE Grade 9 after: Biology 10ch, Chemistry 17ch, Maths 11ch, Physics 9ch
+- Code pushed to GitHub, Vercel will auto-deploy
