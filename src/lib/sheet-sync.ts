@@ -495,9 +495,10 @@ export function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-export function makeSubjectId(subjectName: string, grade: string): string {
+export function makeSubjectId(subjectName: string, grade: string, board: string): string {
   const g = grade.startsWith('Grade') ? grade : `Grade ${grade}`;
-  return `subj_${normalizeName(subjectName)}_${normalizeName(g)}`;
+  const b = normalizeName(board);
+  return `subj_${normalizeName(subjectName)}_${normalizeName(g)}_${b}`;
 }
 
 export function makeChapterId(subjectId: string, chapterNo: number): string {
@@ -565,10 +566,10 @@ export async function buildCurriculumHierarchy(forceRefresh = false): Promise<Bu
   const curriculum = await fetchCurriculumFromSheet(forceRefresh);
   if (curriculum.length === 0) return [];
 
-  // Group by subject+grade
+  // Group by subject+grade+board (prevents merging chapters from different boards)
   const subjectGroups = new Map<string, SheetCurriculumRow[]>();
   for (const row of curriculum) {
-    const key = `${row.subject}|||${row.grade}`;
+    const key = `${row.subject}|||${row.grade}|||${row.board}`;
     if (!subjectGroups.has(key)) subjectGroups.set(key, []);
     subjectGroups.get(key)!.push(row);
   }
@@ -576,13 +577,13 @@ export async function buildCurriculumHierarchy(forceRefresh = false): Promise<Bu
   const subjects: BuiltSubject[] = [];
 
   for (const [subjectKey, rows] of subjectGroups) {
-    const [subjectName, grade] = subjectKey.split('|||');
+    const [subjectName, grade, board] = subjectKey.split('|||');
     const firstRow = rows[0];
-    const board = firstRow.board || 'BISE Abbottabad';
+    const normalizedBoard = board || firstRow.board || 'BISE Abbottabad';
     const field = firstRow.field || 'Science';
     const styling = SUBJECT_STYLING[subjectName] || { color: 'Gray', icon: '📚', order: 99 };
     const gradeDisplay = grade.startsWith('Grade') ? grade : `Grade ${grade}`;
-    const subjectId = makeSubjectId(subjectName, gradeDisplay);
+    const subjectId = makeSubjectId(subjectName, gradeDisplay, normalizedBoard);
 
     // Group by chapter
     const chapterGroups = new Map<string, SheetCurriculumRow[]>();
@@ -616,7 +617,7 @@ export async function buildCurriculumHierarchy(forceRefresh = false): Promise<Bu
       id: subjectId,
       name: subjectName,
       grade: gradeDisplay,
-      board,
+      board: normalizedBoard,
       field,
       totalTopics: rows.length,
       chapterCount: chapterGroups.size,

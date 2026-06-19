@@ -101,11 +101,24 @@ export async function GET(request: Request) {
       dateCompleted: p.date_completed || '',
     }));
 
-    // ─── STEP 4: Filter subjects by grade ──────────────────────────────
+    // ─── STEP 4: Filter subjects by grade AND board ──────────────────────────
     const gradeVariants = [studentGrade, `Grade ${studentGrade}`];
     const gradeSet = new Set(gradeVariants);
+    const studentBoard = String((student as Record<string, unknown>)?.board || '');
 
-    const filteredSubjects = subjects.filter(s => gradeSet.has(s.grade));
+    let filteredSubjects = subjects.filter(s => gradeSet.has(s.grade));
+
+    // If student has a specific board, filter to only show that board's curriculum
+    // (prevents merging chapters from FBISE + BISE Abbottabad etc.)
+    if (studentBoard) {
+      const boardMatches = filteredSubjects.filter(s =>
+        s.board.toLowerCase() === studentBoard.toLowerCase()
+      );
+      // Only use board filtering if it yields results; otherwise fall back to grade-only
+      if (boardMatches.length > 0) {
+        filteredSubjects = boardMatches;
+      }
+    }
 
     // ─── STEP 5: Filter by Group_Eligibility ───────────────────────────
     // Map academic group names: "Pre-Medical" → "Biology", "Pre-Engineering" → "Mathematics"
