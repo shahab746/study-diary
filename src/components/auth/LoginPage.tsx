@@ -191,7 +191,7 @@ function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
             type="tel"
             value={phone}
             onChange={(e) => { setPhone(e.target.value); setError(''); }}
-            placeholder="03XXXXXXXXX"
+            placeholder="03XXXXXXXXX / 05XXXXXXXX"
             style={inputStyle}
             onFocus={handleFocus}
             onBlur={handleBlur}
@@ -369,8 +369,8 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
       setError('Please enter your full name (at least 2 characters).');
       return;
     }
-    if (!/^\d{11}$/.test(phone.trim())) {
-      setError('Phone number must be exactly 11 digits (e.g., 03XXXXXXXXX).');
+    if (!/^\d{9,12}$/.test(phone.trim())) {
+      setError('Phone number must be 9-12 digits.');
       return;
     }
     if (!/^\d{4,6}$/.test(pin.trim())) {
@@ -443,7 +443,7 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
 
   // Validation indicators
   const nameValid = name.trim().length >= 2;
-  const phoneValid = /^\d{11}$/.test(phone.trim());
+  const phoneValid = /^\d{9,12}$/.test(phone.trim());
   const pinValid = /^\d{4,6}$/.test(pin.trim());
   const confirmPinValid = confirmPin === pin && pin.length > 0;
 
@@ -512,7 +512,7 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             type="tel"
             value={phone}
             onChange={(e) => { setPhone(e.target.value); setError(''); }}
-            placeholder="03XXXXXXXXX"
+            placeholder="03XXXXXXXXX / 05XXXXXXXX"
             style={inputStyle}
             onFocus={handleFocus}
             onBlur={handleBlur}

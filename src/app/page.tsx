@@ -626,7 +626,7 @@ function TodayView({ onNewTask, onFocusTimer }: { onNewTask: () => void; onFocus
                 <div style={{ fontSize: 12, color: '#8E8E93' }}>{task.subjectName} · {task.chapterName}</div>
               </div>
               <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor, flexShrink: 0 }}>
-                {task.subjectName} · D{task.dayNumber}
+                {task.subjectName}
               </span>
             </div>
           ))}
@@ -710,7 +710,7 @@ function TasksView({ onNewTask }: { onNewTask: () => void }) {
               <div className="task-meta">
                 <span>{task.subjectName} · {task.chapterName}</span>
                 <span className="task-course-badge" style={{ background: `${task.subjectColor}22`, color: task.subjectColor }}>
-                  D{task.dayNumber}
+                  {task.subjectName}
                 </span>
               </div>
             </div>
@@ -1134,11 +1134,7 @@ function SubjectDetailView({ subjectId, onBack }: { subjectId: string; onBack: (
                       {topic.name}
                     </div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {topic.dayNumber > 0 && (
-                        <span className="difficulty-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>
-                          Day {topic.dayNumber}
-                        </span>
-                      )}
+
                       {isLockedForUser && (
                         <span style={{
                           fontSize: 10,

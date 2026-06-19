@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS, TodayTask } from '@/lib/store';
 import { useState, useRef } from 'react';
-import { Check, ChevronRight, ExternalLink, Clock } from 'lucide-react';
+import { Check, ChevronRight, ExternalLink } from 'lucide-react';
 
 const COLOR_STYLES: Record<string, string> = {
   'Blue': 'border-l-blue-500',
@@ -95,8 +95,6 @@ function MissionNode({ task, onToggle }: { task: TodayTask; onToggle: (id: strin
         {/* Day badge + links */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-            <Clock className="w-3 h-3" />
-            <span>Day {task.dayNumber}</span>
           </div>
           {task.videoLink && (
             <a

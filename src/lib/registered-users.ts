@@ -261,8 +261,8 @@ export async function registerUser(input: {
   if (cleanName.length > 40) {
     return { success: false, error: 'Name must be 40 characters or less.' };
   }
-  if (!/^\d{11}$/.test(cleanPhone)) {
-    return { success: false, error: 'Phone number must be exactly 11 digits (e.g., 03XXXXXXXXX).' };
+  if (!/^\d{9,12}$/.test(cleanPhone)) {
+    return { success: false, error: 'Phone number must be 9-12 digits.' };
   }
   if (!/^\d{4,6}$/.test(cleanPin)) {
     return { success: false, error: 'PIN must be 4-6 digits.' };

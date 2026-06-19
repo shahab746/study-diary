@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudyOS, SubjectDetail, SubjectDetailChapter, SubjectDetailTopic } from '@/lib/store';
-import { Check, ChevronDown, ArrowLeft, Play, FileText, Clock, BookOpen, Zap } from 'lucide-react';
+import { Check, ChevronDown, ArrowLeft, Play, FileText, BookOpen, Zap } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
@@ -117,10 +117,6 @@ function TopicRow({
           {topic.name}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
-            <Clock className="w-2.5 h-2.5" />
-            Day {topic.dayNumber}
-          </span>
         </div>
       </div>
 
